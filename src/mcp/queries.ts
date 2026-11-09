@@ -19,6 +19,17 @@ const MAX_DEPTH = 3;
 // passed as a callback or registered as a handler, a macro expansion, a dispatch candidate and a dynamic rebinding.
 const DEPENDENCY_KINDS = ['calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'may_dispatch_to', 'rebinds'] as const;
 
+// One row per calling definition and relation kind, however many sites it has: its strongest edge (earliest site on a
+// tie), with the number of sites in the detail.
+function callerRows(g: Graph, edges: GraphEdge[]): Row[] {
+  const byCaller = new Map<string, GraphEdge[]>();
+  for (const e of edges) byCaller.set(`${e.kind}\0${e.from}`, [...(byCaller.get(`${e.kind}\0${e.from}`) ?? []), e]);
+  return [...byCaller.values()].map((sites) => {
+    const [best] = [...sites].sort((a, b) => BANDS.indexOf(a.band) - BANDS.indexOf(b.band) || compareText(a.file, b.file) || (a.line ?? 0) - (b.line ?? 0));
+    return edgeRow(g, best.from, best, sites.length > 1 ? { detail: `${sites.length} sites, strongest shown` } : {});
+  });
+}
+
 export function callers(g: Graph, query: string, opts: { includeReferences?: boolean } = {}): QueryResult {
   const title = `callers of ${query}`;
   const hits = resolve(g, ['definition'], query);
@@ -26,11 +37,16 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
   if (hits.length > 1) return ambiguous('callers', query, title, hits, 'var');
   const target = hits[0];
   const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
-  const rows = inEdges(g, target.id, kinds).map((e) => {
-    const r = edgeRow(g, e.from, e);
-    return { ...r, cross: !!r.component && r.component !== target.component };
-  });
+  const rows = callerRows(g, inEdges(g, target.id, kinds)).map((r) => ({ ...r, cross: !!r.component && r.component !== target.component }));
   rows.sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)];
+  if (!opts.includeReferences) {
+    const called = new Set(rows.map((r) => r.id));
+    const referencing = new Set(inEdges(g, target.id, DEPENDENCY_KINDS).map((e) => e.from).filter((from) => !called.has(from)));
+    if (referencing.size) {
+      notes.push(`${referencing.size} more definition(s) reference it without calling it (value use, callback, handler, macro, dispatch, rebinding): pass include_references=true to list them`);
+    }
+  }
   const comps = new Set(rows.map((r) => r.component ?? '(no component)'));
   const entries = rows.filter((r) => r.entry).length;
   return {
@@ -45,7 +61,7 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
       { name: opts.includeReferences ? 'callers and references' : 'callers', rows, searched: 'call edges into this definition' },
     ],
     counts: countBy(rows, (r) => r.component ?? '(no component)'),
-    notes: [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)],
+    notes,
     next: [call('blast_radius', { var: target.name, depth: 2 }), call('tests_for', { symbol: target.name })],
   };
 }

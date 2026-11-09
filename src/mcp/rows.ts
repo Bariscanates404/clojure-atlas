@@ -67,7 +67,8 @@ export function entryOf(g: Graph, id: string): string | undefined {
   return undefined;
 }
 
-const fanInOf = (g: Graph, id: string) => inEdges(g, id, ['calls']).length;
+// distinct calling definitions, not call sites
+const fanInOf = (g: Graph, id: string) => new Set(inEdges(g, id, ['calls']).map((e) => e.from)).size;
 
 export function edgeRow(g: Graph, nodeId: string, e: GraphEdge, extra: Partial<Row> = {}): Row {
   const n = g.byId.get(nodeId);

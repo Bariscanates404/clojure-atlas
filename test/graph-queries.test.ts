@@ -83,6 +83,34 @@ describe('callers', () => {
     assert.ok(labels(callers(g, 'core/save', { includeReferences: true })).includes('api/ref'));
   });
 
+  it('counts a caller once however many call sites it has, and agrees with blast radius', () => {
+    const x = new GraphBuilder();
+    const t = x.def('a/t');
+    const c = x.def('a/c');
+    const d = x.def('a/d');
+    x.edge(c, 'calls', t).edge(c, 'calls', t, { band: 'heuristic' }).edge(c, 'calls', t).edge(d, 'calls', t);
+    const gx = x.build();
+    const r = callers(gx, 'a/t');
+    assert.match(r.verdict, /^2 direct caller\(s\)/);
+    assert.deepEqual(labels(r, 'callers').sort(), ['a/c', 'a/d']);
+    assert.equal(rows(r, 'callers').find((y) => y.label === 'a/c')?.band, 'static_proven', 'the strongest band of its sites');
+    assert.match(rows(r, 'callers').find((y) => y.label === 'a/c')?.detail ?? '', /3 sites/);
+    assert.match(blastRadius(gx, 'a/t').verdict, /^2 caller\(s\)/);
+  });
+
+  it('a definition only referenced or passed as a callback says so instead of reading as unused', () => {
+    const r = callers(g, 'core/save');
+    assert.match(r.notes.join(' '), /1 more definition\(s\) reference it without calling it.*include_references/);
+    assert.doesNotMatch(callers(g, 'core/save', { includeReferences: true }).notes.join(' '), /reference it without calling it/);
+    assert.doesNotMatch(callers(g, 'ui/a').notes.join(' '), /without calling it/);
+    const x = new GraphBuilder();
+    const cb = x.def('a/cb');
+    x.edge(x.def('a/user'), 'passes_callback', cb);
+    const only = callers(x.build(), 'a/cb');
+    assert.match(only.verdict, /^0 direct caller/);
+    assert.match(only.notes.join(' '), /1 more definition\(s\) reference it/);
+  });
+
   it('a definition nobody calls has an empty, found answer', () => {
     const r = callers(g, 'ui/a');
     assert.ok(r.found);
