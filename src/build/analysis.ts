@@ -131,6 +131,8 @@ function reFrame(r: Raw): ReFrameContext | undefined {
   };
 }
 
+const CURRENT_NS = '__current-ns__';
+
 // One kondo JSON document (one `--lint` run) to the normalized model.
 export function normalize(raw: Raw): Analysis {
   const a = (raw.analysis ?? {}) as Raw;
@@ -184,9 +186,11 @@ export function normalize(raw: Raw): Analysis {
       .filter((r) => !inNsForm(s(r.filename) ?? '', n(r.row) ?? 0, n(r.col) ?? 0))
       .map((r): Keyword => {
         const rf = reFrame(r);
+        // kondo spells the namespace of #::{...} keys as a placeholder: it is the namespace the keyword is written in
+        const ns = s(r.ns) === CURRENT_NS ? s(r.from) : s(r.ns);
         return {
           ...span(r),
-          ...(s(r.ns) ? { ns: s(r.ns) } : {}),
+          ...(ns ? { ns } : {}),
           name: s(r.name) ?? '',
           from: s(r.from) ?? '',
           ...(s(r['from-var']) ? { fromVar: s(r['from-var']) } : {}),

@@ -3,7 +3,7 @@
 // attribute keyword is a reference of UNKNOWN role whose context the attribute_usage tool ranks.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { keywordName } from '../analysis.ts';
-import { flatChildren, formAt, kids, unwrap, walk, type Form } from '../reader.ts';
+import { flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import type { Adapter, Context, Owner } from '../model.ts';
 
 const DB_LIBS: Record<string, string> = {
@@ -13,10 +13,33 @@ const WRITES = new Set(['transact', 'transact!', 'transact-async', 'with', 'db-w
 const READS = new Set(['q', 'query', 'qseq', 'pull', 'pull-many', 'entity', 'entity-history', 'datoms', 'seek-datoms', 'index-range']);
 const RESERVED = /^:(db|db\.[a-z]+|xt|xtdb\.api|crux\.db|crux\.tx|fressian)\//;
 const TX_OPS = /^:(db\/(add|retract|cas)|db\.fn\/[a-z]+|xtdb\.api\/(put|delete|match)|xt\/(put|delete|match))$/;
+// the operations whose third element is an attribute; the others take functions, ids or documents there
+const ATTRIBUTE_OPS = /^:db\/(add|retract|cas)$/;
 
 const attributeId = (kind: string, name: string) => `${kind}:${name}`;
 
+// The name of a keyword form. A key of #:ns{...} is written without its namespace; kondo resolves it in code but an
+// edn file has no analysis, so the prefix is applied here (#::{} and #::alias{} need the code's own resolution).
+function keywordIn(ctx: Context, file: string, f: Form): string {
+  const name = ctx.nameOf(file, f);
+  const at = ctx.parentOf(file, f.row, f.col);
+  const prefix = at && at.parent.t === 'map' && at.index % 2 === 0 ? at.parent.ns : undefined;
+  return forwardName(prefix && !prefix.startsWith(':') && !name.includes('/') ? `:${prefix}/${name.slice(1)}` : name);
+}
+
+// :ns/_attr follows :ns/attr backwards: it is a use of that attribute
+const forwardName = (name: string): string => name.replace(/^(:[^/]+)\/_/, '$1/');
+
 const isKeyword = (f: Form) => unwrap(f).t === 'keyword';
+
+// The datomic client takes {:tx-data [...]}: the transaction is its value, the key is the argument's.
+function txData(name: (f: Form) => string, arg: Form): Form {
+  const u = unwrap(arg);
+  if (u.t !== 'map') return arg;
+  const xs = flatChildren(u);
+  const at = xs.findIndex((x, k) => k % 2 === 0 && isKeyword(x) && name(unwrap(x)) === ':tx-data');
+  return at >= 0 ? xs[at + 1] : arg;
+}
 
 // Keyword forms that name attributes in transaction data: map keys (nested maps included) and the attribute slot of
 // an operation vector such as [:db/add e :attr v].
@@ -29,28 +52,69 @@ function txAttributes(name: (f: Form) => string, f: Form): Form[] {
   if (u.t === 'vector' || u.t === 'list') {
     const xs = flatChildren(u);
     if (xs[0] && isKeyword(xs[0]) && TX_OPS.test(name(unwrap(xs[0])))) {
-      return [...(xs[2] && isKeyword(xs[2]) ? [unwrap(xs[2])] : []), ...xs.slice(1).flatMap((x) => (unwrap(x).t === 'map' ? txAttributes(name, x) : []))];
+      return [...(xs[2] && isKeyword(xs[2]) && ATTRIBUTE_OPS.test(name(unwrap(xs[0]))) ? [unwrap(xs[2])] : []), ...xs.slice(1).flatMap((x) => (unwrap(x).t === 'map' ? txAttributes(name, x) : []))];
     }
     return xs.flatMap((x) => txAttributes(name, x));
   }
   return [];
 }
 
-// Keyword forms a query or pull reads: the attribute slot of a data pattern [?e :attr ?v] and every key of a pull
-// pattern; :find, :in and value positions are not attributes.
+const isLogicVar = (f: Form | undefined): boolean => !!f && unwrap(f).t === 'symbol' && /^(\?|_$)/.test(textOf(unwrap(f)) ?? '');
+const isSource = (f: Form | undefined): boolean => !!f && unwrap(f).t === 'symbol' && /^\$/.test(textOf(unwrap(f)) ?? '');
+const keywordsOf = (fs: readonly (Form | undefined)[]): Form[] => fs.flatMap((f) => (f && isKeyword(f) ? [unwrap(f)] : []));
+
+// The attribute of a data pattern [?e :attr ?v] or [$ ?e :attr ?v]. A constant entity (an id, or an ident that is no
+// attribute) only makes a pattern when the value is a variable, which a pull pattern never holds.
+function dataPatternAttribute(xs: readonly Form[]): Form[] | undefined {
+  const [e, a, v] = isSource(xs[0]) ? xs.slice(1) : xs;
+  if (isLogicVar(e) || isSource(xs[0])) return keywordsOf([a]);
+  const constant = e && ['number', 'keyword'].includes(unwrap(e).t);
+  return constant && isLogicVar(v) ? keywordsOf([a]) : undefined;
+}
+
+// The attribute a function clause reads: [(get-else $ ?e :attr default) ?v], get-some (one or more) and missing?.
+function clauseAttributes(xs: readonly Form[]): Form[] {
+  const args = isSource(xs[1]) ? xs.slice(2) : xs.slice(1);
+  const head = textOf(unwrap(xs[0]));
+  if (head === 'get-some') return keywordsOf(args.slice(1));
+  return head === 'get-else' || head === 'missing?' ? keywordsOf([args[1]]) : [];
+}
+
+// The attribute of a pull attribute expression: (:attr :as "x"), (limit :attr 10), (default :attr 0).
+function pullExpression(list: Form): Form[] {
+  const xs = flatChildren(list);
+  if (xs[0] && isKeyword(xs[0])) return keywordsOf([xs[0]]);
+  return /^(limit|default)$/.test(textOf(xs[0] && unwrap(xs[0])) ?? '') ? keywordsOf([xs[1]]) : readAttributes(list);
+}
+
+// Keyword forms a query or pull reads: the attribute slot of a data pattern and of the function clauses, every key
+// of a pull pattern and the attributes of its expressions; :find, :in and value positions are not attributes.
 function readAttributes(f: Form): Form[] {
   const u = unwrap(f);
   if (u.t !== 'vector' && u.t !== 'list' && u.t !== 'map') return [];
   const xs = flatChildren(u);
-  if (u.t === 'vector' && xs[0] && unwrap(xs[0]).t === 'symbol') {
-    const first = (unwrap(xs[0]) as { text: string }).text;
-    const slot = first.startsWith('$') ? 2 : 1;
-    if (/^[?_$]/.test(first)) return xs[slot] && isKeyword(xs[slot]) ? [unwrap(xs[slot])] : [];
+  if (u.t === 'list' && /^(get-else|get-some|missing\?)$/.test(textOf(unwrap(xs[0] ?? u)) ?? '')) return clauseAttributes(xs);
+  if (u.t === 'vector') {
+    const pattern = dataPatternAttribute(xs);
+    if (pattern) return pattern;
   }
-  if (u.t === 'vector' && xs.length && xs.every((x) => ['keyword', 'map', 'symbol', 'list', 'vector'].includes(unwrap(x).t)) && xs.some(isKeyword) && !xs.some((x) => /^:(find|where|in|keys)$/.test((unwrap(x) as { text?: string }).text ?? ''))) {
-    return xs.flatMap((x) => (isKeyword(x) ? [unwrap(x)] : unwrap(x).t === 'map' ? flatChildren(unwrap(x)).flatMap((y, k) => (k % 2 === 0 && isKeyword(y) ? [unwrap(y)] : readAttributes(y))) : readAttributes(x)));
+  if (u.t === 'vector' && xs.length && !xs.some(isLogicVar) && xs.every((x) => ['keyword', 'map', 'symbol', 'list', 'vector'].includes(unwrap(x).t)) && xs.some((x) => isKeyword(x) || unwrap(x).t === 'list') && !xs.some((x) => /^:(find|where|in|keys)$/.test((unwrap(x) as { text?: string }).text ?? ''))) {
+    return xs.flatMap((x) => {
+      const y = unwrap(x);
+      if (y.t === 'keyword') return [y];
+      if (y.t === 'list') return pullExpression(y);
+      return y.t === 'map' ? flatChildren(y).flatMap((z, k) => (k % 2 === 0 && isKeyword(z) ? [unwrap(z)] : readAttributes(z))) : readAttributes(x);
+    });
   }
   return xs.flatMap(readAttributes);
+}
+
+// The attribute a call names by position: (index-range db :attr start end), (datoms db :aevt :attr), (datoms db :eavt e :attr).
+function positionalAttributes(name: string, args: readonly Form[]): Form[] {
+  if (name === 'index-range') return keywordsOf([args[1]]);
+  if (name !== 'datoms' && name !== 'seek-datoms') return [];
+  const index = args[1] && textOf(unwrap(args[1]));
+  return index === ':aevt' || index === ':avet' ? keywordsOf([args[2]]) : index === ':eavt' ? keywordsOf([args[3]]) : [];
 }
 
 const isQueryLiteral = (f: Form): boolean => {
@@ -113,7 +177,7 @@ export const dataAttributes: Adapter = {
   },
   run: (ctx: Context, owner: Owner) => {
     const nsOf = new Map(ctx.analysis.nsDefs.map((d) => [d.file, d.name]));
-    const nameIn = (file: string) => (f: Form) => ctx.nameOf(file, f);
+    const nameIn = (file: string) => (f: Form) => keywordIn(ctx, file, f);
     const defs: Definition[] = [];
     const uses: Use[] = [];
     const seen = new Set<string>();
@@ -133,7 +197,8 @@ export const dataAttributes: Adapter = {
       if (!form) continue;
       const name = nameIn(call.file);
       const write = WRITES.has(call.name);
-      const found = kids(form).slice(1).flatMap((a) => (write ? txAttributes(name, a) : readAttributes(a)));
+      const args = kids(form).slice(1);
+      const found = write ? args.flatMap((a) => txAttributes(name, txData(name, a))) : [...args.flatMap(readAttributes), ...positionalAttributes(call.name, args)];
       for (const f of found) {
         add({ name: name(f), kind: write ? 'writes' : 'reads', band: 'static_proven', file: call.file, row: f.row, col: f.col, from: call.from, ...(call.fromVar ? { fromVar: call.fromVar } : {}), context: `@${call.to}/${call.name}` });
       }
@@ -162,7 +227,7 @@ export const dataAttributes: Adapter = {
       return 'reference';
     };
     for (const k of ctx.analysis.keywords) {
-      const name = keywordName(k);
+      const name = forwardName(keywordName(k));
       if (!k.ns || !known.has(name)) continue;
       add({ name, kind: 'references', band: 'unknown', file: k.file, row: k.row, col: k.col, from: k.from, ...(k.fromVar ? { fromVar: k.fromVar } : {}), context: contextOf(k.file, k.row, k.col) });
     }
@@ -171,7 +236,8 @@ export const dataAttributes: Adapter = {
     const firstUse = new Map<string, Use>();
     for (const u of uses) if (!firstUse.has(u.name) || u.kind !== 'references' && firstUse.get(u.name)?.kind === 'references') firstUse.set(u.name, u);
     const defined = new Map<string, Definition>();
-    for (const d of defs) if (!defined.has(d.name)) defined.set(d.name, d);
+    // a map with :db/valueType defines the attribute, whatever alter maps without one come before it
+    for (const d of defs) if (!defined.has(d.name) || (defined.get(d.name)?.kind === 'data_value' && d.kind === 'data_attribute')) defined.set(d.name, d);
     for (const name of [...known].sort()) {
       const d = defined.get(name);
       const at = d ?? firstUse.get(name);
