@@ -10,11 +10,15 @@ node definition:demo.core/m [definition] src/demo/core.clj:15 {"defined_by":"clo
 node definition:demo.core/map->Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
 node definition:demo.core/secret [definition] src/demo/core.clj:17 {"defined_by":"clojure.core/defn-","private":true}
 node definition:demo.core/table [definition] src/demo/core.clj:7 {"defined_by":"clojure.core/def"}
+node definition:demo.shared/both [definition] src/demo/shared.cljc:4 {"defined_by":"clojure.core/defn","platforms":["clj","cljs"]}
+node definition:demo.shared/js-only [definition] src/demo/shared.cljc:7 {"defined_by":"cljs.core/defn"}
+node definition:demo.shared/jvm-only [definition] src/demo/shared.cljc:6 {"defined_by":"clojure.core/defn"}
 node definition:demo.util/helper [definition] src/demo/util.clj:2 {"defined_by":"clojure.core/defn"}
 node definition:demo.util/twice [definition] src/demo/util.clj:3 {"defined_by":"clojure.core/defn"}
 node namespace:clojure.core [namespace] test-resources/clojure/core.clj:1
 node namespace:demo.core [namespace] src/demo/core.clj:1
 node namespace:demo.core-test [namespace] test/demo/core_test.clj:1
+node namespace:demo.shared [namespace] src/demo/shared.cljc:1
 node namespace:demo.util [namespace] src/demo/util.clj:1
 edge definition:demo.core-test/f-test -calls-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8
 edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:8
@@ -29,6 +33,9 @@ edge definition:demo.core/f -references-> definition:demo.util/helper static_pro
 edge definition:demo.core/m -references-> definition:demo.core/f static_proven src/demo/core.clj:15
 edge definition:demo.core/m -references-> definition:demo.core/table static_proven src/demo/core.clj:15
 edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17
+edge definition:demo.shared/both -calls-> definition:demo.util/helper static_proven src/demo/shared.cljc:4
+edge definition:demo.shared/js-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:7
+edge definition:demo.shared/jvm-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:6
 edge definition:demo.util/twice -calls-> definition:demo.util/helper static_proven src/demo/util.clj:3
 edge namespace:demo.core -defines-> definition:demo.core/->Square static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/Shape static_proven src/demo/core.clj:4
@@ -45,7 +52,12 @@ edge namespace:demo.core -requires-> namespace:demo.util static_proven src/demo/
 edge namespace:demo.core-test -defines-> definition:demo.core-test/f-test static_proven test/demo/core_test.clj:7
 edge namespace:demo.core-test -defines-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:5
 edge namespace:demo.core-test -requires-> namespace:demo.core static_proven test/demo/core_test.clj:3
+edge namespace:demo.shared -defines-> definition:demo.shared/both static_proven src/demo/shared.cljc:4
+edge namespace:demo.shared -defines-> definition:demo.shared/js-only static_proven src/demo/shared.cljc:7
+edge namespace:demo.shared -defines-> definition:demo.shared/jvm-only static_proven src/demo/shared.cljc:6
+edge namespace:demo.shared -requires-> namespace:demo.util static_proven src/demo/shared.cljc:2
 edge namespace:demo.util -defines-> definition:demo.util/helper static_proven src/demo/util.clj:2
 edge namespace:demo.util -defines-> definition:demo.util/twice static_proven src/demo/util.clj:3
-usages resolved=12 unresolved=0 unknown=1 not-vars=5 external=19
+usages resolved=15 unresolved=0 unknown=1 not-vars=5 external=23
 adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+files sources=5 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

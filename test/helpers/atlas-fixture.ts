@@ -17,6 +17,8 @@ export function rowsText(doc: AtlasDocument): string {
     ...nodes, ...edges,
     `usages resolved=${u.resolved} unresolved=${u.unresolved} unknown=${u.unknown} not-vars=${u.notVars} external=${u.external}`,
     `adapters ${adapters.join(' ')}`,
+    `files sources=${doc.stats.files.sources} edn=${doc.stats.files.edn} skipped-large=${doc.stats.files.skipped_large} `
+      + `syntax-error-files=${doc.stats.syntax_errors.files} dropped-edges=${doc.stats.dropped_edges}`,
     '',
   ].join('\n');
 }

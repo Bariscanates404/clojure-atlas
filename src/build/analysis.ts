@@ -1,6 +1,7 @@
 // The slice of clj-kondo's analysis the builder reads, normalized: camelCase fields, the copies a .cljc file
 // yields per platform merged, and two kinds of var usage dropped: the arity-only copy kondo synthesizes for a
 // higher-order call (the value use at the same place stays) and a :refer in the ns form.
+import { contains } from './reader.ts';
 
 export interface Span {
   file: string;
@@ -164,9 +165,15 @@ export function normalize(raw: Raw): Analysis {
       })),
     (x) => key(x.file, x.nameRow, x.nameCol, x.to, x.name, x.defmethod),
   );
+  const nsForms = new Map(nsDefs.map((d) => [d.file, d]));
+  const inNsForm = (file: string, row: number, col: number) => {
+    const d = nsForms.get(file);
+    return !!d && contains(d, row, col);
+  };
   const keywords = dedupe(
     list(a.keywords)
-      .filter((r) => s(r.from) !== 'user' || s(r.ns) !== undefined)
+      // :require, :as, :refer in an ns form are syntax, not keyword uses
+      .filter((r) => !inNsForm(s(r.filename) ?? '', n(r.row) ?? 0, n(r.col) ?? 0))
       .map((r): Keyword => {
         const rf = reFrame(r);
         return {
@@ -180,7 +187,7 @@ export function normalize(raw: Raw): Analysis {
         };
       }),
     (x) => key(x.file, x.row, x.col),
-    (p, q) => ({ ...p, ...q, ...(p.reg ?? q.reg ? { reg: p.reg ?? q.reg } : {}), ...(p.reFrame || q.reFrame ? { reFrame: { ...q.reFrame, ...p.reFrame } } : {}) }),
+    (p, q) => ({ ...q, ...p, ...(p.reg ?? q.reg ? { reg: p.reg ?? q.reg } : {}), ...(p.reFrame || q.reFrame ? { reFrame: { ...q.reFrame, ...p.reFrame } } : {}) }),
   );
   const protocolImpls = dedupe(
     list(a['protocol-impls']).map((r) => ({

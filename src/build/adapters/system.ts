@@ -13,8 +13,6 @@ const COMPONENT = 'com.stuartsierra.component';
 
 export const systemKeyId = (name: string) => `system_key:${name}`;
 
-const textOf = (f: Form): string => ('text' in f ? f.text : '');
-
 interface Key {
   name: string;
   file: string;
@@ -85,7 +83,7 @@ function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep
   for (const call of ctx.analysis.varUses.filter((u) => u.to === COMPONENT && (u.name === 'system-map' || u.name === 'system-using'))) {
     const form = formAt(ctx.forms(call.file), call.row, call.col);
     if (!form) continue;
-    const name = (k: Form) => ctx.keywordAt(call.file, k.row, k.col) ?? textOf(k);
+    const name = (k: Form) => ctx.nameOf(call.file, k);
     const depMap = kids(form)[2];
     const pairs = call.name === 'system-map' ? kids(form).slice(1) : depMap ? flatChildren(unwrap(depMap)) : [];
     for (let k = 0; k + 1 < pairs.length; k += 2) {
@@ -130,7 +128,7 @@ export const systemKeys: Adapter = {
     const igFiles = new Set(ctx.analysis.nsUses.filter((u) => u.to === IG).map((u) => u.file));
     const deps: Dep[] = [];
     for (const file of [...igFiles, ...(igFiles.size ? ctx.edn : [])]) {
-      const name = (k: Form) => ctx.keywordAt(file, k.row, k.col) ?? textOf(k);
+      const name = (k: Form) => ctx.nameOf(file, k);
       const cfg = integrantConfig(ctx, file, name);
       keys.push(...cfg.keys);
       deps.push(...cfg.deps);

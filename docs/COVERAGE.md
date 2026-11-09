@@ -17,32 +17,32 @@ How to read the columns:
 
 | repo | files | syntax-error files | definitions | resolved | unresolved | unknown | resolved % | multimethods | events | routes | data_attributes | system | schemas | unknown edges | build | graph |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| babashka | 656 | 2 | 6478 | 15481 | 61 | 2261 | 87.0% | 448 | 0 | 0 | 21 | 4 | 384 | 10 | 8.7 s | 452 KB |
-| biff | 146 | 1 | 1250 | 2449 | 13 | 20 | 98.7% | 23 | 0 | 8 | 0 | 0 | 6 | 0 | 2.6 s | 87 KB |
-| cider-nrepl | 130 | 0 | 1149 | 3093 | 22 | 187 | 93.7% | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 2.4 s | 87 KB |
-| clj-kondo | 427 | 12 | 2750 | 10800 | 26 | 251 | 97.5% | 116 | 1 | 0 | 0 | 1 | 8 | 0 | 4.2 s | 246 KB |
-| compojure | 11 | 0 | 87 | 250 | 0 | 6 | 97.7% | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 1.2 s | 8 KB |
-| datascript | 67 | 1 | 1024 | 4471 | 496 | 1339 | 70.9% | 15 | 0 | 0 | 1470 | 0 | 0 | 126 | 4.1 s | 99 KB |
+| babashka | 656 | 2 | 6478 | 15481 | 61 | 2261 | 87.0% | 448 | 0 | 0 | 21 | 4 | 384 | 10 | 9.0 s | 452 KB |
+| biff | 146 | 1 | 1250 | 2449 | 13 | 20 | 98.7% | 23 | 0 | 8 | 0 | 0 | 6 | 0 | 2.9 s | 87 KB |
+| cider-nrepl | 130 | 0 | 1149 | 3093 | 22 | 187 | 93.7% | 57 | 0 | 0 | 0 | 0 | 0 | 0 | 2.6 s | 87 KB |
+| clj-kondo | 427 | 12 | 2750 | 10800 | 26 | 251 | 97.5% | 116 | 1 | 0 | 0 | 1 | 8 | 0 | 5.1 s | 246 KB |
+| compojure | 11 | 0 | 87 | 250 | 0 | 6 | 97.7% | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 1.2 s | 8 KB |
+| datascript | 67 | 1 | 1024 | 4471 | 496 | 1339 | 70.9% | 15 | 0 | 0 | 1470 | 0 | 0 | 126 | 3.8 s | 99 KB |
 | day-of-datomic | 43 | 0 | 127 | 84 | 29 | 1 | 73.7% | 0 | 0 | 0 | 86 | 0 | 0 | 50 | 1.7 s | 7 KB |
-| fulcro | 140 | 0 | 2725 | 9996 | 16 | 945 | 91.2% | 28 | 0 | 0 | 0 | 0 | 26 | 0 | 5.6 s | 179 KB |
-| honeysql | 20 | 0 | 506 | 2776 | 0 | 15 | 99.5% | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.1 s | 44 KB |
-| integrant | 7 | 0 | 138 | 442 | 0 | 4 | 99.1% | 52 | 0 | 0 | 0 | 61 | 0 | 0 | 1.2 s | 12 KB |
-| logseq | 1088 | 0 | 18099 | 69041 | 0 | 256 | 99.6% | 324 | 0 | 0 | 24772 | 0 | 131 | 20271 | 14.0 s | 1.9 MB |
-| malli | 93 | 0 | 1372 | 7960 | 53 | 366 | 95.0% | 849 | 0 | 0 | 0 | 0 | 85 | 0 | 3.9 s | 170 KB |
-| metabase | 4460 | 0 | 68435 | 312308 | 811 | 9801 | 96.7% | 10174 | 0 | 20 | 0 | 2 | 526 | 0 | 79.2 s | 7.4 MB |
-| mount | 47 | 0 | 222 | 913 | 0 | 8 | 99.1% | 0 | 0 | 4 | 28 | 56 | 0 | 0 | 1.5 s | 23 KB |
-| next-jdbc | 38 | 0 | 342 | 2277 | 6 | 48 | 97.7% | 2 | 0 | 0 | 0 | 0 | 94 | 0 | 2.0 s | 46 KB |
-| pathom3 | 53 | 0 | 907 | 3815 | 0 | 17 | 99.6% | 8 | 0 | 0 | 0 | 0 | 27 | 0 | 4.5 s | 85 KB |
-| pedestal | 230 | 1 | 2092 | 5154 | 22 | 420 | 92.1% | 13 | 0 | 111 | 0 | 24 | 180 | 0 | 3.3 s | 172 KB |
-| penpot | 1558 | 0 | 25429 | 125583 | 13 | 2154 | 98.3% | 1758 | 0 | 0 | 0 | 423 | 190 | 0 | 22.2 s | 2.6 MB |
-| polylith-realworld | 51 | 0 | 384 | 894 | 0 | 0 | 100.0% | 0 | 0 | 22 | 0 | 0 | 0 | 0 | 1.3 s | 29 KB |
-| re-frame | 70 | 0 | 762 | 2629 | 0 | 77 | 97.2% | 6 | 287 | 0 | 0 | 0 | 7 | 0 | 2.6 s | 75 KB |
-| reagent | 65 | 0 | 829 | 2842 | 0 | 102 | 96.5% | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2.0 s | 66 KB |
-| reitit | 133 | 0 | 962 | 3860 | 4 | 119 | 96.9% | 30 | 8 | 369 | 0 | 4 | 151 | 0 | 3.4 s | 101 KB |
-| ring | 72 | 0 | 634 | 1495 | 0 | 101 | 93.7% | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 2.0 s | 53 KB |
-| shadow-cljs | 320 | 3 | 2498 | 5347 | 29 | 972 | 84.2% | 465 | 0 | 0 | 0 | 0 | 234 | 0 | 5.2 s | 187 KB |
-| usermanager | 7 | 0 | 50 | 73 | 0 | 10 | 88.0% | 0 | 0 | 7 | 0 | 4 | 0 | 0 | 1.6 s | 4 KB |
-| xtdb-v1 | 226 | 4 | 2773 | 11681 | 8 | 799 | 93.5% | 275 | 146 | 0 | 1842 | 13 | 203 | 354 | 8.3 s | 328 KB |
+| fulcro | 140 | 0 | 2725 | 9996 | 16 | 945 | 91.2% | 28 | 0 | 0 | 0 | 0 | 26 | 0 | 7.3 s | 179 KB |
+| honeysql | 20 | 0 | 506 | 2776 | 0 | 15 | 99.5% | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3.5 s | 44 KB |
+| integrant | 7 | 0 | 138 | 442 | 0 | 4 | 99.1% | 52 | 0 | 0 | 0 | 61 | 0 | 0 | 1.8 s | 12 KB |
+| logseq | 1088 | 0 | 18099 | 69041 | 0 | 256 | 99.6% | 324 | 0 | 0 | 24772 | 0 | 131 | 20271 | 17.8 s | 1.9 MB |
+| malli | 93 | 0 | 1372 | 7960 | 53 | 366 | 95.0% | 849 | 0 | 0 | 0 | 0 | 85 | 0 | 7.0 s | 170 KB |
+| metabase | 4460 | 0 | 68435 | 312308 | 811 | 9801 | 96.7% | 10174 | 0 | 13 | 0 | 2 | 526 | 0 | 74.7 s | 7.4 MB |
+| mount | 47 | 0 | 222 | 913 | 0 | 8 | 99.1% | 0 | 0 | 1 | 28 | 56 | 0 | 0 | 1.8 s | 23 KB |
+| next-jdbc | 38 | 0 | 342 | 2277 | 6 | 48 | 97.7% | 2 | 0 | 0 | 0 | 0 | 94 | 0 | 2.3 s | 46 KB |
+| pathom3 | 53 | 0 | 907 | 3815 | 0 | 17 | 99.6% | 8 | 0 | 0 | 0 | 0 | 27 | 0 | 3.6 s | 85 KB |
+| pedestal | 230 | 1 | 2092 | 5154 | 22 | 420 | 92.1% | 13 | 0 | 111 | 0 | 24 | 180 | 0 | 3.2 s | 172 KB |
+| penpot | 1558 | 0 | 25429 | 125583 | 13 | 2154 | 98.3% | 1758 | 0 | 0 | 0 | 423 | 190 | 0 | 21.1 s | 2.6 MB |
+| polylith-realworld | 51 | 0 | 384 | 894 | 0 | 0 | 100.0% | 0 | 0 | 22 | 0 | 0 | 0 | 0 | 2.2 s | 29 KB |
+| re-frame | 70 | 0 | 762 | 2629 | 0 | 77 | 97.2% | 6 | 287 | 0 | 0 | 0 | 7 | 0 | 3.2 s | 76 KB |
+| reagent | 65 | 0 | 829 | 2842 | 0 | 102 | 96.5% | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 2.8 s | 66 KB |
+| reitit | 133 | 0 | 962 | 3860 | 4 | 119 | 96.9% | 30 | 8 | 369 | 0 | 4 | 151 | 0 | 4.7 s | 101 KB |
+| ring | 72 | 0 | 634 | 1495 | 0 | 101 | 93.7% | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 3.0 s | 53 KB |
+| shadow-cljs | 320 | 3 | 2498 | 5347 | 29 | 972 | 84.2% | 465 | 0 | 0 | 0 | 0 | 234 | 0 | 6.0 s | 187 KB |
+| usermanager | 7 | 0 | 50 | 73 | 0 | 10 | 88.0% | 0 | 0 | 7 | 0 | 4 | 0 | 0 | 1.4 s | 4 KB |
+| xtdb-v1 | 226 | 4 | 2773 | 11681 | 8 | 799 | 93.5% | 275 | 146 | 0 | 1842 | 13 | 203 | 354 | 7.5 s | 329 KB |
 
 ## Repos under 95% resolved
 
@@ -93,7 +93,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### compojure
 - most frequent unresolved: none
 - most frequent unknown: `request` 2, `x` 2, `raise` 1, `respond` 1
-- adapters: multimethods (defmethod) 2 edges, events off, routes (compojure) 2 edges, data_attributes off, system off, schemas off
+- adapters: multimethods (defmethod) 2 edges, events off, routes (compojure) 0 edges, data_attributes off, system off, schemas off
 
 ### datascript
 - most frequent unresolved: `datascript.parser/->Variable` 132, `datascript.parser/->DefaultSrc` 42, `datascript.parser/->Pattern` 35, `datascript.parser/->Constant` 30, `datascript.parser/->BindScalar` 21, `datascript.parser/->PlainSymbol` 20, `datascript.parser/->Placeholder` 16, `datascript.parser/->RuleVars` 15, `datascript.db/DB` 14, `datascript.parser/->SrcVar` 13, `datascript.parser/->Aggregate` 10, `datascript.parser/->RuleBranch` 8, `datascript.parser/->Or` 7, `datascript.parser/->Rule` 7, `datascript.db/entid` 6
@@ -133,12 +133,12 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### metabase
 - most frequent unresolved: `metabase.test-runner.assert-exprs.approximately-equal/keep-me` 81, `metabase.auth-identity.provider/authenticate` 48, `metabase.auth-identity.provider/login!` 19, `metabase.util.secret/expose` 12, `metabase.types.core/keep-me` 10, `metabase-enterprise.remote-sync.source.protocol/->ingestable` 7, `metabase.auth-identity.provider/validate` 7, `metabase.lib.schema/keep-me` 7, `metabase.models.interface/to-json` 7, `metabase.audit-app.events.audit-log/keep-me` 6, `metabase.driver.h2/keep-me` 6, `metabase.lib.core/keep-me` 6, `metabase.events.impl/publish-event!` 5, `metabase.driver.postgres/keep-me` 4, `metabase.mcp.v2.tools.content/keep-me` 4
 - most frequent unknown: `_` 432, `_conn` 293, `_model` 276, `card-id` 270, `user-id` 242, `<>` 195, `db-id` 193, `k` 192, `topic` 153, `convo-id` 143, `id` 142, `group-id` 124, `card` 120, `this` 117, `model` 112
-- adapters: multimethods (defmethod) 10174 edges, events off, routes (compojure) 20 edges, data_attributes off, system (integrant) 2 edges, schemas (malli, spec) 526 edges
+- adapters: multimethods (defmethod) 10174 edges, events off, routes (compojure) 13 edges, data_attributes off, system (integrant) 2 edges, schemas (malli, spec) 526 edges
 
 ### mount
 - most frequent unresolved: none
 - most frequent unknown: `RuntimeException` 2, `this` 2, `Throwable` 1, `k` 1, `ks` 1, `watcher` 1
-- adapters: multimethods off, events off, routes (compojure) 4 edges, data_attributes (datascript, datomic) 28 edges, system (mount) 56 edges, schemas off
+- adapters: multimethods off, events off, routes (compojure) 1 edges, data_attributes (datascript, datomic) 28 edges, system (mount) 56 edges, schemas off
 
 ### next-jdbc
 - most frequent unresolved: `next.jdbc.types/as-other` 2, `next.jdbc.types/as-varchar` 2, `next.jdbc.types/as-boolean` 1, `next.jdbc.types/as-real` 1

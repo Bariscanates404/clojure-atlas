@@ -4,7 +4,7 @@
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { keywordName, type VarUse } from '../analysis.ts';
 import { contains, formAt, kids, unwrap } from '../reader.ts';
-import { defId, type Adapter, type Container, type Context, type Owner } from '../model.ts';
+import { defId, groupBy, type Adapter, type Container, type Context, type Owner } from '../model.ts';
 
 const SPEC = /^(clojure|cljs)\.spec\.alpha$/;
 const SPEC_DEF = /^(clojure|cljs)\.spec\.alpha\/def$/;
@@ -18,8 +18,7 @@ export const schemaId = (name: string) => `schema:${name}`;
 
 // Whether a place lies inside a call to one of the selected vars.
 function inCallOf(ctx: Context, select: (u: VarUse) => boolean): (file: string, row: number, col: number) => boolean {
-  const byFile = new Map<string, VarUse[]>();
-  for (const u of ctx.analysis.varUses) if (select(u)) byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
+  const byFile = groupBy(ctx.analysis.varUses.filter(select), (u) => u.file);
   return (file, row, col) => (byFile.get(file) ?? []).some((c) => contains(c, row, col));
 }
 

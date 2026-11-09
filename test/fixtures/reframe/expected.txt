@@ -1,25 +1,49 @@
+node definition:app.events/handle-stamp [definition] src/app/events.cljs:24 {"defined_by":"cljs.core/defn"}
 node definition:app.events/on-saved [definition] src/app/events.cljs:9 {"defined_by":"cljs.core/defn"}
+node definition:app.events/std-interceptors [definition] src/app/events.cljs:22 {"defined_by":"cljs.core/def"}
 node definition:app.events/view [definition] src/app/events.cljs:17 {"defined_by":"cljs.core/defn"}
+node definition:user/go [definition] dev/user.cljs:4 {"defined_by":"cljs.core/defn"}
+node event::app.events/same [event] src/app/events.cljs:28 {"registered_by":"re-frame.core/reg-event-db"}
 node event::app.events/save [event] src/app/events.cljs:4 {"registered_by":"re-frame.core/reg-event-db"}
 node event::app.events/saved [event] src/app/events.cljs:11 {"registered_by":"re-frame.core/reg-event-fx"}
+node event::app.events/stamp [event] src/app/events.cljs:26 {"registered_by":"re-frame.core/reg-event-db"}
 node event::app.events/unknown [event] src/app/events.cljs:20 {"registered_by":null}
-node handler::app.events/count [handler] src/app/events.cljs:15
-node handler::app.events/items [handler] src/app/events.cljs:13
-node handler::app.events/save [handler] src/app/events.cljs:4
+node event::app.shared/reset [event] src/app/shared.cljc:4 {"registered_by":"re-frame.core/reg-event-db"}
+node handler:event :app.events/same src/app/events.cljs:28 [handler] src/app/events.cljs:28
+node handler:event :app.events/save src/app/events.cljs:4 [handler] src/app/events.cljs:4
+node handler:event :app.shared/reset src/app/shared.cljc:4 [handler] src/app/shared.cljc:4
+node handler:subscription :app.events/count src/app/events.cljs:15 [handler] src/app/events.cljs:15
+node handler:subscription :app.events/items src/app/events.cljs:13 [handler] src/app/events.cljs:13
+node handler:subscription :app.events/same src/app/events.cljs:30 [handler] src/app/events.cljs:30
 node namespace:app.events [namespace] src/app/events.cljs:1
+node namespace:app.shared [namespace] src/app/shared.cljc:1
+node namespace:user [namespace] dev/user.cljs:1
 node subscription::app.events/count [subscription] src/app/events.cljs:15 {"registered_by":"re-frame.core/reg-sub"}
 node subscription::app.events/items [subscription] src/app/events.cljs:13 {"registered_by":"re-frame.core/reg-sub"}
+node subscription::app.events/same [subscription] src/app/events.cljs:30 {"registered_by":"re-frame.core/reg-sub"}
 edge definition:app.events/view -dispatches-> event::app.events/save static_proven src/app/events.cljs:19
 edge definition:app.events/view -dispatches-> event::app.events/unknown static_proven src/app/events.cljs:20
 edge definition:app.events/view -subscribes-> subscription::app.events/count static_proven src/app/events.cljs:18
-edge event::app.events/save -registers-> handler::app.events/save static_proven src/app/events.cljs:4
+edge definition:user/go -dispatches-> event::app.events/save static_proven dev/user.cljs:4
+edge event::app.events/same -registers-> handler:event :app.events/same src/app/events.cljs:28 static_proven src/app/events.cljs:28
+edge event::app.events/save -registers-> handler:event :app.events/save src/app/events.cljs:4 static_proven src/app/events.cljs:4
 edge event::app.events/saved -registers-> definition:app.events/on-saved static_proven src/app/events.cljs:11
-edge handler::app.events/count -subscribes-> subscription::app.events/items static_proven src/app/events.cljs:15
-edge handler::app.events/save -dispatches-> event::app.events/saved static_proven src/app/events.cljs:6
+edge event::app.events/stamp -registers-> definition:app.events/handle-stamp static_proven src/app/events.cljs:26
+edge event::app.shared/reset -registers-> handler:event :app.shared/reset src/app/shared.cljc:4 static_proven src/app/shared.cljc:4
+edge handler:event :app.events/same src/app/events.cljs:28 -dispatches-> event::app.events/saved static_proven src/app/events.cljs:28
+edge handler:event :app.events/save src/app/events.cljs:4 -dispatches-> event::app.events/saved static_proven src/app/events.cljs:6
+edge handler:subscription :app.events/count src/app/events.cljs:15 -subscribes-> subscription::app.events/items static_proven src/app/events.cljs:15
+edge namespace:app.events -defines-> definition:app.events/handle-stamp static_proven src/app/events.cljs:24
 edge namespace:app.events -defines-> definition:app.events/on-saved static_proven src/app/events.cljs:9
+edge namespace:app.events -defines-> definition:app.events/std-interceptors static_proven src/app/events.cljs:22
 edge namespace:app.events -defines-> definition:app.events/view static_proven src/app/events.cljs:17
+edge namespace:app.events -references-> definition:app.events/handle-stamp static_proven src/app/events.cljs:26
 edge namespace:app.events -references-> definition:app.events/on-saved static_proven src/app/events.cljs:11
-edge subscription::app.events/count -registers-> handler::app.events/count static_proven src/app/events.cljs:15
-edge subscription::app.events/items -registers-> handler::app.events/items static_proven src/app/events.cljs:13
-usages resolved=1 unresolved=0 unknown=0 not-vars=0 external=15
-adapters multimethods=off:0 events=re-frame.core:9 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+edge namespace:app.events -references-> definition:app.events/std-interceptors static_proven src/app/events.cljs:26
+edge namespace:user -defines-> definition:user/go static_proven dev/user.cljs:4
+edge subscription::app.events/count -registers-> handler:subscription :app.events/count src/app/events.cljs:15 static_proven src/app/events.cljs:15
+edge subscription::app.events/items -registers-> handler:subscription :app.events/items src/app/events.cljs:13 static_proven src/app/events.cljs:13
+edge subscription::app.events/same -registers-> handler:subscription :app.events/same src/app/events.cljs:30 static_proven src/app/events.cljs:30
+usages resolved=3 unresolved=0 unknown=0 not-vars=0 external=29
+adapters multimethods=off:0 events=re-frame.core:15 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+files sources=3 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

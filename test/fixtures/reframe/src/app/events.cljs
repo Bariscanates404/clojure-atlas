@@ -18,3 +18,13 @@
   [:div @(rf/subscribe [::count])
    [:button {:on-click #(rf/dispatch [::save 1])}]
    [:a {:on-click #(rf/dispatch [::unknown])}]])
+
+(def std-interceptors [rf/trim-v])
+
+(defn handle-stamp [db _] db)
+
+(rf/reg-event-db ::stamp std-interceptors handle-stamp)
+
+(rf/reg-event-db ::same (fn [db _] (rf/dispatch [::saved]) db))
+
+(rf/reg-sub ::same (fn [db _] (:same db)))

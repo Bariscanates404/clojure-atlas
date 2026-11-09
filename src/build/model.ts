@@ -3,7 +3,7 @@
 import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { keywordName, type Analysis, type Keyword, type Span, type VarDef, type VarUse } from './analysis.ts';
 import type { ProjectConfig } from './config.ts';
-import { contains, readForms, type Form } from './reader.ts';
+import { contains, readForms, textOf, type Form } from './reader.ts';
 
 export interface Rows {
   nodes: GraphNode[];
@@ -30,6 +30,8 @@ export interface Context {
   defAt: (file: string, row: number, col: number) => string | undefined;
   // a keyword at this place, resolved (::x and ::alias/x included), with its leading colon
   keywordAt: (file: string, row: number, col: number) => string | undefined;
+  // the resolved keyword where kondo saw one (code), else the form's text (.edn files kondo does not read)
+  nameOf: (file: string, f: Form) => string;
 }
 
 export interface Adapter {
@@ -54,6 +56,19 @@ export type Owner = (site: Site) => string;
 
 const LANGUAGE_NS = /^(clojure|cljs)\.(core|string|set|walk|test|edn|zip|data|pprint|repl|template|spec\.alpha|core\.async)$/;
 
+export const CORE_NS = /^(clojure|cljs)\.core$/;
+
+export function groupBy<T>(xs: Iterable<T>, key: (x: T) => string): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const x of xs) {
+    const k = key(x);
+    const list = out.get(k);
+    if (list) list.push(x);
+    else out.set(k, [x]);
+  }
+  return out;
+}
+
 export const defId = (fullName: string) => `definition:${fullName}`;
 export const nsId = (ns: string) => `namespace:${ns}`;
 
@@ -77,6 +92,10 @@ export function createContext(analysis: Analysis, config: ProjectConfig, sources
     keywordAt: (file, row, col) => {
       const k = keywords.get(at(file, row, col));
       return k && keywordName(k);
+    },
+    nameOf: (file, f) => {
+      const k = keywords.get(at(file, f.row, f.col));
+      return k ? keywordName(k) : textOf(f) ?? '';
     },
     analysis,
     // the language's own namespaces are never the project's, even where a repo declares them in test fixtures

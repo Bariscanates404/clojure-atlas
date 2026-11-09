@@ -4,8 +4,8 @@
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { isTestFile } from '../../mcp/keyflow.ts';
 import type { VarUse } from '../analysis.ts';
-import { contains, flatChildren, formAt, kids, unwrap, type Form } from '../reader.ts';
-import { defId, type Adapter, type Context, type Owner } from '../model.ts';
+import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
+import { CORE_NS, defId, groupBy, type Adapter, type Context, type Owner } from '../model.ts';
 
 const COMPOJURE = 'compojure.core';
 const COMPOJURE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'ANY']);
@@ -62,7 +62,6 @@ export const routeId = (r: Pick<Route, 'method' | 'path' | 'base' | 'mount'>) =>
 export const permissionId = (name: string) => `permission:${name}`;
 export const exemptionId = (reason: string) => `authz_exemption:${reason}`;
 
-const text = (f: Form | undefined): string | undefined => (f && 'text' in f ? f.text : undefined);
 const keywordOf = (f: Form): string | undefined => (unwrap(f).t === 'keyword' ? text(unwrap(f)) : undefined);
 
 function literalPath(f: Form | undefined): string | undefined {
@@ -155,26 +154,30 @@ function routeDataAuthz(ctx: Context, file: string, data: Form | undefined): Aut
   // a vector of authz maps is a list of checks, all of which must pass
   const items = unwrap(value).t === 'vector' ? flatChildren(unwrap(value)) : [value];
   const permissions: Permission[] = [];
-  for (const [i, item] of items.entries()) {
+  let exempt: Authz['exempt'];
+  for (const item of items) {
     const m = authzMap(ctx, { form: item, file });
     if (!m) continue;
-    const exempt = cfg.exempt ? entry(m.map, cfg.exempt) : undefined;
-    if (exempt && items.length === 1) return { permissions: [], exempt: { reason: text(unwrap(exempt)) ?? '?', line: value.row } };
+    // an exemption beside checks is kept with them: the MCP shows the checks and lists the exemption
+    const reason = cfg.exempt ? entry(m.map, cfg.exempt) : undefined;
+    if (reason) exempt = { reason: text(unwrap(reason)) ?? '?', line: value.row };
     // the check itself, then the alternative map that also satisfies it
+    const check = permissions.reduce((n, p) => Math.max(n, p.check), 0) + 1;
     const alt = cfg.alternative ? entry(m.map, cfg.alternative) : undefined;
     const options = [m.map, ...(alt && unwrap(alt).t === 'map' ? [unwrap(alt)] : [])];
     const found = options.map((o) => {
       const perm = cfg.permission ? entry(o, cfg.permission) : undefined;
       const scopeForm = cfg.scope ? entry(o, cfg.scope) : undefined;
       const scope = scopeForm && m.bind({ form: scopeForm, file }).form;
-      return perm ? permissionsOf(ctx, m.bind({ form: perm, file }), i + 1, scope && formText(scope)) : [];
+      return perm ? permissionsOf(ctx, m.bind({ form: perm, file }), check, scope && formText(scope)) : [];
     }).filter((ps) => ps.length);
     const single = found.length > 1 && found.every((ps) => ps.length === 1);
     permissions.push(...(single ? found.map(([p], k) => ({ ...p, alternative: k + 1, alternatives: found.length })) : found.flat()));
   }
   // cited at the route's own authz entry: a constant or helper may live in another file
   const checks = permissions.reduce((n, p) => Math.max(n, p.check), 0);
-  return permissions.length ? { permissions: permissions.map((p) => ({ ...p, checks, line: value.row })) } : undefined;
+  if (!permissions.length && !exempt) return undefined;
+  return { permissions: permissions.map((p) => ({ ...p, checks, line: value.row })), ...(exempt ? { exempt } : {}) };
 }
 
 // Short source-like text of a scope form, for the edge attribute.
@@ -235,13 +238,25 @@ function chainOf(ctx: Context, file: string, f: Form | undefined): Chain {
 
 // ---------- compojure ----------
 
+// What a body returns: a var, the project function its last call calls, or that of the last form of a let/do.
+function returnedCall(ctx: Context, file: string, f: Form): Link[] {
+  const u = unwrap(f);
+  const def = (x: Form | undefined) => (x && x.t === 'symbol' ? ctx.defAt(file, x.row, x.col) : undefined);
+  if (u.t === 'symbol') {
+    const d = def(u);
+    return d ? [{ def: d, line: u.row }] : [];
+  }
+  if (u.t !== 'list' || !u.children.length) return [];
+  const head = def(u.children[0]);
+  return head ? [{ def: head, line: u.row }] : returnedCall(ctx, file, u.children[u.children.length - 1]);
+}
+
 function compojureRoutes(ctx: Context): Route[] {
   const macro = (u: VarUse): string | undefined => {
     const full = ctx.config.routeMacros[`${u.to}/${u.name}`] ?? `${u.to}/${u.name}`;
     return full.startsWith(`${COMPOJURE}/`) ? full.slice(COMPOJURE.length + 1) : undefined;
   };
-  const byFile = new Map<string, VarUse[]>();
-  for (const u of ctx.analysis.varUses) if (macro(u)) byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
+  const byFile = groupBy(ctx.analysis.varUses.filter((u) => macro(u)), (u) => u.file);
   const out: Route[] = [];
   for (const [file, uses] of byFile) {
     const forms = ctx.forms(file);
@@ -250,7 +265,6 @@ function compojureRoutes(ctx: Context): Route[] {
       return literalPath(form ? kids(form)[1] : undefined);
     };
     const contexts = uses.filter((u) => macro(u) === 'context');
-    const fileUses = ctx.analysis.varUses.filter((v) => v.file === file && !v.defmethod);
     for (const u of uses) {
       const method = macro(u) ?? '';
       const path = COMPOJURE_METHODS.has(method) ? pathOf(u) : undefined;
@@ -260,9 +274,8 @@ function compojureRoutes(ctx: Context): Route[] {
         .sort((a, b) => a.row - b.row || a.col - b.col)
         .map((c) => pathOf(c) ?? '')
         .join('');
-      const handlers = fileUses
-        .filter((v) => v !== u && contains(u, v.nameRow, v.nameCol) && ctx.defs.has(`${v.to}/${v.name}`))
-        .map((v) => ({ def: `${v.to}/${v.name}`, line: v.nameRow }));
+      const form = formAt(forms, u.row, u.col);
+      const handlers = form && kids(form).length > 3 ? returnedCall(ctx, file, kids(form)[kids(form).length - 1]) : [];
       out.push({ method, path, mount, base: u.fromVar ? `${u.from}/${u.fromVar}` : u.from, file, line: u.row, library: 'compojure', handlers, guards: [], authz: NO_AUTHZ });
     }
   }
@@ -286,7 +299,7 @@ function appendsToRoute(ctx: Context, file: string, f: Form): boolean {
   if (f.t !== 'list' || !f.children[1] || !isRoute(unwrap(f.children[1]))) return false;
   const head = f.children[0];
   const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
-  return !!use && /^(clojure|cljs)\.core$/.test(use.to) && (use.name === 'into' || use.name === 'conj');
+  return !!use && CORE_NS.test(use.to) && (use.name === 'into' || use.name === 'conj');
 }
 
 interface Scope {
@@ -342,10 +355,9 @@ function routeFunctions(ctx: Context): Map<string, RouteFn> {
 }
 
 function dataRoutes(ctx: Context, owner: Owner): Route[] {
-  const files = new Map<string, string>();
-  for (const u of ctx.analysis.nsUses) {
-    if (DATA_LIBS.test(u.to)) files.set(u.file, [...new Set([...(files.get(u.file)?.split(', ') ?? []), libraryOf(u.to)])].sort().join(', '));
-  }
+  const libs = new Map<string, Set<string>>();
+  for (const u of ctx.analysis.nsUses) if (DATA_LIBS.test(u.to)) libs.set(u.file, (libs.get(u.file) ?? new Set()).add(libraryOf(u.to)));
+  const files = new Map([...libs].map(([f, s]) => [f, [...s].sort().join(', ')]));
   const fns = routeFunctions(ctx);
   const out: Route[] = [];
   const mounted = new Set<string>();
@@ -435,10 +447,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
 
 // A handler that calls a declared permission fn with a keyword checks that permission (HEURISTIC, one level deep).
 function handlerPermissions(ctx: Context): (handlers: readonly Link[], check: number) => Permission[] {
-  const calls = new Map<string, VarUse[]>();
-  for (const u of ctx.analysis.varUses) {
-    if (u.fromVar && ctx.config.permissionFns.includes(`${u.to}/${u.name}`)) calls.set(`${u.from}/${u.fromVar}`, [...(calls.get(`${u.from}/${u.fromVar}`) ?? []), u]);
-  }
+  const calls = groupBy(ctx.analysis.varUses.filter((u) => u.fromVar && ctx.config.permissionFns.includes(`${u.to}/${u.name}`)), (u) => `${u.from}/${u.fromVar}`);
   return (handlers, check) => handlers.flatMap((h) => (calls.get(h.def) ?? []).flatMap((u) => {
     const call = formAt(ctx.forms(u.file), u.row, u.col);
     return (call ? kids(call).slice(1).map(unwrap) : [])

@@ -10,3 +10,5 @@
 (defmethod print-method ::circle [x w] (.write w (str x)))
 
 (defn total [shapes] (reduce + (map area shapes)))
+
+(defmethod area ::poly [_] (reify Object (toString [_] (str (u/square 2)))))

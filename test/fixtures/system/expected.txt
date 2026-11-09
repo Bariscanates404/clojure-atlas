@@ -50,3 +50,4 @@ edge system_key:sys.states/cache -registers-> definition:sys.states/cache static
 edge system_key:sys.states/conn -registers-> definition:sys.states/conn static_proven src/sys/states.clj:6 {"via":"defstate"}
 usages resolved=5 unresolved=0 unknown=0 not-vars=0 external=14
 adapters multimethods=defmethod:3 events=off:0 routes=off:0 data_attributes=off:0 system=component, integrant, mount:12 schemas=off:0
+files sources=3 edn=1 skipped-large=0 syntax-error-files=0 dropped-edges=0

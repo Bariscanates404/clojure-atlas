@@ -5,7 +5,7 @@ import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { isTestFile } from '../../mcp/keyflow.ts';
 import type { Span, VarUse } from '../analysis.ts';
 import { contains, formAt, kids } from '../reader.ts';
-import { defId, nsId, type Adapter, type Container, type Context } from '../model.ts';
+import { CORE_NS, defId, groupBy, nsId, type Adapter, type Container, type Context } from '../model.ts';
 
 export const methodId = (multi: string, dispatch: string) => defId(`${multi} ${dispatch}`);
 
@@ -16,13 +16,8 @@ interface Method {
   span: Span;
 }
 
-const DEFMETHOD = /^(clojure|cljs)\.core$/;
-
 export function methods(ctx: Context): Method[] {
-  const forms = new Map<string, VarUse[]>();
-  for (const u of ctx.analysis.varUses) {
-    if (u.name === 'defmethod' && DEFMETHOD.test(u.to)) forms.set(u.file, [...(forms.get(u.file) ?? []), u]);
-  }
+  const forms = groupBy(ctx.analysis.varUses.filter((u) => u.name === 'defmethod' && CORE_NS.test(u.to)), (u) => u.file);
   return ctx.analysis.varUses
     .filter((u) => u.defmethod)
     .map((use) => {

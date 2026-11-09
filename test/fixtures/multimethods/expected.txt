@@ -1,26 +1,33 @@
 node definition:clojure.core/print-method :shapes.core/circle [definition] src/shapes/core.clj:10 {"defined_by":"clojure.core/defmethod","multi":"clojure.core/print-method","dispatch":":shapes.core/circle"}
+node definition:java.lang/toString impl src/shapes/core.clj:14 [definition] src/shapes/core.clj:14 {"defined_by":"clojure.core/reify","protocol":"java.lang/Object","impl_ns":"shapes.core"}
 node definition:shapes.core/area [definition] src/shapes/core.clj:4 {"defined_by":"clojure.core/defmulti"}
 node definition:shapes.core/area :default [definition] src/shapes/core.clj:8 {"defined_by":"clojure.core/defmethod","multi":"shapes.core/area","dispatch":":default"}
 node definition:shapes.core/area :shapes.core/circle [definition] src/shapes/core.clj:6 {"defined_by":"clojure.core/defmethod","multi":"shapes.core/area","dispatch":":shapes.core/circle"}
+node definition:shapes.core/area :shapes.core/poly [definition] src/shapes/core.clj:14 {"defined_by":"clojure.core/defmethod","multi":"shapes.core/area","dispatch":":shapes.core/poly"}
 node definition:shapes.core/area :shapes.util/square [definition] src/shapes/util.clj:6 {"defined_by":"clojure.core/defmethod","multi":"shapes.core/area","dispatch":":shapes.util/square"}
 node definition:shapes.core/total [definition] src/shapes/core.clj:12 {"defined_by":"clojure.core/defn"}
 node definition:shapes.util/square [definition] src/shapes/util.clj:4 {"defined_by":"clojure.core/defn"}
 node namespace:shapes.core [namespace] src/shapes/core.clj:1
 node namespace:shapes.util [namespace] src/shapes/util.clj:1
+edge definition:java.lang/toString impl src/shapes/core.clj:14 -calls-> definition:shapes.util/square static_proven src/shapes/core.clj:14
 edge definition:shapes.core/area -calls-> definition:shapes.core/area :default heuristic src/shapes/core.clj:8 {"via":"multimethod dispatch","dispatch":":default"}
 edge definition:shapes.core/area -calls-> definition:shapes.core/area :shapes.core/circle heuristic src/shapes/core.clj:6 {"via":"multimethod dispatch","dispatch":":shapes.core/circle"}
+edge definition:shapes.core/area -calls-> definition:shapes.core/area :shapes.core/poly heuristic src/shapes/core.clj:14 {"via":"multimethod dispatch","dispatch":":shapes.core/poly"}
 edge definition:shapes.core/area -calls-> definition:shapes.core/area :shapes.util/square heuristic src/shapes/util.clj:6 {"via":"multimethod dispatch","dispatch":":shapes.util/square"}
 edge definition:shapes.core/area :shapes.core/circle -calls-> definition:shapes.util/square static_proven src/shapes/core.clj:6
 edge definition:shapes.core/area :shapes.util/square -calls-> definition:shapes.util/square static_proven src/shapes/util.clj:6
 edge definition:shapes.core/total -references-> definition:shapes.core/area static_proven src/shapes/core.clj:12
 edge namespace:shapes.core -defines-> definition:clojure.core/print-method :shapes.core/circle static_proven src/shapes/core.clj:10
+edge namespace:shapes.core -defines-> definition:java.lang/toString impl src/shapes/core.clj:14 static_proven src/shapes/core.clj:14
 edge namespace:shapes.core -defines-> definition:shapes.core/area static_proven src/shapes/core.clj:4
 edge namespace:shapes.core -defines-> definition:shapes.core/area :default static_proven src/shapes/core.clj:8
 edge namespace:shapes.core -defines-> definition:shapes.core/area :shapes.core/circle static_proven src/shapes/core.clj:6
+edge namespace:shapes.core -defines-> definition:shapes.core/area :shapes.core/poly static_proven src/shapes/core.clj:14
 edge namespace:shapes.core -defines-> definition:shapes.core/total static_proven src/shapes/core.clj:12
 edge namespace:shapes.core -requires-> namespace:shapes.util static_proven src/shapes/core.clj:2
 edge namespace:shapes.util -defines-> definition:shapes.core/area :shapes.util/square static_proven src/shapes/util.clj:6
 edge namespace:shapes.util -defines-> definition:shapes.util/square static_proven src/shapes/util.clj:4
 edge namespace:shapes.util -requires-> namespace:shapes.core static_proven src/shapes/util.clj:2
-usages resolved=3 unresolved=0 unknown=0 not-vars=0 external=12
-adapters multimethods=defmethod:7 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+usages resolved=4 unresolved=0 unknown=0 not-vars=0 external=15
+adapters multimethods=defmethod:9 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

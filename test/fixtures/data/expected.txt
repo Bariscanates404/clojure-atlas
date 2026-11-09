@@ -37,3 +37,4 @@ edge namespace:store.users -defines-> definition:store.users/names static_proven
 edge namespace:store.users -defines-> definition:store.users/rename-tx static_proven src/store/users.clj:18
 usages resolved=0 unresolved=0 unknown=0 not-vars=0 external=12
 adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=datascript, datomic:12 system=off:0 schemas=off:0
+files sources=2 edn=1 skipped-large=0 syntax-error-files=0 dropped-edges=0

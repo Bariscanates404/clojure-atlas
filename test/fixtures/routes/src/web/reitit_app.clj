@@ -4,6 +4,7 @@
 
 (def routes
   [["/ping" h/health]
+   ["/" ["/home" {:get h/health}]]
    ["/api" {:middleware [h/wrap-log]}
     ["/items" {:middleware [[h/wrap-auth :admin]]
                :get h/list-items

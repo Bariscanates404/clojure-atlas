@@ -15,3 +15,6 @@
          ["/export" {:post {:handler h/report
                             :authz [{:permission :export} {:permission :read-items :or {:permission :admin}}]}}]
          ["/browse" {:get h/report}]]))
+
+(defn status-routes []
+  [["/status" {:get {:handler h/health :authz [{:exempt "public status"} {:permission :read-status}]}}]])

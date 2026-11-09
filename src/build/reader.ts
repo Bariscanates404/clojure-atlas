@@ -160,7 +160,7 @@ export function readForms(src: string): ReadResult {
         skipSpace();
         if (peek() !== '{') fail('namespaced map without a map');
         next();
-        return done({ t: 'map', ns: prefix.startsWith(':') ? `:${prefix.slice(1)}` : prefix, children: children('}') } as const);
+        return done({ t: 'map', ns: prefix, children: children('}') } as const);
       }
       const tag = token();
       if (!tag) fail(`unknown dispatch #${d ?? ''}`);
@@ -193,6 +193,9 @@ export function readForms(src: string): ReadResult {
     return { forms, error: { row, col, message: err.message } };
   }
 }
+
+// The text of an atom (symbol, keyword, string, ...); collections and wrappers have none.
+export const textOf = (f: Form | undefined): string | undefined => (f && 'text' in f ? f.text : undefined);
 
 export const isColl = (f: Form): f is Pos & { t: Coll; children: Form[]; ns?: string } =>
   f.t === 'list' || f.t === 'vector' || f.t === 'map' || f.t === 'set' || f.t === 'fn';

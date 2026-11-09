@@ -32,3 +32,4 @@ edge schema:model.malli/User -registers-> definition:model.malli/User static_pro
 edge schema:model.malli/User -uses_schema-> schema:model.malli/Address static_proven src/model/malli.clj:6
 usages resolved=4 unresolved=0 unknown=0 not-vars=0 external=15
 adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=malli, spec:6
+files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

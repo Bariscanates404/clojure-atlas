@@ -2,6 +2,7 @@
 // prove writes and reads; a query literal outside a call reads them HEURISTICALLY, and any other use of a known
 // attribute keyword is a reference of UNKNOWN role whose context the attribute_usage tool ranks.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
+import { keywordName } from '../analysis.ts';
 import { flatChildren, formAt, kids, unwrap, walk, type Form } from '../reader.ts';
 import type { Adapter, Context, Owner } from '../model.ts';
 
@@ -117,7 +118,7 @@ export const dataAttributes: Adapter = {
   },
   run: (ctx: Context, owner: Owner) => {
     const nsOf = new Map(ctx.analysis.nsDefs.map((d) => [d.file, d.name]));
-    const nameIn = (file: string) => (f: Form) => ctx.keywordAt(file, f.row, f.col) ?? ('text' in f ? f.text : '');
+    const nameIn = (file: string) => (f: Form) => ctx.nameOf(file, f);
     const defs: Definition[] = [];
     const uses: Use[] = [];
     const seen = new Set<string>();
@@ -170,7 +171,7 @@ export const dataAttributes: Adapter = {
       return 'reference';
     };
     for (const k of ctx.analysis.keywords) {
-      const name = `:${k.ns ? `${k.ns}/` : ''}${k.name}`;
+      const name = keywordName(k);
       if (!k.ns || !known.has(name)) continue;
       add({ name, kind: 'references', band: 'unknown', file: k.file, row: k.row, col: k.col, from: k.from, ...(k.fromVar ? { fromVar: k.fromVar } : {}), context: contextOf(k.file, k.row, k.col) });
     }
