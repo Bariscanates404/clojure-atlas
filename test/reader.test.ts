@@ -43,7 +43,12 @@ describe('reader', () => {
 
   it('keeps reader conditionals and flattens both platforms for adapters', () => {
     const [f] = read1('[1 #?(:clj 2 :cljs 3) #?@(:clj [4])]');
-    assert.deepEqual(flatChildren(f).map(shape), ['number:1', 'number:2', 'number:3', ['vector', 'number:4']]);
+    assert.deepEqual(flatChildren(f).map(shape), ['number:1', 'number:2', 'number:3', 'number:4']);
+  });
+
+  it('keeps a map in key and value pairs: a conditional is one slot, a splicing one adds whole pairs', () => {
+    const [m] = read1('{:id 1 :v #?(:clj 1 :cljs 2) #?@(:clj [:b 2 :c 3]) :z 3}');
+    assert.deepEqual(flatChildren(m).map(shape), ['keyword::id', 'number:1', 'keyword::v', 'number:1', 'keyword::b', 'number:2', 'keyword::c', 'number:3', 'keyword::z', 'number:3']);
   });
 
   it('reads a namespaced map with its prefix', () => {

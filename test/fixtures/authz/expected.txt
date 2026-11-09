@@ -29,6 +29,7 @@ node key::exempt [key] undefined:undefined
 node key::get [key] undefined:undefined {"other_uses":1}
 node key::handler [key] undefined:undefined
 node key::middleware [key] undefined:undefined {"other_uses":1}
+node key::or [key] undefined:undefined
 node key::permission [key] undefined:undefined
 node key::post [key] undefined:undefined
 node key::put [key] undefined:undefined
@@ -74,6 +75,7 @@ edge definition:shop.catalog/catalog-routes -produces_key-> key::get static_prov
 edge definition:shop.catalog/catalog-routes -produces_key-> key::handler static_proven src/shop/catalog.clj:13 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::handler static_proven src/shop/catalog.clj:14 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::handler static_proven src/shop/catalog.clj:15 {"via":"map-literal"}
+edge definition:shop.catalog/catalog-routes -produces_key-> key::or static_proven src/shop/catalog.clj:16 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::permission static_proven src/shop/catalog.clj:12 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::permission static_proven src/shop/catalog.clj:16 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::post static_proven src/shop/catalog.clj:15 {"via":"map-literal"}
@@ -198,5 +200,5 @@ edge route:POST /catalog/export @shop.catalog/catalog-routes -routes_to-> defini
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::edit-catalog static_proven src/shop/catalog.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
 usages resolved=25 unresolved=0 unknown=0 not-vars=0 external=28
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:35 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:41 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:35 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:42 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=8 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
