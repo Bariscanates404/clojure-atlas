@@ -1,4 +1,4 @@
-// Multimethods: one node per defmethod (multimethod plus dispatch value), defined by its namespace and reached
+// Multimethods: one dispatch arm per defmethod (multimethod plus dispatch value), defined by its namespace and reached
 // from the defmulti through a HEURISTIC call edge (which method runs is decided by the dispatch value at runtime).
 // A top-level defmethod owns the usages in its body.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
@@ -7,7 +7,7 @@ import type { Span, VarUse } from '../analysis.ts';
 import { contains, formAt, kids } from '../reader.ts';
 import { CORE_NS, defId, groupBy, nsId, type Adapter, type Container, type Context } from '../model.ts';
 
-export const methodId = (multi: string, dispatch: string) => defId(`${multi} ${dispatch}`);
+export const methodId = (multi: string, dispatch: string) => `dispatch_arm:${multi}@${dispatch}`;
 
 interface Method {
   use: VarUse;
@@ -42,10 +42,10 @@ export const multimethods: Adapter = {
       const id = methodId(m.multi, m.dispatch);
       const component = ctx.componentOf(m.span.file);
       nodes.push({
-        id, kind: 'definition', name: `${m.multi} ${m.dispatch}`, file: m.span.file, line: m.span.row, end_line: m.span.endRow,
+        id, kind: 'dispatch_arm', name: `${m.multi.split('/').pop()} ${m.dispatch}`, file: m.span.file, line: m.span.row, end_line: m.span.endRow,
         ...(component ? { component } : {}),
         ...(isTestFile(m.span.file) ? { roles: ['test'] } : {}),
-        attrs: { defined_by: 'clojure.core/defmethod', multi: m.multi, dispatch: m.dispatch },
+        attrs: { dispatch_value: m.dispatch, multimethod: m.multi },
       });
       edges.push({ from: nsId(m.use.from), to: id, kind: 'defines', band: 'static_proven', file: m.span.file, line: m.span.row });
       if (ctx.defs.has(m.multi)) {

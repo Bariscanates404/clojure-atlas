@@ -31,11 +31,11 @@ describe('files', () => {
       writeFileSync(path.join(root, rel), body);
     };
     for (const f of ['src/a.clj', 'src/b.cljs', 'src/c.cljc', 'resources/system.edn', 'mod/deps.edn', 'project.clj',
-      'node_modules/x/y.clj', 'target/t.clj', 'out/o.cljs', '.cpcache/c.clj', 'src/.hidden.edn']) put(f);
+      'node_modules/x/y.clj', 'target/t.clj', 'out/o.cljs', '.cpcache/c.clj', 'src/.hidden.edn', 'e2e/login.ts', 'e2e/types.d.ts', 'e2e/package.json']) put(f);
     put('src/huge.clj', 'x'.repeat(2 * 1024 * 1024 + 1));
     try {
       assert.deepEqual(listFiles(root), {
-        sources: ['src/a.clj', 'src/b.cljs', 'src/c.cljc'], edn: ['mod/deps.edn', 'resources/system.edn'],
+        sources: ['src/a.clj', 'src/b.cljs', 'src/c.cljc'], edn: ['mod/deps.edn', 'resources/system.edn'], typescript: ['e2e/login.ts'], packageJsons: ['e2e/package.json'],
         moduleRoots: ['', 'mod'], skippedLarge: ['src/huge.clj'],
       });
     } finally {

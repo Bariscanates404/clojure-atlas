@@ -3,7 +3,8 @@
 import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { keywordName, type Analysis, type Keyword, type Span, type VarDef, type VarUse } from './analysis.ts';
 import type { ProjectConfig } from './config.ts';
-import { contains, readForms, textOf, type Form } from './reader.ts';
+import type { Playwright } from './typescript.ts';
+import { contains, kids, readForms, textOf, walk, type Form } from './reader.ts';
 
 export interface Rows {
   nodes: GraphNode[];
@@ -19,6 +20,7 @@ export interface Container {
 export interface Context {
   analysis: Analysis;
   config: ProjectConfig;
+  playwright: Playwright;
   projectNs: ReadonlySet<string>;
   // "ns/name" to its first definition
   defs: ReadonlyMap<string, VarDef>;
@@ -32,6 +34,8 @@ export interface Context {
   keywordAt: (file: string, row: number, col: number) => string | undefined;
   // the resolved keyword where kondo saw one (code), else the form's text (.edn files kondo does not read)
   nameOf: (file: string, f: Form) => string;
+  // the collection or wrapper directly holding the form that starts at this place, and its index there
+  parentOf: (file: string, row: number, col: number) => { parent: Form; index: number } | undefined;
 }
 
 export interface Adapter {
@@ -40,6 +44,8 @@ export interface Adapter {
   edgeKinds: readonly string[];
   // what switched it on (a required library), or null: it then adds nothing and says so
   detect: (ctx: Context) => string | null;
+  // why it could not run although its subject is there (a missing tool): the capability is then absent, not empty
+  unavailable?: (ctx: Context) => string | null;
   containers?: (ctx: Context) => Container[];
   run: (ctx: Context, owner: Owner) => Rows;
 }
@@ -72,18 +78,28 @@ export function groupBy<T>(xs: Iterable<T>, key: (x: T) => string): Map<string, 
 export const defId = (fullName: string) => `definition:${fullName}`;
 export const nsId = (ns: string) => `namespace:${ns}`;
 
-export function createContext(analysis: Analysis, config: ProjectConfig, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
+export function createContext(analysis: Analysis, config: ProjectConfig, playwright: Playwright, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
   const defs = new Map<string, VarDef>();
   for (const d of analysis.varDefs) if (d.name && !LANGUAGE_NS.test(d.ns) && !defs.has(`${d.ns}/${d.name}`)) defs.set(`${d.ns}/${d.name}`, d);
   const cache = new Map<string, Form[]>();
+  const parents = new Map<string, Map<string, { parent: Form; index: number }>>();
   const at = (file: string, row: number, col: number) => `${file}:${row}:${col}`;
   const uses = new Map<string, VarUse>();
   for (const u of analysis.varUses) if (!u.defmethod) uses.set(at(u.file, u.nameRow, u.nameCol), u);
   const keywords = new Map<string, Keyword>();
   for (const k of analysis.keywords) keywords.set(at(k.file, k.row, k.col), k);
   const useAt = (file: string, row: number, col: number) => uses.get(at(file, row, col));
+  const forms = (file: string): Form[] => {
+    let f = cache.get(file);
+    if (!f) {
+      f = readForms(sources.get(file) ?? '').forms;
+      cache.set(file, f);
+    }
+    return f;
+  };
   return {
     config,
+    playwright,
     useAt,
     defAt: (file, row, col) => {
       const u = useAt(file, row, col);
@@ -92,6 +108,15 @@ export function createContext(analysis: Analysis, config: ProjectConfig, sources
     keywordAt: (file, row, col) => {
       const k = keywords.get(at(file, row, col));
       return k && keywordName(k);
+    },
+    parentOf: (file, row, col) => {
+      let m = parents.get(file);
+      if (!m) {
+        m = new Map();
+        for (const f of walk(forms(file))) kids(f).forEach((c, index) => m?.set(`${c.row}:${c.col}`, { parent: f, index }));
+        parents.set(file, m);
+      }
+      return m.get(`${row}:${col}`);
     },
     nameOf: (file, f) => {
       const k = keywords.get(at(file, f.row, f.col));
@@ -103,32 +128,23 @@ export function createContext(analysis: Analysis, config: ProjectConfig, sources
     defs,
     edn,
     componentOf,
-    forms: (file) => {
-      let f = cache.get(file);
-      if (!f) {
-        f = readForms(sources.get(file) ?? '').forms;
-        cache.set(file, f);
-      }
-      return f;
-    },
+    forms,
   };
 }
 
 const size = (s: Span) => (s.endRow - s.row) * 100000 + (s.endCol - s.col);
 
 export function makeOwner(ctx: Context, containers: readonly Container[]): Owner {
-  const byFile = new Map<string, Container[]>();
-  for (const c of containers) {
-    const xs = byFile.get(c.span.file) ?? [];
-    xs.push(c);
-    byFile.set(c.span.file, xs);
-  }
+  const byFile = groupBy(containers, (c) => c.span.file);
+  // a site read from the forms has no var: the definition whose span holds it stands in
+  const defsByFile = groupBy([...ctx.defs.values()].map((d) => ({ id: defId(`${d.ns}/${d.name}`), span: d as Span })), (c) => c.span.file);
+  const innermost = (cs: readonly Container[] | undefined, site: Site) => {
+    let best: Container | undefined;
+    for (const c of cs ?? []) if (contains(c.span, site.row, site.col) && (!best || size(c.span) < size(best.span))) best = c;
+    return best;
+  };
   return (site) => {
     if (site.fromVar && ctx.defs.has(`${site.from}/${site.fromVar}`)) return defId(`${site.from}/${site.fromVar}`);
-    let best: Container | undefined;
-    for (const c of byFile.get(site.file) ?? []) {
-      if (contains(c.span, site.row, site.col) && (!best || size(c.span) < size(best.span))) best = c;
-    }
-    return best ? best.id : nsId(site.from);
+    return (innermost(byFile.get(site.file), site) ?? innermost(defsByFile.get(site.file), site))?.id ?? nsId(site.from);
   };
 }

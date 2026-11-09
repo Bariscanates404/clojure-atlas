@@ -1,11 +1,13 @@
 node definition:model.malli/Address [definition] src/model/malli.clj:4 {"defined_by":"clojure.core/def"}
 node definition:model.malli/User [definition] src/model/malli.clj:6 {"defined_by":"clojure.core/def"}
-node definition:model.malli/address-of [definition] src/model/malli.clj:12 {"defined_by":"clojure.core/defn"}
+node definition:model.malli/address-of [definition] src/model/malli.clj:12 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"u","reads":[":address"],"reads_complete":true}],"variadic":false}]}}
 node definition:model.malli/not-a-schema [definition] src/model/malli.clj:8 {"defined_by":"clojure.core/def"}
-node definition:model.malli/valid-user? [definition] src/model/malli.clj:10 {"defined_by":"clojure.core/defn"}
-node definition:model.spec/email? [definition] src/model/spec.clj:4 {"defined_by":"clojure.core/defn"}
-node definition:model.spec/just-data [definition] src/model/spec.clj:11 {"defined_by":"clojure.core/defn"}
-node definition:model.spec/valid-person? [definition] src/model/spec.clj:9 {"defined_by":"clojure.core/defn"}
+node definition:model.malli/valid-user? [definition] src/model/malli.clj:10 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"u","reads_complete":false,"escapes":["passed to m/validate"]}],"variadic":false}]}}
+node definition:model.spec/email? [definition] src/model/spec.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to string?"]}],"variadic":false}]}}
+node definition:model.spec/just-data [definition] src/model/spec.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:model.spec/valid-person? [definition] src/model/spec.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"p","reads_complete":false,"escapes":["passed to s/valid?"]}],"variadic":false}]}}
+node key::address [key] undefined:undefined {"other_uses":1}
+node key::model.spec/email [key] undefined:undefined {"other_uses":2}
 node namespace:model.malli [namespace] src/model/malli.clj:1
 node namespace:model.spec [namespace] src/model/spec.clj:1
 node schema::model.spec/email [schema] src/model/spec.clj:6 {"library":"spec"}
@@ -13,9 +15,11 @@ node schema::model.spec/person [schema] src/model/spec.clj:7 {"library":"spec"}
 node schema:model.malli/Address [schema] src/model/malli.clj:4 {"library":"malli"}
 node schema:model.malli/User [schema] src/model/malli.clj:6 {"library":"malli"}
 edge definition:model.malli/User -references-> definition:model.malli/Address static_proven src/model/malli.clj:6
+edge definition:model.malli/address-of -consumes_key-> key::address static_proven src/model/malli.clj:12 {"via":"get"}
 edge definition:model.malli/address-of -references-> definition:model.malli/Address static_proven src/model/malli.clj:12
 edge definition:model.malli/valid-user? -references-> definition:model.malli/User static_proven src/model/malli.clj:10
 edge definition:model.malli/valid-user? -uses_schema-> schema:model.malli/User static_proven src/model/malli.clj:10
+edge definition:model.spec/just-data -produces_key-> key::model.spec/email static_proven src/model/spec.clj:11 {"via":"map-literal"}
 edge definition:model.spec/valid-person? -uses_schema-> schema::model.spec/person static_proven src/model/spec.clj:9
 edge namespace:model.malli -defines-> definition:model.malli/Address static_proven src/model/malli.clj:4
 edge namespace:model.malli -defines-> definition:model.malli/User static_proven src/model/malli.clj:6
@@ -31,5 +35,5 @@ edge schema:model.malli/Address -registers-> definition:model.malli/Address stat
 edge schema:model.malli/User -registers-> definition:model.malli/User static_proven src/model/malli.clj:6
 edge schema:model.malli/User -uses_schema-> schema:model.malli/Address static_proven src/model/malli.clj:6
 usages resolved=4 unresolved=0 unknown=0 not-vars=0 external=15
-adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=malli, spec:6
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=malli, spec:6 key_flow=keywords in code:2 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

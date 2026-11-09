@@ -58,7 +58,7 @@ How to read the columns:
   know). Usages of library vars (clojure.core and dependencies) are not counted, and neither are symbols that can
   never be vars (special forms, auto-gensyms, \`&\`, clojure.test's \`thrown?\`).
 - **resolved %**: resolved / (resolved + unresolved + unknown).
-- adapter columns: edges each adapter added (0 when its library is not used).
+- adapter columns: edges each adapter added (0 when its library is not used); key_tables counts tables.
 - **unknown edges**: edges in band UNKNOWN (attribute references of unproven role).
 
 ${coverageTable(rows)}

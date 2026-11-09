@@ -31,7 +31,7 @@
     "build": "tsc -p tsconfig.build.json",
     "bundle": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/clojure-atlas.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "node --test \"test/*.test.ts\"",
     "coverage": "node scripts/coverage.ts",
     "prepack": "npm run build"
   },
@@ -41,6 +41,7 @@
   "devDependencies": {
     "@types/node": "22.20.5",
     "esbuild": "0.25.10",
+    "ts-api": "npm:typescript@5.9.2",
     "typescript": "7.0.2"
   }
 }

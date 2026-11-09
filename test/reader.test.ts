@@ -51,6 +51,10 @@ describe('reader', () => {
     assert.ok(f.t === 'map' && f.ns === 'user');
   });
 
+  it('reads nil, true and false as literals, not symbols', () => {
+    assert.deepEqual(shape(read1('[nil true false nil?]')[0]), ['vector', 'other:nil', 'other:true', 'other:false', 'symbol:nil?']);
+  });
+
   it('reads the legacy #^ metadata like ^, with its target', () => {
     const [f] = read1('#^String s');
     assert.deepEqual(shape(f), ['meta', 'symbol:String', 'symbol:s']);

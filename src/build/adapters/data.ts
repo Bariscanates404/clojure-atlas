@@ -156,12 +156,8 @@ export const dataAttributes: Adapter = {
     }
 
     const known = new Set([...defs.map((d) => d.name), ...uses.map((u) => u.name)]);
-    const parents = new Map<string, Form>();
-    for (const file of nsOf.keys()) {
-      for (const f of walk(ctx.forms(file))) for (const c of kids(f)) parents.set(`${file}:${c.row}:${c.col}`, f);
-    }
     const contextOf = (file: string, row: number, col: number): string => {
-      const p = parents.get(`${file}:${row}:${col}`);
+      const p = ctx.parentOf(file, row, col)?.parent;
       if (!p) return 'reference';
       const xs = flatChildren(p);
       const name = nameIn(file);

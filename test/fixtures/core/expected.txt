@@ -1,53 +1,58 @@
 node definition:demo.core-test/f-test [definition] test/demo/core_test.clj:7 roles=test {"defined_by":"clojure.test/deftest"}
-node definition:demo.core-test/fixture-map [definition] test/demo/core_test.clj:5 roles=test {"defined_by":"clojure.core/defn"}
+node definition:demo.core-test/fixture-map [definition] test/demo/core_test.clj:5 roles=test {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:demo.core/->Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
 node definition:demo.core/Shape [definition] src/demo/core.clj:4 {"defined_by":"clojure.core/defprotocol"}
 node definition:demo.core/Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
 node definition:demo.core/area [definition] src/demo/core.clj:4 {"defined_by":"clojure.core/defprotocol"}
-node definition:demo.core/area impl src/demo/core.clj:5 [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord","protocol":"demo.core/Shape","impl_ns":"demo.core"}
-node definition:demo.core/f [definition] src/demo/core.clj:9 {"defined_by":"clojure.core/defn"}
+node definition:demo.core/f [definition] src/demo/core.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"m","reads":[":a"],"reads_complete":false,"escapes":["passed to f"]},{"kind":"rest","name":"more"}],"variadic":true}]}}
 node definition:demo.core/m [definition] src/demo/core.clj:15 {"defined_by":"clojure.core/defmacro","macro":true}
 node definition:demo.core/map->Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
-node definition:demo.core/secret [definition] src/demo/core.clj:17 {"defined_by":"clojure.core/defn-","private":true}
+node definition:demo.core/secret [definition] src/demo/core.clj:17 {"defined_by":"clojure.core/defn-","private":true,"signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:demo.core/table [definition] src/demo/core.clj:7 {"defined_by":"clojure.core/def"}
-node definition:demo.shared/both [definition] src/demo/shared.cljc:4 {"defined_by":"clojure.core/defn","platforms":["clj","cljs"]}
-node definition:demo.shared/js-only [definition] src/demo/shared.cljc:7 {"defined_by":"cljs.core/defn"}
-node definition:demo.shared/jvm-only [definition] src/demo/shared.cljc:6 {"defined_by":"clojure.core/defn"}
-node definition:demo.util/helper [definition] src/demo/util.clj:2 {"defined_by":"clojure.core/defn"}
-node definition:demo.util/twice [definition] src/demo/util.clj:3 {"defined_by":"clojure.core/defn"}
+node definition:demo.shared/both [definition] src/demo/shared.cljc:4 {"defined_by":"clojure.core/defn","platforms":["clj","cljs"],"signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to u/helper"]}],"variadic":false}]}}
+node definition:demo.shared/js-only [definition] src/demo/shared.cljc:7 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:demo.shared/jvm-only [definition] src/demo/shared.cljc:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:demo.util/helper [definition] src/demo/util.clj:2 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:demo.util/twice [definition] src/demo/util.clj:3 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to helper"]}],"variadic":false}]}}
+node implementation:src/demo/core.clj:5:29 [implementation] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord","protocol":"demo.core/Shape","method":"demo.core/area","impl_ns":"demo.core"}
+node key::a [key] undefined:undefined
 node namespace:clojure.core [namespace] test-resources/clojure/core.clj:1
 node namespace:demo.core [namespace] src/demo/core.clj:1
 node namespace:demo.core-test [namespace] test/demo/core_test.clj:1
 node namespace:demo.shared [namespace] src/demo/shared.cljc:1
 node namespace:demo.util [namespace] src/demo/util.clj:1
-edge definition:demo.core-test/f-test -calls-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8
-edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:8
-edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:9
+edge definition:demo.core-test/f-test -calls-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8 {"arity":0,"arity_band":"static_proven"}
+edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:8 {"arity":1,"arity_band":"static_proven"}
+edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:9 {"arity":1,"arity_band":"static_proven"}
 edge definition:demo.core-test/f-test -tests-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8
 edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_proven test/demo/core_test.clj:8
 edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_proven test/demo/core_test.clj:9
-edge definition:demo.core/area -calls-> definition:demo.core/area impl src/demo/core.clj:5 heuristic src/demo/core.clj:5 {"via":"protocol dispatch"}
-edge definition:demo.core/area impl src/demo/core.clj:5 -calls-> definition:demo.util/twice static_proven src/demo/core.clj:5
-edge definition:demo.core/f -calls-> definition:demo.util/helper static_proven src/demo/core.clj:10
+edge definition:demo.core-test/fixture-map -produces_key-> key::a static_proven test/demo/core_test.clj:5 {"via":"map-literal"}
+edge definition:demo.core/Square -references-> definition:demo.core/Shape static_proven src/demo/core.clj:5
+edge definition:demo.core/area -calls-> implementation:src/demo/core.clj:5:29 heuristic src/demo/core.clj:5 {"via":"protocol dispatch"}
+edge definition:demo.core/f -calls-> definition:demo.util/helper static_proven src/demo/core.clj:10 {"arity":1,"arity_band":"static_proven"}
+edge definition:demo.core/f -consumes_key-> key::a static_proven src/demo/core.clj:10 {"via":"keyword-fn"}
 edge definition:demo.core/f -references-> definition:demo.util/helper static_proven src/demo/core.clj:11
 edge definition:demo.core/m -references-> definition:demo.core/f static_proven src/demo/core.clj:15
 edge definition:demo.core/m -references-> definition:demo.core/table static_proven src/demo/core.clj:15
-edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17
-edge definition:demo.shared/both -calls-> definition:demo.util/helper static_proven src/demo/shared.cljc:4
-edge definition:demo.shared/js-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:7
-edge definition:demo.shared/jvm-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:6
-edge definition:demo.util/twice -calls-> definition:demo.util/helper static_proven src/demo/util.clj:3
+edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17 {"arity":1,"arity_band":"static_proven"}
+edge definition:demo.core/table -produces_key-> key::a static_proven src/demo/core.clj:7 {"via":"map-literal"}
+edge definition:demo.shared/both -calls-> definition:demo.util/helper static_proven src/demo/shared.cljc:4 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:demo.shared/js-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:7 {"arity":1,"arity_band":"static_proven"}
+edge definition:demo.shared/jvm-only -calls-> definition:demo.shared/both static_proven src/demo/shared.cljc:6 {"arity":1,"arity_band":"static_proven"}
+edge definition:demo.util/twice -calls-> definition:demo.util/helper static_proven src/demo/util.clj:3 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge implementation:src/demo/core.clj:5:29 -calls-> definition:demo.util/twice static_proven src/demo/core.clj:5 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge implementation:src/demo/core.clj:5:29 -implements-> definition:demo.core/area static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/->Square static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/Shape static_proven src/demo/core.clj:4
 edge namespace:demo.core -defines-> definition:demo.core/Square static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/area static_proven src/demo/core.clj:4
-edge namespace:demo.core -defines-> definition:demo.core/area impl src/demo/core.clj:5 static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/f static_proven src/demo/core.clj:9
 edge namespace:demo.core -defines-> definition:demo.core/m static_proven src/demo/core.clj:15
 edge namespace:demo.core -defines-> definition:demo.core/map->Square static_proven src/demo/core.clj:5
 edge namespace:demo.core -defines-> definition:demo.core/secret static_proven src/demo/core.clj:17
 edge namespace:demo.core -defines-> definition:demo.core/table static_proven src/demo/core.clj:7
-edge namespace:demo.core -references-> definition:demo.core/Shape static_proven src/demo/core.clj:5
+edge namespace:demo.core -defines-> implementation:src/demo/core.clj:5:29 static_proven src/demo/core.clj:5
 edge namespace:demo.core -requires-> namespace:demo.util static_proven src/demo/core.clj:2
 edge namespace:demo.core-test -defines-> definition:demo.core-test/f-test static_proven test/demo/core_test.clj:7
 edge namespace:demo.core-test -defines-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:5
@@ -59,5 +64,5 @@ edge namespace:demo.shared -requires-> namespace:demo.util static_proven src/dem
 edge namespace:demo.util -defines-> definition:demo.util/helper static_proven src/demo/util.clj:2
 edge namespace:demo.util -defines-> definition:demo.util/twice static_proven src/demo/util.clj:3
 usages resolved=15 unresolved=0 unknown=1 not-vars=5 external=23
-adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0
+adapters multimethods=off:0 implementations=protocol implementations:3 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:3 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
 files sources=5 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

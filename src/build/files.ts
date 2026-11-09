@@ -6,6 +6,7 @@ import path from 'node:path';
 
 export const SOURCE_EXT = /\.(clj|cljs|cljc)$/;
 const EDN_EXT = /\.edn$/;
+const TS_EXT = /(?<!\.d)\.ts$/;
 const MODULE_FILES = new Set(['deps.edn', 'project.clj', 'shadow-cljs.edn', 'bb.edn', 'build.boot']);
 // build output, dependencies and tool state; hidden directories are skipped as well
 const SKIP_DIRS = new Set(['node_modules', 'target', 'out', 'dist', 'classes']);
@@ -14,13 +15,16 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 export interface RepoFiles {
   sources: string[];
   edn: string[];
+  // TypeScript sources and package.json files, for the Playwright adapter
+  typescript: string[];
+  packageJsons: string[];
   moduleRoots: string[];
   skippedLarge: string[];
 }
 
 // Repo-relative paths with forward slashes, sorted.
 export function listFiles(root: string): RepoFiles {
-  const out: RepoFiles = { sources: [], edn: [], moduleRoots: [], skippedLarge: [] };
+  const out: RepoFiles = { sources: [], edn: [], typescript: [], packageJsons: [], moduleRoots: [], skippedLarge: [] };
   const visit = (rel: string): void => {
     for (const e of readdirSync(path.join(root, rel), { withFileTypes: true })) {
       const p = rel ? `${rel}/${e.name}` : e.name;
@@ -30,6 +34,8 @@ export function listFiles(root: string): RepoFiles {
       }
       if (!e.isFile() || e.name.startsWith('.')) continue;
       if (MODULE_FILES.has(e.name)) out.moduleRoots.push(rel);
+      if (e.name === 'package.json') out.packageJsons.push(p);
+      if (TS_EXT.test(e.name)) out.typescript.push(p);
       // project.clj is Leiningen build configuration, not code
       if ((!SOURCE_EXT.test(e.name) && !EDN_EXT.test(e.name)) || e.name === 'project.clj') continue;
       if (statSync(path.join(root, p)).size > MAX_FILE_BYTES) out.skippedLarge.push(p);

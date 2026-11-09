@@ -15,6 +15,9 @@ const FIXTURES: [string, string][] = [
   ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],
   ['system', 'integrant init-key, refs in edn and code, composite keys, mount defstate, component system-map'],
+  ['client', 'reitit client routes named by :name or :view, nested paths, parameters as {p}, secretary defroute'],
+  ['requests', 'http-xhrio and project effect maps, cljs-ajax, cljs-http and js/fetch requests joined to server routes by method and path'],
+  ['keys', 'map keys produced, consumed and removed (threaded slots heuristic), a key table, signatures with destructuring and call args'],
   ['schema', 'spec s/def and uses inside spec calls, malli schema defs and uses inside malli calls'],
 ];
 

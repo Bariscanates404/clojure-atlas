@@ -34,7 +34,8 @@ export function coverageRow(doc: AtlasDocument, graphBytes: number): CoverageRow
     unresolved: u.unresolved,
     unknown: u.unknown,
     resolvedPct: counted ? (100 * u.resolved) / counted : 100,
-    adapters: Object.fromEntries(Object.entries(doc.stats.adapters).map(([k, a]) => [k, a.edges])),
+    // edges an adapter added; nodes for one that adds no edges (key tables)
+    adapters: Object.fromEntries(Object.entries(doc.stats.adapters).map(([k, a]) => [k, doc.capabilities.find((c) => c.name === k)?.edge_kinds?.length ? a.edges : a.nodes])),
     nodes: doc.nodes.length,
     edges: doc.edges.length,
     unknownEdges: doc.edges.filter((e) => e.band === 'unknown').length,

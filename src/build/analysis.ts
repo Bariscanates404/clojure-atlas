@@ -59,6 +59,8 @@ export interface Keyword extends Span {
   fromVar?: string;
   reg?: string;
   reFrame?: ReFrameContext;
+  // a name in {:keys [...]} destructuring
+  destructured?: boolean;
 }
 
 export interface ProtocolImpl extends Span {
@@ -184,6 +186,7 @@ export function normalize(raw: Raw): Analysis {
           ...(s(r['from-var']) ? { fromVar: s(r['from-var']) } : {}),
           ...(s(r.reg) ? { reg: s(r.reg) } : {}),
           ...(rf ? { reFrame: rf } : {}),
+          ...(r['keys-destructuring'] === true ? { destructured: true } : {}),
         };
       }),
     (x) => key(x.file, x.row, x.col),

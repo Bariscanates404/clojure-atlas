@@ -8,12 +8,14 @@ import { assemble, type AtlasDocument } from './assemble.ts';
 import { EMPTY_CONFIG, parseConfig } from './config.ts';
 import { componentOf, gitInfo, listFiles } from './files.ts';
 import { analyze } from './kondo.ts';
+import { readPlaywright } from './typescript.ts';
 import { createContext } from './model.ts';
 
 export const DEFAULT_GRAPH = '.clojure-atlas/graph.json.gz';
 export const CONFIG_FILE = '.clojure-atlas.edn';
 
-export async function buildGraph(dir: string): Promise<AtlasDocument> {
+// readTs reads the Playwright side; tests hand in one bound to a TypeScript of their choosing.
+export async function buildGraph(dir: string, readTs: typeof readPlaywright = readPlaywright): Promise<AtlasDocument> {
   const started = Date.now();
   const root = path.resolve(dir);
   const files = listFiles(root);
@@ -22,7 +24,8 @@ export async function buildGraph(dir: string): Promise<AtlasDocument> {
   const analysis = await analyze(root, files.sources, config.lintAs);
   const sources = new Map<string, string>();
   for (const f of [...files.sources, ...files.edn]) sources.set(f, readFileSync(path.join(root, f), 'utf8'));
-  const ctx = createContext(analysis, config, sources, files.edn, (f) => componentOf(files.moduleRoots, f));
+  const playwright = readTs(root, files.packageJsons, files.typescript);
+  const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f));
   const git = gitInfo(root);
   const doc = assemble(ctx, ADAPTERS, { repo_name: path.basename(root), ref: git.ref, sha: git.sha, built_at: new Date().toISOString() }, {
     sources: files.sources.length, edn: files.edn.length, skipped_large: files.skippedLarge.length,

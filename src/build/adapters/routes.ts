@@ -6,6 +6,7 @@ import { isTestFile } from '../../mcp/keyflow.ts';
 import type { VarUse } from '../analysis.ts';
 import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
 import { CORE_NS, defId, groupBy, type Adapter, type Context, type Owner } from '../model.ts';
+import { entries, entry, isRoute, isRouteGroup, joinPath, keywordOf } from './route-data.ts';
 
 const COMPOJURE = 'compojure.core';
 const COMPOJURE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'ANY']);
@@ -43,7 +44,7 @@ interface Authz {
   exempt?: { reason: string; line: number };
 }
 
-interface Route {
+export interface Route {
   method: string;
   path: string;
   mount: string;
@@ -62,7 +63,6 @@ export const routeId = (r: Pick<Route, 'method' | 'path' | 'base' | 'mount'>) =>
 export const permissionId = (name: string) => `permission:${name}`;
 export const exemptionId = (reason: string) => `authz_exemption:${reason}`;
 
-const keywordOf = (f: Form): string | undefined => (unwrap(f).t === 'keyword' ? text(unwrap(f)) : undefined);
 
 function literalPath(f: Form | undefined): string | undefined {
   if (!f) return undefined;
@@ -72,14 +72,6 @@ function literalPath(f: Form | undefined): string | undefined {
   return undefined;
 }
 
-function entries(m: Form): [Form, Form][] {
-  const xs = flatChildren(m);
-  const out: [Form, Form][] = [];
-  for (let k = 0; k + 1 < xs.length; k += 2) out.push([xs[k], xs[k + 1]]);
-  return out;
-}
-
-const entry = (m: Form, key: string): Form | undefined => entries(m).find(([k]) => keywordOf(k) === key)?.[1];
 const chainForms = (m: Form): Form[] => entries(m).filter(([k]) => CHAIN_KEYS.has(keywordOf(k) ?? '')).map(([, v]) => v);
 
 // ---------- authz as .clojure-atlas.edn declares it ----------
@@ -284,15 +276,9 @@ function compojureRoutes(ctx: Context): Route[] {
 
 // ---------- route data ----------
 
-const joinPath = (prefix: string, seg: string) => (prefix.endsWith('/') && seg.startsWith('/') ? prefix + seg.slice(1) : prefix + seg);
 
 // pedestal terse routes: ^:interceptors [...] beside the route data
 const isInterceptorVector = (f: Form): boolean => f.t === 'meta' && keywordOf(f.children[0]) === ':interceptors' && unwrap(f).t === 'vector';
-
-const isRoute = (f: Form): boolean => f.t === 'vector' && f.children.length > 1 && unwrap(f.children[0]).t === 'string'
-  && /^(\/|$)/.test(text(unwrap(f.children[0])) ?? 'x');
-
-const isRouteGroup = (f: Form): boolean => f.t === 'vector' && flatChildren(f).some((x) => isRoute(unwrap(x)));
 
 // (into ["/x" data] children) or (conj ["/x" data] child ...): one route with more children
 function appendsToRoute(ctx: Context, file: string, f: Form): boolean {
@@ -364,7 +350,6 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
   const visited = new Set<string>();
 
   const route = (v: Form, file: string, scope: Scope, appended: readonly Form[] = []): void => {
-    visited.add(`${file}:${v.row}:${v.col}`);
     const xs = [...flatChildren(v), ...appended];
     const path = joinPath(scope.prefix, text(unwrap(xs[0])) ?? '');
     const emit = (method: string, handlers: Link[], guards: Guard[], authz: Authz) =>
@@ -410,6 +395,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
   // a route, a group of routes, a call or conditional holding them, or a route function or var to mount here
   const nested = (f: Form, file: string, scope: Scope): void => {
     const u = unwrap(f);
+    visited.add(`${file}:${u.row}:${u.col}`);
     if (u.t === 'symbol') {
       const def = ctx.defAt(file, u.row, u.col);
       const fn = def ? fns.get(def) : undefined;
@@ -456,6 +442,8 @@ function handlerPermissions(ctx: Context): (handlers: readonly Link[], check: nu
   }));
 }
 
+export const serverRoutes = (ctx: Context, owner: Owner): Route[] => [...compojureRoutes(ctx), ...dataRoutes(ctx, owner)];
+
 export const httpRoutes: Adapter = {
   name: 'routes',
   edgeKinds: ['routes_to', 'guarded_by', 'requires_permission', 'exempted_by'],
@@ -467,7 +455,7 @@ export const httpRoutes: Adapter = {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const inHandlers = handlerPermissions(ctx);
-    for (const r of [...compojureRoutes(ctx), ...dataRoutes(ctx, owner)]) {
+    for (const r of serverRoutes(ctx, owner)) {
       const id = routeId(r);
       const component = ctx.componentOf(r.file);
       nodes.push({

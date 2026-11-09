@@ -170,6 +170,7 @@ export function readForms(src: string): ReadResult {
     if (!text) fail(`unexpected ${c}`);
     if (text.startsWith(':')) return done({ t: 'keyword', text } as const);
     if (/^[+-]?\d/.test(text)) return done({ t: 'number', text } as const);
+    if (text === 'nil' || text === 'true' || text === 'false') return done({ t: 'other', text } as const);
     return done({ t: 'symbol', text } as const);
   };
 

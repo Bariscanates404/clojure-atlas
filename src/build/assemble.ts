@@ -3,7 +3,7 @@
 // counts, and the coverage statistics `clojure-atlas coverage` prints.
 import { BANDS, FORMAT, VERSION, compareText, type Capability, type GraphDocument, type GraphEdge, type GraphNode, type GraphSource } from '../mcp/graph.ts';
 import { declaresAuthz } from './config.ts';
-import { core, implementationContainers, type UsageStats } from './core.ts';
+import { core, type UsageStats } from './core.ts';
 import { makeOwner, type Adapter, type Context, type Rows } from './model.ts';
 
 export interface AdapterStats {
@@ -24,9 +24,6 @@ export interface BuildStats {
 
 export type AtlasDocument = GraphDocument & { stats: BuildStats };
 
-// Capabilities the MCP tools ask for that a Clojure source analysis does not produce.
-const NOT_EXTRACTED = ['signatures', 'key_flow', 'key_tables', 'selectors', 'browser_tests', 'requests'];
-
 function bandCounts(edges: readonly GraphEdge[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const b of BANDS) {
@@ -46,12 +43,18 @@ function routeAuthz(ctx: Context, edges: readonly GraphEdge[]): Capability {
   return { name: 'route_authz', status: 'available', edge_kinds: AUTHZ_KINDS, edges: mine.length, bands: bandCounts(mine), note: 'as declared in .clojure-atlas.edn' };
 }
 
+// Arities and parameters ride on definitions, the arity and passed keys on calls edges.
+function signaturesOf(edges: readonly GraphEdge[]): Capability {
+  const mine = edges.filter((e) => e.kind === 'calls' && typeof e.attrs?.arity === 'number');
+  return { name: 'signatures', status: 'available', edge_kinds: ['calls'], edges: mine.length, bands: bandCounts(mine) };
+}
+
 const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}`;
 
 export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: BuildStats['files']): AtlasDocument {
   const detected = new Map(adapters.map((a) => [a.name, a.detect(ctx)]));
   const active = adapters.filter((a) => detected.get(a.name) !== null);
-  const owner = makeOwner(ctx, [...implementationContainers(ctx), ...active.flatMap((a) => a.containers?.(ctx) ?? [])]);
+  const owner = makeOwner(ctx, active.flatMap((a) => a.containers?.(ctx) ?? []));
   const base = core(ctx, owner);
   const produced: [string, Rows][] = [['definitions', base], ...active.map((a): [string, Rows] => [a.name, a.run(ctx, owner)])];
 
@@ -79,13 +82,15 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     ...[['definitions', ['defines', 'requires', 'calls', 'references', 'tests']] as const, ...adapters.map((a) => [a.name, a.edgeKinds] as const)].map(([name, kinds]): Capability => {
       const rows = kept.get(name);
       const why = detected.get(name);
+      const missing = why ? null : adapters.find((a) => a.name === name)?.unavailable?.(ctx);
+      if (missing) return { name, status: 'absent', edge_kinds: [...kinds], note: missing };
       return {
         name, status: 'available', edge_kinds: [...kinds], edges: rows?.edges.length ?? 0, bands: bandCounts(rows?.edges ?? []),
         ...(name === 'definitions' ? {} : { note: why ? `switched on by ${why}` : 'not used: nothing in this codebase switches it on' }),
       };
     }),
     routeAuthz(ctx, [...edges.values()]),
-    ...NOT_EXTRACTED.map((name): Capability => ({ name, status: 'absent', note: 'not extracted from Clojure sources by clojure-atlas' })),
+    signaturesOf([...edges.values()]),
   ];
 
   const adapterStats: Record<string, AdapterStats> = {};

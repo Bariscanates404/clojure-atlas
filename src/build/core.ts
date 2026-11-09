@@ -1,11 +1,12 @@
 // The core graph every codebase gets: namespaces and definitions, and the edges kondo resolves statically:
 // defines (namespace -> definition), requires (namespace -> namespace), calls and references (a usage with and
-// without an argument list), tests (a deftest -> what it uses) and protocol implementations.
+// without an argument list) and tests (a deftest -> what it uses).
 import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../mcp/keyflow.ts';
-import type { ProtocolImpl, VarDef, VarUse } from './analysis.ts';
-import { defId, nsId, type Container, type Context, type Owner, type Rows } from './model.ts';
+import type { VarDef, VarUse } from './analysis.ts';
+import { defId, nsId, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids } from './reader.ts';
+import { callArgs, signatureOf, type Arity } from './signatures.ts';
 
 export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
 
@@ -43,7 +44,7 @@ function assertionHeads(ctx: Context): (u: VarUse) => boolean {
 
 const isTestDef = (d: VarDef) => d.test || /(^|\/)(deftest|defspec)$/.test(d.definedBy ?? '');
 
-export function definitionNode(ctx: Context, d: VarDef): GraphNode {
+export function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): GraphNode {
   const component = ctx.componentOf(d.file);
   const test = isTestDef(d) || isTestFile(d.file);
   return {
@@ -60,6 +61,7 @@ export function definitionNode(ctx: Context, d: VarDef): GraphNode {
       ...(d.macro ? { macro: true } : {}),
       ...(d.private ? { private: true } : {}),
       ...(d.langs.length > 1 ? { platforms: d.langs } : {}),
+      ...(signature ? { signature: { arities: signature } } : {}),
     },
   };
 }
@@ -76,33 +78,6 @@ function namespaceNodes(ctx: Context): GraphNode[] {
   return out;
 }
 
-// A protocol method implemented in a defrecord, deftype, extend-type, extend-protocol or reify form.
-export const implId = (p: ProtocolImpl) => defId(`${p.protocolNs}/${p.method} impl ${p.file}:${p.row}`);
-
-function implementations(ctx: Context): Rows {
-  const nodes: GraphNode[] = [];
-  const edges: GraphEdge[] = [];
-  for (const p of ctx.analysis.protocolImpls) {
-    const component = ctx.componentOf(p.file);
-    const id = implId(p);
-    nodes.push({
-      id, kind: 'definition', name: `${p.protocolNs}/${p.method} impl ${p.file}:${p.row}`, file: p.file, line: p.row, end_line: p.endRow,
-      ...(component ? { component } : {}),
-      attrs: { defined_by: p.definedBy, protocol: `${p.protocolNs}/${p.protocolName}`, impl_ns: p.implNs },
-    });
-    edges.push({ from: nsId(p.implNs), to: id, kind: 'defines', band: 'static_proven', file: p.file, line: p.row });
-    if (ctx.defs.has(`${p.protocolNs}/${p.method}`)) {
-      edges.push({ from: defId(`${p.protocolNs}/${p.method}`), to: id, kind: 'calls', band: 'heuristic', file: p.file, line: p.row, attrs: { via: 'protocol dispatch' } });
-    }
-  }
-  return { nodes, edges };
-}
-
-// Top-level protocol impls own the usages in their bodies; one inside a function stays with that function.
-export function implementationContainers(ctx: Context): Container[] {
-  return ctx.analysis.protocolImpls.map((p) => ({ id: implId(p), span: p }));
-}
-
 function top(counts: Map<string, number>, n = 15): [string, number][] {
   return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, n);
 }
@@ -111,8 +86,12 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const nodes: GraphNode[] = [...namespaceNodes(ctx)];
   const edges: GraphEdge[] = [];
   const testIds = new Set<string>();
+  const signatures = new Map<string, Arity[]>();
   for (const d of ctx.defs.values()) {
-    const node = definitionNode(ctx, d);
+    const form = /\/defn-?$/.test(d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
+    const sig = form ? signatureOf(form, (f) => ctx.nameOf(d.file, f)) : null;
+    if (sig) signatures.set(`${d.ns}/${d.name}`, sig);
+    const node = definitionNode(ctx, d, sig);
     nodes.push(node);
     if (isTestDef(d)) testIds.add(node.id);
     edges.push({ from: nsId(d.ns), to: node.id, kind: 'defines', band: 'static_proven', file: d.file, line: d.row });
@@ -120,17 +99,14 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   for (const u of ctx.analysis.nsUses) {
     if (ctx.projectNs.has(u.to) && u.to !== u.from) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
   }
-  const impls = implementations(ctx);
-  nodes.push(...impls.nodes);
-  edges.push(...impls.edges);
 
   const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [] };
   const unresolved = new Map<string, number>();
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
-  const link = (from: string, to: string, kind: string, u: { file: string; nameRow: number }) => {
+  const link = (from: string, to: string, kind: string, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
     if (from === to) return;
-    edges.push({ from, to, kind, band: 'static_proven', file: u.file, line: u.nameRow });
+    edges.push({ from, to, kind, band: 'static_proven', file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
     if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band: 'static_proven', file: u.file, line: u.nameRow });
   };
   const isAssertion = assertionHeads(ctx);
@@ -156,7 +132,11 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
       return;
     }
     stats.resolved++;
-    link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), u.arity !== undefined ? 'calls' : 'references', u);
+    const call = u.arity !== undefined ? formAt(ctx.forms(u.file), u.row, u.col) : undefined;
+    const attrs = u.arity !== undefined
+      ? { arity: u.arity, arity_band: 'static_proven', ...(call ? callArgs(call, u.arity, signatures.get(full) ?? null, (f) => ctx.nameOf(u.file, f)) : {}) }
+      : undefined;
+    link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), u.arity !== undefined ? 'calls' : 'references', u, attrs);
   };
   for (const u of ctx.analysis.varUses) usage(u);
 

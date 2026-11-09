@@ -1,0 +1,68 @@
+node definition:cart.core/checkout [definition] src/cart/core.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads_complete":false,"escapes":["passed to ->","used as a value"]}],"variadic":false}]}}
+node definition:cart.core/configure [definition] src/cart/core.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"opts","reads_complete":false,"escapes":["passed to assoc"]},{"kind":"kwargs","keys":[":verbose"],"reads_complete":true}],"variadic":true}]}}
+node definition:cart.core/item-types [definition] src/cart/core.clj:3 {"defined_by":"clojure.core/def"}
+node definition:cart.core/line-total [definition] src/cart/core.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"map","keys":[":price",":qty"],"as":"item","defaults":[":qty"],"reads":[":discount"],"reads_complete":true}],"variadic":false}]}}
+node definition:cart.core/summary [definition] src/cart/core.clj:20 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads":[":meta",":total"],"reads_complete":false,"escapes":["passed to ->"]}],"variadic":false}]}}
+node key::cfg [key] undefined:undefined
+node key::count [key] undefined:undefined
+node key::coupon [key] undefined:undefined
+node key::depth [key] undefined:undefined
+node key::discount [key] undefined:undefined
+node key::draft [key] undefined:undefined
+node key::first [key] undefined:undefined
+node key::h [key] undefined:undefined
+node key::items [key] undefined:undefined
+node key::meta [key] undefined:undefined
+node key::path [key] undefined:undefined
+node key::price [key] undefined:undefined
+node key::qty [key] undefined:undefined
+node key::total [key] undefined:undefined
+node key::type [key] undefined:undefined
+node key::verbose [key] undefined:undefined {"other_uses":1}
+node key::x [key] undefined:undefined
+node key_table:src/cart/core.clj:4:3 [key_table] src/cart/core.clj:4 {"shape":"vector","form_line":3,"var":"cart.core/item-types","rows":[{"line":4,"keys":[":type",":price",":path"],"tags":{":type":":book"},"vecs":{":path":[":catalog",":books"]}},{"line":5,"keys":[":type",":price",":path"],"tags":{":type":":music"},"vecs":{":path":[":catalog",":music"]}},{"line":6,"keys":[":type",":path"],"tags":{":type":":film"},"vecs":{":path":[":catalog",":films"]}}]}
+node namespace:cart.core [namespace] src/cart/core.clj:1
+edge definition:cart.core/checkout -consumes_key-> key::count heuristic src/cart/core.clj:18 {"via":"update"}
+edge definition:cart.core/checkout -consumes_key-> key::items static_proven src/cart/core.clj:14 {"via":"destructure"}
+edge definition:cart.core/checkout -produces_key-> key::count heuristic src/cart/core.clj:18 {"via":"update"}
+edge definition:cart.core/checkout -produces_key-> key::total heuristic src/cart/core.clj:16 {"via":"assoc"}
+edge definition:cart.core/checkout -references-> definition:cart.core/line-total static_proven src/cart/core.clj:16
+edge definition:cart.core/checkout -removes_key-> key::draft heuristic src/cart/core.clj:17 {"via":"dissoc"}
+edge definition:cart.core/configure -consumes_key-> key::verbose static_proven src/cart/core.clj:11 {"via":"destructure"}
+edge definition:cart.core/configure -produces_key-> key::verbose static_proven src/cart/core.clj:11 {"via":"assoc"}
+edge definition:cart.core/item-types -produces_key-> key::path static_proven src/cart/core.clj:4 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::path static_proven src/cart/core.clj:5 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::path static_proven src/cart/core.clj:6 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::price static_proven src/cart/core.clj:4 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::price static_proven src/cart/core.clj:5 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::type static_proven src/cart/core.clj:4 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::type static_proven src/cart/core.clj:5 {"via":"map-literal"}
+edge definition:cart.core/item-types -produces_key-> key::type static_proven src/cart/core.clj:6 {"via":"map-literal"}
+edge definition:cart.core/line-total -consumes_key-> key::discount static_proven src/cart/core.clj:9 {"via":"get"}
+edge definition:cart.core/line-total -consumes_key-> key::price static_proven src/cart/core.clj:8 {"via":"destructure"}
+edge definition:cart.core/line-total -consumes_key-> key::qty static_proven src/cart/core.clj:8 {"via":"destructure"}
+edge definition:cart.core/summary -calls-> definition:cart.core/configure static_proven src/cart/core.clj:24 {"arity":3,"arity_band":"static_proven","args":[{"i":0,"shape":"map","keys":[],"band":"static_proven"}],"kwargs":{"keys":[":verbose"],"band":"static_proven"}}
+edge definition:cart.core/summary -calls-> definition:cart.core/line-total static_proven src/cart/core.clj:23 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"map","keys":[":price",":qty",":coupon"],"band":"static_proven"}]}
+edge definition:cart.core/summary -consumes_key-> key::count static_proven src/cart/core.clj:22 {"via":"get-in"}
+edge definition:cart.core/summary -consumes_key-> key::depth heuristic src/cart/core.clj:25 {"via":"keyword-fn"}
+edge definition:cart.core/summary -consumes_key-> key::meta static_proven src/cart/core.clj:22 {"via":"get-in"}
+edge definition:cart.core/summary -consumes_key-> key::meta heuristic src/cart/core.clj:25 {"via":"keyword-fn"}
+edge definition:cart.core/summary -consumes_key-> key::total static_proven src/cart/core.clj:21 {"via":"keyword-fn"}
+edge definition:cart.core/summary -produces_key-> key::cfg static_proven src/cart/core.clj:24 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::count static_proven src/cart/core.clj:22 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::coupon static_proven src/cart/core.clj:23 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::depth static_proven src/cart/core.clj:25 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::first static_proven src/cart/core.clj:23 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::h static_proven src/cart/core.clj:26 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::price static_proven src/cart/core.clj:23 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::qty static_proven src/cart/core.clj:23 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::total static_proven src/cart/core.clj:21 {"via":"map-literal"}
+edge definition:cart.core/summary -produces_key-> key::x static_proven src/cart/core.clj:26 {"via":"hash-map"}
+edge namespace:cart.core -defines-> definition:cart.core/checkout static_proven src/cart/core.clj:13
+edge namespace:cart.core -defines-> definition:cart.core/configure static_proven src/cart/core.clj:11
+edge namespace:cart.core -defines-> definition:cart.core/item-types static_proven src/cart/core.clj:3
+edge namespace:cart.core -defines-> definition:cart.core/line-total static_proven src/cart/core.clj:8
+edge namespace:cart.core -defines-> definition:cart.core/summary static_proven src/cart/core.clj:20
+usages resolved=3 unresolved=0 unknown=0 not-vars=0 external=20
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:33 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=1 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

@@ -1,15 +1,22 @@
 node definition:web.compojure-app/app [definition] src/web/compojure_app.clj:5 {"defined_by":"compojure.core/defroutes"}
 node definition:web.handlers/audit [definition] src/web/handlers.clj:9 {"defined_by":"clojure.core/def"}
-node definition:web.handlers/create-item [definition] src/web/handlers.clj:8 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/health [definition] src/web/handlers.clj:2 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/list-items [definition] src/web/handlers.clj:7 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/show-user [definition] src/web/handlers.clj:3 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/upload [definition] src/web/handlers.clj:4 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/wrap-auth [definition] src/web/handlers.clj:5 {"defined_by":"clojure.core/defn"}
-node definition:web.handlers/wrap-log [definition] src/web/handlers.clj:6 {"defined_by":"clojure.core/defn"}
+node definition:web.handlers/create-item [definition] src/web/handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:web.handlers/health [definition] src/web/handlers.clj:2 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:web.handlers/list-items [definition] src/web/handlers.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:web.handlers/show-user [definition] src/web/handlers.clj:3 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"id","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:web.handlers/upload [definition] src/web/handlers.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"req","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.handlers/wrap-auth [definition] src/web/handlers.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.handlers/wrap-log [definition] src/web/handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:web.pedestal-app/table [definition] src/web/pedestal_app.clj:5 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/app [definition] src/web/reitit_app.clj:13 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/routes [definition] src/web/reitit_app.clj:5 {"defined_by":"clojure.core/def"}
+node key::body [key] undefined:undefined
+node key::get [key] undefined:undefined {"other_uses":2}
+node key::handler [key] undefined:undefined
+node key::middleware [key] undefined:undefined
+node key::name [key] undefined:undefined
+node key::post [key] undefined:undefined
+node key::status [key] undefined:undefined
 node namespace:web.compojure-app [namespace] src/web/compojure_app.clj:1
 node namespace:web.handlers [namespace] src/web/handlers.clj:1
 node namespace:web.pedestal-app [namespace] src/web/pedestal_app.clj:1
@@ -24,15 +31,28 @@ node route:GET /items @web.pedestal-app/table [route] src/web/pedestal_app.clj:7
 node route:GET /report @web.compojure-app/app [route] src/web/compojure_app.clj:7 {"method":"get","path":"/report","full_path":"/report","base":"web.compojure-app/app","mount":"","library":"compojure"}
 node route:POST /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:9 {"method":"post","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:POST /avatar @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:11 {"method":"post","path":"/avatar","full_path":"/api/users/:id/avatar","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
-edge definition:web.compojure-app/app -calls-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6
-edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:10
-edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:7
-edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11
-edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:7
+edge definition:web.compojure-app/app -calls-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6 {"arity":0,"arity_band":"static_proven"}
+edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:10 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"id"}]}
+edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:7 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"req"}]}
+edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:7 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.handlers/audit -produces_key-> key::name static_proven src/web/handlers.clj:9 {"via":"map-literal"}
+edge definition:web.handlers/create-item -produces_key-> key::status static_proven src/web/handlers.clj:8 {"via":"map-literal"}
+edge definition:web.handlers/health -produces_key-> key::status static_proven src/web/handlers.clj:2 {"via":"map-literal"}
+edge definition:web.handlers/list-items -produces_key-> key::status static_proven src/web/handlers.clj:7 {"via":"map-literal"}
+edge definition:web.handlers/show-user -produces_key-> key::body static_proven src/web/handlers.clj:3 {"via":"map-literal"}
+edge definition:web.handlers/show-user -produces_key-> key::status static_proven src/web/handlers.clj:3 {"via":"map-literal"}
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
 edge definition:web.reitit-app/app -references-> definition:web.reitit-app/routes static_proven src/web/reitit_app.clj:13
+edge definition:web.reitit-app/routes -produces_key-> key::get static_proven src/web/reitit_app.clj:10 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::get static_proven src/web/reitit_app.clj:7 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::handler static_proven src/web/reitit_app.clj:11 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::middleware static_proven src/web/reitit_app.clj:11 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::middleware static_proven src/web/reitit_app.clj:8 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::middleware static_proven src/web/reitit_app.clj:9 {"via":"map-literal"}
+edge definition:web.reitit-app/routes -produces_key-> key::post static_proven src/web/reitit_app.clj:11 {"via":"map-literal"}
 edge definition:web.reitit-app/routes -references-> definition:web.handlers/create-item static_proven src/web/reitit_app.clj:11
 edge definition:web.reitit-app/routes -references-> definition:web.handlers/health static_proven src/web/reitit_app.clj:6
 edge definition:web.reitit-app/routes -references-> definition:web.handlers/health static_proven src/web/reitit_app.clj:7
@@ -72,5 +92,5 @@ edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.hand
 edge route:POST /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/create-item static_proven src/web/reitit_app.clj:11
 edge route:POST /avatar @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11
 usages resolved=16 unresolved=0 unknown=0 not-vars=0 external=22
-adapters multimethods=off:0 events=off:0 routes=compojure, pedestal, reitit:16 data_attributes=off:0 system=off:0 schemas=off:0
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, pedestal, reitit:16 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:13 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=4 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
