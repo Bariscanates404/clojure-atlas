@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildGraph, writeGraph } from '../src/build/index.ts';
-import { coverageRow, coverageTable, type CoverageRow } from '../src/coverage.ts';
+import { coverageRow, coverageTable, pct, type CoverageRow } from '../src/coverage.ts';
 
 interface CorpusEntry {
   name: string;
@@ -36,11 +36,11 @@ for (const entry of corpus) {
     + `- most frequent unresolved: ${u.topUnresolved.map(([n, k]) => `\`${n}\` ${k}`).join(', ') || 'none'}\n`
     + `- most frequent unknown: ${u.topUnknown.map(([n, k]) => `\`${n}\` ${k}`).join(', ') || 'none'}\n`
     + `- adapters: ${Object.entries(doc.stats.adapters).map(([k, a]) => `${k} ${a.detected ? `(${a.detected}) ${a.edges} edges` : 'off'}`).join(', ')}\n`);
-  if (row.resolutionRate < 95 || row.unknown > row.resolved * 0.05) {
-    gaps.push(`- **${entry.name}** resolution rate ${row.resolutionRate.toFixed(1)}%, ${row.unknown} usages in an unknown namespace `
+  if ((row.resolutionRate ?? 100) < 95 || row.unknown > row.resolved * 0.05) {
+    gaps.push(`- **${entry.name}** resolution rate ${pct(row.resolutionRate)}, ${row.unknown} usages in an unknown namespace `
       + `(most: ${names(u.topUnknown)}); ${u.unresolved} unresolved (most: ${names(u.topUnresolved, 3)})`);
   }
-  process.stderr.write(`${entry.name}: resolution rate ${row.resolutionRate.toFixed(1)}%, ${row.unknown} unknown namespace, ${(row.buildMs / 1000).toFixed(1)} s\n`);
+  process.stderr.write(`${entry.name}: resolution rate ${pct(row.resolutionRate)}, ${row.unknown} unknown namespace, ${(row.buildMs / 1000).toFixed(1)} s\n`);
 }
 
 if (!only.length) {

@@ -4,8 +4,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { componentOf, listFiles } from '../src/build/files.ts';
-import { MCP_ENTRY, withMcpEntry } from '../src/cli.ts';
-import { coverageTable, type CoverageRow } from '../src/coverage.ts';
+import { coverageRow, coverageTable, type CoverageRow } from '../src/coverage.ts';
+import { MCP_ENTRY, parseCommand, UsageError, withMcpEntry } from '../src/cli.ts';
 import { readFileSync } from 'node:fs';
 import { VERSION } from '../src/version.ts';
 
@@ -65,10 +65,57 @@ describe('coverage table', () => {
     assert.equal(lines.length, 3);
     assert.equal(lines[2], '| demo | 4 | 3 | 0 | 9 | 19 | 1 | 95.0% | 2 | 2 | 1 | 1.5 s | 2 KB |');
   });
+
+  it('shows n/a, not 100%, for a repo whose usages never reached a project namespace', () => {
+    const doc = { source: { repo_name: 'bare', sha: 'a' }, stats: { files: { expected: 1, sources: 1 }, syntax_errors: { files: 0 }, definitions: 1, usages: { resolved: 0, unresolved: 0, unknown: 0 }, adapters: {} }, capabilities: [], nodes: [], edges: [] };
+    const row = coverageRow(doc as unknown as Parameters<typeof coverageRow>[0], 10);
+    assert.equal(row.resolutionRate, null);
+    assert.match(coverageTable([row]), /\| 0 \| 0 \| n\/a \| 0 \|/);
+  });
 });
 
 describe('version', () => {
   it('is the package.json version', () => {
     assert.equal(VERSION, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
+  });
+});
+
+describe('command line parsing', () => {
+  it('reads each command with its defaults', () => {
+    assert.deepEqual(parseCommand(['build']), { cmd: 'build', dir: '.' });
+    assert.deepEqual(parseCommand(['build', 'x', '-o', 'g.gz']), { cmd: 'build', dir: 'x', out: 'g.gz' });
+    assert.deepEqual(parseCommand(['coverage']), { cmd: 'coverage', graph: '.clojure-atlas/graph.json.gz' });
+    assert.deepEqual(parseCommand(['init', '--yes']), { cmd: 'init', yes: true });
+    assert.deepEqual(parseCommand(['init']), { cmd: 'init', yes: false });
+  });
+
+  it('answers help and version before anything else is looked at', () => {
+    for (const argv of [[], ['--help'], ['-h'], ['build', '--help'], ['build', '-h'], ['mcp', '--bogus', '-h'], ['frobnicate', '--help']]) assert.deepEqual(parseCommand(argv), { cmd: 'help' });
+    assert.deepEqual(parseCommand(['--version']), { cmd: 'version' });
+    assert.deepEqual(parseCommand(['build', '--version']), { cmd: 'version' });
+  });
+
+  it('rejects unknown commands and options, missing values, stray arguments and bad numbers', () => {
+    const bad: [string[], RegExp][] = [
+      [['frobnicate'], /unknown command frobnicate/],
+      [['build', '.', '-o'], /-o needs a value/],
+      [['build', '-o', '--x'], /-o needs a value/],
+      [['mcp', '--repo', '--graph', 'x'], /--repo needs a value/],
+      [['mcp', '--graph'], /--graph needs a value/],
+      [['mcp', '--outt', 'x'], /unknown option --outt/],
+      [['build', '--outt', 'x'], /unknown option --outt/],
+      [['build', 'a', 'b'], /unexpected argument b/],
+      [['mcp', 'stray'], /unexpected argument stray/],
+      [['coverage', 'a', 'b'], /unexpected argument b/],
+      [['init', '--yes', 'x'], /unexpected argument x/],
+      [['mcp', '--max-distance', '5abc'], /non-negative integer, got 5abc/],
+      [['mcp', '--max-distance', '1.9'], /non-negative integer, got 1\.9/],
+      [['mcp', '--max-distance', '-1'], /--max-distance needs a value/],
+    ];
+    for (const [argv, why] of bad) assert.throws(() => parseCommand(argv), (e) => e instanceof UsageError && why.test(e.message), argv.join(' '));
+  });
+
+  it('refuses a .mcp.json it cannot extend, naming the file', () => {
+    for (const bad of ['null', '[]', '3', '{bad', '{"mcpServers":[]}', '{"mcpServers":null}']) assert.throws(() => withMcpEntry(bad), /^Error: \.mcp\.json/, bad);
   });
 });

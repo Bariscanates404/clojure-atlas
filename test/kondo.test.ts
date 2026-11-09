@@ -9,8 +9,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { deflateRawSync } from 'node:zlib';
-import { ASSETS, HOST, KONDO_VERSION, locateKondo, unzipEntry, type KondoHost } from '../src/build/kondo-binary.ts';
-import { analyze } from '../src/build/kondo.ts';
+import { ASSETS, cacheRoot, downloader, HOST, KONDO_VERSION, locateKondo, unzipEntry, type KondoHost } from '../src/build/kondo-binary.ts';
+import { analyze, chunkFiles } from '../src/build/kondo.ts';
 
 // A minimal zip holding the given files (one deflated, one stored), written by hand.
 function zipOf(files: [string, Buffer, boolean][]): Buffer {
@@ -95,10 +95,19 @@ describe('kondo binary', () => {
     assert.equal(log.downloads.length, 1);
   });
 
-  it('refuses a download whose sha256 is not the pinned one and writes nothing', async () => {
-    const { h } = host({ dir: 'bad', runs: ['clj-kondo'], assets: { 'testos-x1': ['testos-x1', '0'.repeat(64)] } });
-    await assert.rejects(locateKondo(h), /sha256 [0-9a-f]{64}, expected 0{64}; refusing to run it/);
+  it('refuses a download whose sha256 is not the pinned one, writes nothing, and uses clj-kondo on PATH', async () => {
+    const { h, log } = host({ dir: 'bad', runs: ['clj-kondo'], assets: { 'testos-x1': ['testos-x1', '0'.repeat(64)] } });
+    assert.equal((await locateKondo(h)).command, 'clj-kondo');
+    assert.match(log.warnings.join('\n'), /sha256 [0-9a-f]{64}, expected 0{64}; refusing to run it; using clj-kondo on PATH/);
     assert.equal(existsSync(path.join(cache, 'bad')), false);
+    const none = host({ dir: 'bad2', assets: { 'testos-x1': ['testos-x1', '0'.repeat(64)] } });
+    await assert.rejects(locateKondo(none.h), /refusing to run it, and there is no clj-kondo on PATH/);
+  });
+
+  it('says on stderr that it is downloading, before it does', async () => {
+    const { h, log } = host({ dir: 'say', runs: ['clj-kondo'] });
+    await locateKondo(h);
+    assert.match(log.warnings[0], /^downloading clj-kondo 2025\.10\.23 \(testos-x1\) once, to /);
   });
 
   it('falls back to clj-kondo on PATH without a native release or a download, and says why', async () => {
@@ -107,7 +116,7 @@ describe('kondo binary', () => {
     assert.match(unsupported.log.warnings[0], /has no native release for plan9-x1; using clj-kondo on PATH/);
     const offline = host({ dir: 'offline', runs: ['clj-kondo'], download: async () => { throw new Error('getaddrinfo ENOTFOUND'); } });
     assert.equal((await locateKondo(offline.h)).command, 'clj-kondo');
-    assert.match(offline.log.warnings[0], /cannot download .*\(getaddrinfo ENOTFOUND\); using clj-kondo on PATH/);
+    assert.match(offline.log.warnings[1], /cannot download .*\(getaddrinfo ENOTFOUND\); using clj-kondo on PATH/);
   });
 
   it('stops with the reason when nothing can run', async () => {
@@ -138,6 +147,46 @@ describe('the real host', () => {
     const notExecutable = path.join(cache, 'plain-file');
     writeFileSync(notExecutable, 'x');
     assert.equal(HOST.version(notExecutable), null);
+  });
+});
+
+describe('the cache directory', () => {
+  it('uses an absolute XDG_CACHE_HOME or LOCALAPPDATA, and treats an empty or relative one as unset', () => {
+    assert.equal(cacheRoot({ XDG_CACHE_HOME: '/x/cache' }, 'linux', '/home/u'), '/x/cache');
+    assert.equal(cacheRoot({ XDG_CACHE_HOME: '' }, 'linux', '/home/u'), '/home/u/.cache');
+    assert.equal(cacheRoot({ XDG_CACHE_HOME: 'rel/cache' }, 'darwin', '/home/u'), '/home/u/.cache');
+    assert.equal(cacheRoot({}, 'linux', '/home/u'), '/home/u/.cache');
+    assert.equal(cacheRoot({ LOCALAPPDATA: 'C:\\L' }, 'win32', '/h'), path.join('/h', 'AppData', 'Local'));
+  });
+});
+
+describe('a download that never ends', () => {
+  it('gives up after the timeout so the PATH fallback is reached', async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const started = Date.now();
+      await assert.rejects(downloader(300)(`http://127.0.0.1:${(server.address() as AddressInfo).port}/x`));
+      assert.ok(Date.now() - started < 5000);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+});
+
+describe('chunking the command line', () => {
+  it('keeps every run under the file count and the character budget, in order, and loses nothing', () => {
+    const files = Array.from({ length: 1000 }, (_, i) => `${'d/'.repeat(100)}file-${i}.clj`);
+    const runs = chunkFiles(files);
+    assert.deepEqual(runs.flat(), files);
+    for (const run of runs) {
+      assert.ok(run.length <= 300);
+      assert.ok(run.reduce((n, f) => n + f.length + 1, 0) <= 24_000);
+    }
+    assert.ok(runs.length > Math.ceil(1000 / 300));
+    assert.deepEqual(chunkFiles([]), []);
+    assert.deepEqual(chunkFiles(['a'.repeat(30)], 300, 10), [['a'.repeat(30)]]);
   });
 });
 

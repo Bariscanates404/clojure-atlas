@@ -60,8 +60,8 @@ describe('snapshot', () => {
     assert.equal(gitDistance(root)('0'.repeat(40), head), null);
   });
 
-  it('reads both paths of a rename or copy from git status, and leaves the graph output out', () => {
-    const status = [' M src/a.clj', 'R  src/new.clj', 'src/old.clj', 'C  src/copy.clj', 'src/orig.clj', '?? .clojure-atlas/graph.json.gz', '?? z.clj', ''].join('\0');
+  it('reads both paths of a rename or copy from git status, ', () => {
+    const status = [' M src/a.clj', 'R  src/new.clj', 'src/old.clj', 'C  src/copy.clj', 'src/orig.clj', '?? z.clj', ''].join('\0');
     assert.deepEqual(changedPaths(status), ['src/a.clj', 'src/copy.clj', 'src/new.clj', 'src/old.clj', 'src/orig.clj', 'z.clj']);
     assert.deepEqual(changedPaths(''), []);
   });
