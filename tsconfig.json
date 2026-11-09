@@ -20,7 +20,8 @@
   "include": [
     "src",
     "test",
-    "scripts"
+    "scripts",
+    "bench"
   ],
   "exclude": [
     "test/fixtures"

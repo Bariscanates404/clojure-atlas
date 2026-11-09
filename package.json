@@ -34,6 +34,7 @@
     "test": "node --test \"test/*.test.ts\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=98 \"test/*.test.ts\"",
     "coverage": "node scripts/coverage.ts",
+    "bench": "node bench/score.ts",
     "prepack": "npm run build"
   },
   "devDependencies": {

@@ -1,0 +1,190 @@
+[
+  {
+    "id": "q01",
+    "repo": "integrant",
+    "question": "Which definitions call integrant.core/dependent-keys directly?",
+    "tool": "callers",
+    "args": {"var": "integrant.core/dependent-keys"},
+    "expected": [
+      "integrant.core/load-namespaces",
+      "integrant.core/run!",
+      "integrant.core/build",
+      "integrant.core/halt-missing-keys!"
+    ],
+    "evidence": {
+      "integrant.core/load-namespaces": "src/integrant/core.cljc:260",
+      "integrant.core/run!": "src/integrant/core.cljc:389",
+      "integrant.core/build": "src/integrant/core.cljc:442",
+      "integrant.core/halt-missing-keys!": "src/integrant/core.cljc:673"
+    }
+  },
+  {
+    "id": "q02",
+    "repo": "mount",
+    "question": "Which definitions or namespaces call mount.core/stop-except?",
+    "tool": "callers",
+    "args": {"var": "mount.core/stop-except"},
+    "expected": [
+      "mount.test.stop-except/stop-except",
+      "tapp.example",
+      "app.example"
+    ],
+    "evidence": {
+      "mount.test.stop-except/stop-except": "test/core/mount/test/stop_except.cljc:22",
+      "tapp.example": "test/cljs/tapp/example.cljs:22",
+      "app.example": "dev/cljs/app/example.cljs:22"
+    }
+  },
+  {
+    "id": "q03",
+    "repo": "ring",
+    "question": "Which definitions call ring.util.request/character-encoding (not the :character-encoding request key)?",
+    "tool": "callers",
+    "args": {"var": "ring.util.request/character-encoding"},
+    "expected": [
+      "ring.middleware.params/params-request",
+      "ring.middleware.multipart-params/parse-multipart-params",
+      "ring.util.test.request/test-character-encoding"
+    ],
+    "evidence": {
+      "ring.middleware.params/params-request": "ring-core/src/ring/middleware/params.clj:47",
+      "ring.middleware.multipart-params/parse-multipart-params": "ring-core/src/ring/middleware/multipart_params.clj:103",
+      "ring.util.test.request/test-character-encoding": "ring-core/test/ring/util/test/request.clj:39"
+    }
+  },
+  {
+    "id": "q04",
+    "repo": "usermanager",
+    "question": "Which definitions call the model function usermanager.model.user-manager/get-users (not the controller of the same name)?",
+    "tool": "callers",
+    "args": {"var": "usermanager.model.user-manager/get-users"},
+    "expected": [
+      "usermanager.controllers.user/get-users",
+      "usermanager.model.user-manager-test/user-test"
+    ],
+    "evidence": {
+      "usermanager.controllers.user/get-users": "src/usermanager/controllers/user.clj:65",
+      "usermanager.model.user-manager-test/user-test": "test/usermanager/model/user_manager_test.clj:44"
+    }
+  },
+  {
+    "id": "q05",
+    "repo": "integrant",
+    "question": "Which definitions use integrant.core/ref? in any way, including passing it as a predicate value?",
+    "tool": "callers",
+    "args": {"var": "integrant.core/ref?", "include_references": true},
+    "expected": [
+      "integrant.core/find-derived-refs",
+      "integrant.core/ambiguous-refs",
+      "integrant.core/missing-refs",
+      "integrant.core-test/ref-test"
+    ],
+    "evidence": {
+      "integrant.core/find-derived-refs": "src/integrant/core.cljc:178",
+      "integrant.core/ambiguous-refs": "src/integrant/core.cljc:323",
+      "integrant.core/missing-refs": "src/integrant/core.cljc:328",
+      "integrant.core-test/ref-test": "test/integrant/core_test.cljc:80"
+    }
+  },
+  {
+    "id": "q06",
+    "repo": "honeysql",
+    "question": "Which definitions use honey.sql/format-columns in any way, including registering it as a clause formatter value?",
+    "tool": "callers",
+    "args": {"var": "honey.sql/format-columns", "include_references": true},
+    "expected": [
+      "honey.sql/cols-from-insert-clause",
+      "honey.sql/columns-from-columns",
+      "honey.sql/clause-format"
+    ],
+    "evidence": {
+      "honey.sql/cols-from-insert-clause": "src/honey/sql.cljc:1160",
+      "honey.sql/columns-from-columns": "src/honey/sql.cljc:1390",
+      "honey.sql/clause-format": "src/honey/sql.cljc:1954"
+    }
+  },
+  {
+    "id": "q07",
+    "repo": "re-frame",
+    "question": "Who dispatches the :delete-todo event, and what named handler handles it?",
+    "tool": "event_flow",
+    "args": {"name": ":delete-todo"},
+    "expected": [
+      "todomvc.views/todo-item"
+    ],
+    "evidence": {
+      "todomvc.views/todo-item": "examples/todomvc/src/todomvc/views.cljs:40"
+    }
+  },
+  {
+    "id": "q08",
+    "repo": "re-frame",
+    "question": "Who dispatches the auto-namespaced ::add-item event of the flow demo, and what named handler handles it?",
+    "tool": "event_flow",
+    "args": {"name": ":re-frame.flow.demo/add-item"},
+    "expected": [
+      "re-frame.flow.demo/controls"
+    ],
+    "evidence": {
+      "re-frame.flow.demo/controls": "examples/flow/src/re_frame/flow/demo.cljs:45"
+    }
+  },
+  {
+    "id": "q09",
+    "repo": "usermanager",
+    "question": "Which handler var does the route GET /user/list reach?",
+    "tool": "route_authz",
+    "args": {"route": "GET /user/list"},
+    "expected": [
+      "usermanager.controllers.user/get-users"
+    ],
+    "evidence": {
+      "usermanager.controllers.user/get-users": "src/usermanager/main.clj:132"
+    }
+  },
+  {
+    "id": "q10",
+    "repo": "pedestal",
+    "question": "Which handler var does the route GET /admin reach?",
+    "tool": "route_authz",
+    "args": {"route": "GET /admin"},
+    "expected": [
+      "buddy-auth.service/admin"
+    ],
+    "evidence": {
+      "buddy-auth.service/admin": "samples/buddy-auth/src/buddy_auth/service.clj:80"
+    }
+  },
+  {
+    "id": "q11",
+    "repo": "usermanager",
+    "question": "Which deftests exercise usermanager.model.user-manager/get-user-by-id?",
+    "tool": "tests_for",
+    "args": {"symbol": "usermanager.model.user-manager/get-user-by-id"},
+    "expected": [
+      "usermanager.model.user-manager-test/user-test",
+      "usermanager.model.user-manager-test/save-test"
+    ],
+    "evidence": {
+      "usermanager.model.user-manager-test/user-test": "test/usermanager/model/user_manager_test.clj:39",
+      "usermanager.model.user-manager-test/save-test": "test/usermanager/model/user_manager_test.clj:55"
+    }
+  },
+  {
+    "id": "q12",
+    "repo": "compojure",
+    "question": "Which definitions produce or consume the :compojure/path request key?",
+    "tool": "key_flow",
+    "args": {"key": ":compojure/path"},
+    "expected": [
+      "compojure.core/route-matches",
+      "compojure.middleware/redirect-to-canonical",
+      "compojure.middleware/assoc-path"
+    ],
+    "evidence": {
+      "compojure.core/route-matches": "src/compojure/core.clj:45",
+      "compojure.middleware/redirect-to-canonical": "src/compojure/middleware.clj:15",
+      "compojure.middleware/assoc-path": "src/compojure/middleware.clj:20"
+    }
+  }
+]

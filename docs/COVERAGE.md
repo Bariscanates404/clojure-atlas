@@ -4,47 +4,52 @@ Measured by `node scripts/coverage.ts <corpus-dir>` over the repos pinned in [co
 the recorded sha. Every number below comes from that run.
 
 How to read the columns:
-- **files**: Clojure sources analyzed (.clj, .cljs, .cljc; build output, dependencies and hidden directories skipped).
+- **files expected**: Clojure files git tracks in the repo (.clj, .cljs, .cljc, project.clj excluded).
+- **files analyzed**: the ones clj-kondo analyzed (build output, dependencies, hidden directories and files over the
+  size limit skipped).
 - **syntax-error files**: files clj-kondo could not fully parse.
-- **resolved / unresolved / unknown**: var usages that name a project namespace. *resolved* found its definition;
+- **resolved / unresolved**: var usages that name a project namespace. *resolved* found its definition;
   *unresolved* names a project namespace but no definition in it (a var created by a macro clj-kondo does not know,
-  or by `intern`); *unknown* is a symbol clj-kondo could not resolve at all (mostly bindings of macros it does not
-  know). Usages of library vars (clojure.core and dependencies) are not counted, and neither are symbols that can
-  never be vars (special forms, auto-gensyms, `&`, clojure.test's `thrown?`).
-- **resolved %**: resolved / (resolved + unresolved + unknown).
+  or by `intern`). Usages of library vars (clojure.core and dependencies) are not counted, and neither are
+  symbols that can never be vars (special forms, auto-gensyms, `&`, clojure.test's `thrown?`).
+- **resolution rate**: resolved / (resolved + unresolved): of the usages clj-kondo attributes to a project
+  namespace, the share the graph links to a definition. It says nothing about the next column.
+- **unknown namespace**: symbols clj-kondo could not attribute to any namespace (mostly bindings of macros it does
+  not know). Some are var usages the graph misses, most are locals; nothing static tells which, so they are
+  reported as a raw count and kept out of the rate.
 - adapter columns: edges each adapter added (0 when its library is not used); key_tables counts tables.
 - **unknown edges**: edges in band UNKNOWN (attribute references of unproven role).
 
-| repo | files | syntax-error files | definitions | resolved | unresolved | unknown | resolved % | multimethods | implementations | events | routes | data_attributes | system | schemas | key_flow | key_tables | client_routes | requests | selectors | browser_tests | unknown edges | build | graph |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| babashka | 656 | 2 | 6478 | 15481 | 61 | 2261 | 87.0% | 448 | 738 | 0 | 0 | 21 | 4 | 384 | 19507 | 221 | 0 | 0 | 0 | 0 | 10 | 11.9 s | 734 KB |
-| biff | 146 | 1 | 1250 | 2449 | 13 | 20 | 98.7% | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5185 | 30 | 0 | 0 | 0 | 0 | 0 | 4.5 s | 171 KB |
-| cider-nrepl | 130 | 0 | 1149 | 3093 | 22 | 187 | 93.7% | 57 | 55 | 0 | 0 | 0 | 0 | 0 | 5254 | 45 | 0 | 0 | 0 | 0 | 0 | 3.8 s | 160 KB |
-| clj-kondo | 427 | 12 | 2750 | 10800 | 26 | 251 | 97.5% | 116 | 721 | 1 | 0 | 0 | 1 | 8 | 22862 | 99 | 0 | 0 | 0 | 0 | 0 | 6.7 s | 490 KB |
-| compojure | 11 | 0 | 87 | 250 | 0 | 6 | 97.7% | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 208 | 0 | 0 | 0 | 0 | 0 | 0 | 1.6 s | 13 KB |
-| datascript | 67 | 1 | 1024 | 4471 | 496 | 1339 | 70.9% | 15 | 326 | 0 | 0 | 1463 | 0 | 0 | 3834 | 52 | 0 | 0 | 0 | 0 | 126 | 4.3 s | 160 KB |
-| day-of-datomic | 43 | 0 | 127 | 84 | 29 | 1 | 73.7% | 0 | 1 | 0 | 0 | 86 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 50 | 1.5 s | 11 KB |
-| fulcro | 140 | 0 | 2725 | 9996 | 16 | 945 | 91.2% | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11453 | 74 | 0 | 0 | 0 | 0 | 0 | 4.8 s | 375 KB |
-| honeysql | 20 | 0 | 506 | 2776 | 0 | 15 | 99.5% | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2471 | 3 | 0 | 0 | 0 | 0 | 0 | 2.1 s | 77 KB |
-| integrant | 7 | 0 | 138 | 442 | 0 | 4 | 99.1% | 52 | 12 | 0 | 0 | 0 | 61 | 0 | 492 | 3 | 0 | 0 | 0 | 0 | 0 | 1.5 s | 20 KB |
-| logseq | 1088 | 0 | 18099 | 69041 | 0 | 256 | 99.6% | 324 | 313 | 0 | 0 | 24772 | 0 | 131 | 86131 | 627 | 0 | 0 | 0 | 0 | 20271 | 20.2 s | 3.4 MB |
-| malli | 93 | 0 | 1372 | 7960 | 53 | 366 | 95.0% | 849 | 2134 | 0 | 0 | 0 | 0 | 85 | 9095 | 77 | 0 | 0 | 0 | 0 | 0 | 6.6 s | 288 KB |
-| metabase | 4460 | 0 | 68435 | 312308 | 811 | 9801 | 96.7% | 10174 | 3461 | 0 | 13 | 0 | 2 | 526 | 386443 | 6356 | 0 | 0 | 0 | 0 | 0 | 84.6 s | 13.2 MB |
-| mount | 47 | 0 | 222 | 913 | 0 | 8 | 99.1% | 0 | 9 | 0 | 1 | 28 | 56 | 0 | 284 | 3 | 0 | 0 | 0 | 0 | 0 | 1.4 s | 31 KB |
-| next-jdbc | 38 | 0 | 342 | 2277 | 6 | 48 | 97.7% | 2 | 417 | 0 | 0 | 0 | 0 | 94 | 1221 | 4 | 0 | 0 | 0 | 0 | 0 | 1.7 s | 70 KB |
-| pathom3 | 53 | 0 | 907 | 3815 | 0 | 17 | 99.6% | 8 | 109 | 0 | 0 | 0 | 0 | 27 | 11682 | 368 | 0 | 0 | 0 | 0 | 0 | 4.0 s | 226 KB |
-| pedestal | 230 | 1 | 2092 | 5154 | 22 | 420 | 92.1% | 13 | 598 | 0 | 111 | 0 | 24 | 180 | 5146 | 12 | 0 | 0 | 0 | 0 | 0 | 3.5 s | 266 KB |
-| penpot | 1558 | 0 | 25429 | 125583 | 13 | 2154 | 98.3% | 1758 | 2629 | 0 | 0 | 0 | 423 | 190 | 150057 | 451 | 0 | 1 | 0 | 0 | 0 | 25.6 s | 4.7 MB |
-| polylith-realworld | 51 | 0 | 384 | 894 | 0 | 0 | 100.0% | 0 | 0 | 0 | 22 | 0 | 0 | 0 | 1391 | 21 | 0 | 0 | 0 | 0 | 0 | 1.6 s | 49 KB |
-| re-frame | 70 | 0 | 762 | 2629 | 0 | 77 | 97.2% | 6 | 73 | 287 | 0 | 0 | 0 | 7 | 1728 | 4 | 2 | 0 | 0 | 0 | 0 | 2.4 s | 111 KB |
-| reagent | 65 | 0 | 829 | 2842 | 0 | 102 | 96.5% | 5 | 124 | 0 | 0 | 0 | 0 | 0 | 1470 | 2 | 0 | 0 | 0 | 0 | 0 | 2.0 s | 98 KB |
-| reitit | 133 | 0 | 962 | 3860 | 4 | 119 | 96.9% | 30 | 618 | 8 | 369 | 0 | 4 | 151 | 9868 | 111 | 18 | 0 | 0 | 0 | 0 | 3.8 s | 205 KB |
-| ring | 72 | 0 | 634 | 1495 | 0 | 101 | 93.7% | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2046 | 8 | 0 | 0 | 0 | 0 | 0 | 2.8 s | 86 KB |
-| shadow-cljs | 320 | 3 | 2498 | 5347 | 29 | 972 | 84.2% | 465 | 189 | 0 | 0 | 0 | 0 | 234 | 12549 | 46 | 0 | 0 | 0 | 0 | 0 | 7.3 s | 391 KB |
-| usermanager | 7 | 0 | 50 | 73 | 0 | 10 | 88.0% | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 99 | 0 | 0 | 0 | 0 | 0 | 0 | 2.4 s | 7 KB |
-| xtdb-v1 | 226 | 4 | 2773 | 11681 | 8 | 799 | 93.5% | 275 | 2051 | 146 | 0 | 1838 | 13 | 203 | 14366 | 158 | 0 | 0 | 0 | 0 | 354 | 8.0 s | 535 KB |
+| repo | files expected | files analyzed | syntax-error files | definitions | resolved | unresolved | resolution rate | unknown namespace | multimethods | implementations | events | routes | data_attributes | system | schemas | key_flow | key_tables | client_routes | requests | selectors | browser_tests | unknown edges | build | graph |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| babashka | 663 | 656 | 2 | 6478 | 15481 | 61 | 99.6% | 2261 | 448 | 738 | 0 | 0 | 21 | 4 | 384 | 19507 | 221 | 0 | 0 | 0 | 0 | 179 | 8.3 s | 734 KB |
+| biff | 163 | 146 | 1 | 1250 | 2449 | 13 | 99.5% | 20 | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5185 | 30 | 0 | 0 | 0 | 0 | 133 | 2.1 s | 172 KB |
+| cider-nrepl | 131 | 130 | 0 | 1149 | 3093 | 22 | 99.3% | 187 | 57 | 55 | 0 | 0 | 0 | 0 | 0 | 5254 | 45 | 0 | 0 | 0 | 0 | 93 | 1.7 s | 158 KB |
+| clj-kondo | 461 | 427 | 12 | 2750 | 10800 | 26 | 99.8% | 251 | 116 | 721 | 1 | 0 | 0 | 1 | 8 | 22862 | 99 | 0 | 0 | 0 | 0 | 40 | 3.4 s | 488 KB |
+| compojure | 11 | 11 | 0 | 87 | 250 | 0 | 100.0% | 6 | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 208 | 0 | 0 | 0 | 0 | 0 | 0 | 0.4 s | 13 KB |
+| datascript | 67 | 67 | 1 | 1024 | 4471 | 496 | 90.0% | 1339 | 15 | 326 | 0 | 0 | 1463 | 0 | 0 | 3834 | 52 | 0 | 0 | 0 | 0 | 137 | 2.4 s | 159 KB |
+| day-of-datomic | 43 | 43 | 0 | 127 | 84 | 29 | 74.3% | 1 | 0 | 1 | 0 | 0 | 86 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 50 | 0.6 s | 11 KB |
+| fulcro | 140 | 140 | 0 | 2725 | 9996 | 16 | 99.8% | 945 | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11453 | 74 | 0 | 0 | 0 | 0 | 104 | 3.9 s | 375 KB |
+| honeysql | 26 | 20 | 0 | 506 | 2776 | 0 | 100.0% | 15 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2471 | 3 | 0 | 0 | 0 | 0 | 12 | 1.3 s | 78 KB |
+| integrant | 7 | 7 | 0 | 138 | 442 | 0 | 100.0% | 4 | 52 | 12 | 0 | 0 | 0 | 61 | 0 | 492 | 3 | 0 | 0 | 0 | 0 | 0 | 0.6 s | 20 KB |
+| logseq | 1094 | 1088 | 0 | 18099 | 69041 | 0 | 100.0% | 256 | 324 | 313 | 0 | 0 | 24772 | 0 | 131 | 86131 | 627 | 0 | 0 | 0 | 0 | 26084 | 13.8 s | 3.4 MB |
+| malli | 93 | 93 | 0 | 1372 | 7960 | 53 | 99.3% | 366 | 849 | 2134 | 0 | 0 | 0 | 0 | 85 | 9095 | 77 | 0 | 0 | 0 | 0 | 11 | 4.3 s | 289 KB |
+| metabase | 4547 | 4460 | 0 | 68435 | 312308 | 811 | 99.7% | 9801 | 10174 | 3461 | 0 | 13 | 0 | 2 | 526 | 386443 | 6356 | 0 | 0 | 0 | 0 | 4897 | 57.8 s | 13.2 MB |
+| mount | 47 | 47 | 0 | 222 | 913 | 0 | 100.0% | 8 | 0 | 9 | 0 | 1 | 28 | 56 | 0 | 284 | 3 | 0 | 0 | 0 | 0 | 0 | 0.6 s | 31 KB |
+| next-jdbc | 46 | 38 | 0 | 342 | 2277 | 6 | 99.7% | 48 | 2 | 417 | 0 | 0 | 0 | 0 | 94 | 1221 | 4 | 0 | 0 | 0 | 0 | 4 | 0.9 s | 70 KB |
+| pathom3 | 55 | 53 | 0 | 907 | 3815 | 0 | 100.0% | 17 | 8 | 109 | 0 | 0 | 0 | 0 | 27 | 11682 | 368 | 0 | 0 | 0 | 0 | 0 | 2.8 s | 226 KB |
+| pedestal | 230 | 230 | 1 | 2092 | 5154 | 22 | 99.6% | 420 | 13 | 598 | 0 | 111 | 0 | 24 | 180 | 5146 | 12 | 0 | 0 | 0 | 0 | 23 | 2.4 s | 266 KB |
+| penpot | 1560 | 1558 | 0 | 25429 | 125583 | 13 | 100.0% | 2154 | 1758 | 2629 | 0 | 0 | 0 | 423 | 190 | 150057 | 451 | 0 | 1 | 0 | 0 | 2610 | 22.3 s | 4.7 MB |
+| polylith-realworld | 51 | 51 | 0 | 384 | 894 | 0 | 100.0% | 0 | 0 | 0 | 0 | 22 | 0 | 0 | 0 | 1391 | 21 | 0 | 0 | 0 | 0 | 28 | 2.2 s | 49 KB |
+| re-frame | 70 | 70 | 0 | 762 | 2629 | 0 | 100.0% | 77 | 6 | 73 | 359 | 0 | 0 | 0 | 7 | 1728 | 4 | 2 | 0 | 0 | 0 | 120 | 2.4 s | 114 KB |
+| reagent | 65 | 65 | 0 | 829 | 2842 | 0 | 100.0% | 102 | 5 | 124 | 0 | 0 | 0 | 0 | 0 | 1470 | 2 | 0 | 0 | 0 | 0 | 16 | 2.2 s | 97 KB |
+| reitit | 133 | 133 | 0 | 962 | 3860 | 4 | 99.9% | 119 | 30 | 618 | 8 | 369 | 0 | 4 | 151 | 9868 | 111 | 18 | 0 | 0 | 0 | 4 | 3.2 s | 206 KB |
+| ring | 72 | 72 | 0 | 634 | 1495 | 0 | 100.0% | 101 | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2046 | 8 | 0 | 0 | 0 | 0 | 2 | 1.8 s | 86 KB |
+| shadow-cljs | 320 | 320 | 3 | 2498 | 5347 | 29 | 99.5% | 972 | 465 | 189 | 0 | 0 | 0 | 0 | 234 | 12549 | 46 | 0 | 0 | 0 | 0 | 11 | 4.7 s | 391 KB |
+| usermanager | 11 | 7 | 0 | 50 | 73 | 0 | 100.0% | 10 | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 99 | 0 | 0 | 0 | 0 | 0 | 0 | 0.5 s | 7 KB |
+| xtdb-v1 | 227 | 226 | 4 | 2773 | 11681 | 8 | 99.9% | 799 | 275 | 2051 | 146 | 0 | 1838 | 13 | 203 | 14366 | 158 | 0 | 0 | 0 | 0 | 482 | 5.9 s | 537 KB |
 
-## Repos under 95% resolved
+## Repos under 95% resolution rate, or with unknown-namespace usages above 5% of resolved
 
 What is left in each is one of two kinds, both visible in the names below:
 - **unknown**: a symbol bound by a macro clj-kondo does not know, so it cannot tell a local from a var
@@ -56,17 +61,16 @@ What is left in each is one of two kinds, both visible in the names below:
 Both shrink when the repo ships a clj-kondo config for its macros, or when `.clojure-atlas.edn` names them under
 `:lint-as`; the corpus is measured without adding either.
 
-- **babashka** 87.0%: 2261 unknown (most: `v` 136, `session` 97, `this` 85, `a` 71, `m` 67); 61 unresolved (most: `babashka.deps/add-deps` 13, `babashka.impl.clojure.spec.gen.alpha/fmap` 9, `babashka.impl.clojure.spec.gen.alpha/return` 8)
-- **cider-nrepl** 93.7%: 187 unknown (most: `args` 27, `opts` 20, `instrument-coll` 14, `version` 11, `x` 10); 22 unresolved (most: `cider.test-helpers/clojure.lang.ExceptionInfo` 3, `cider.test-helpers/thrown-with-msg?` 3, `cider.test-helpers/java.util.List` 2)
-- **datascript** 70.9%: 1339 unknown (most: `db` 234, `d` 58, `entity` 40, `_` 35, `attr` 34); 496 unresolved (most: `datascript.parser/->Variable` 132, `datascript.parser/->DefaultSrc` 42, `datascript.parser/->Pattern` 35)
-- **day-of-datomic** 73.7%: 1 unknown (most: `.getMessage` 1); 29 unresolved (most: `datomic.samples.repl/email` 5, `datomic.samples.repl/id` 4, `datomic.samples.repl/transact` 4)
-- **fulcro** 91.2%: 945 unknown (most: `=1x=>` 75, `=>` 61, `args` 57, `id` 57, `n` 43); 16 unresolved (most: `com.fulcrologic.fulcro.inspect.devtool-api/db-changed` 3, `com.fulcrologic.fulcro.inspect.devtool-api/optimistic-action` 3, `com.fulcrologic.fulcro.inspect.devtool-api/send-failed` 3)
-- **malli** 95.0%: 366 unknown (most: `this` 54, `x` 50, `a` 16, `y` 12, `b` 10); 53 unresolved (most: `malli.instrument.fn-schemas/power-arg-ns` 8, `malli.instrument.fn-schemas/power-arg-refer` 8, `malli.instrument.fn-schemas/power-full` 8)
-- **pedestal** 92.1%: 420 unknown (most: `request-inspection` 36, `interceptor-1` 28, `interceptor-2` 22, `t` 18, `this` 18); 22 unresolved (most: `io.pedestal.log/-register` 4, `io.pedestal.http.route.sawtooth.impl/create-matcher-from-routes` 2, `io.pedestal.log/counter` 2)
-- **ring** 93.7%: 101 unknown (most: `response` 15, `request` 13, `socket` 12, `_` 7, `listener` 6); 0 unresolved (most: none)
-- **shadow-cljs** 84.2%: 972 unknown (most: `env` 70, `bind` 54, `x` 50, `object` 42, `render` 40); 29 unresolved (most: `shadow.lazy/Loadable.` 3, `demo.browser/bla` 2, `shadow.build.api/has-tests?` 2)
-- **usermanager** 88.0%: 10 unknown (most: `database` 3, `db` 2, `user-without-id` 2, `id` 1, `params` 1); 0 unresolved (most: none)
-- **xtdb-v1** 93.5%: 799 unknown (most: `kv-store` 97, `this` 79, `node` 73, `dir` 59, `db-dir` 38); 8 unresolved (most: `user/xtdb-node` 4, `xtdb.soak.config/weather-api-token` 2, `xtdb.api/start-cluster-node` 1)
+- **babashka** resolution rate 99.6%, 2261 usages in an unknown namespace (most: `v` 136, `session` 97, `this` 85, `a` 71, `m` 67); 61 unresolved (most: `babashka.deps/add-deps` 13, `babashka.impl.clojure.spec.gen.alpha/fmap` 9, `babashka.impl.clojure.spec.gen.alpha/return` 8)
+- **cider-nrepl** resolution rate 99.3%, 187 usages in an unknown namespace (most: `args` 27, `opts` 20, `instrument-coll` 14, `version` 11, `x` 10); 22 unresolved (most: `cider.test-helpers/clojure.lang.ExceptionInfo` 3, `cider.test-helpers/thrown-with-msg?` 3, `cider.test-helpers/java.util.List` 2)
+- **datascript** resolution rate 90.0%, 1339 usages in an unknown namespace (most: `db` 234, `d` 58, `entity` 40, `_` 35, `attr` 34); 496 unresolved (most: `datascript.parser/->Variable` 132, `datascript.parser/->DefaultSrc` 42, `datascript.parser/->Pattern` 35)
+- **day-of-datomic** resolution rate 74.3%, 1 usages in an unknown namespace (most: `.getMessage` 1); 29 unresolved (most: `datomic.samples.repl/email` 5, `datomic.samples.repl/id` 4, `datomic.samples.repl/transact` 4)
+- **fulcro** resolution rate 99.8%, 945 usages in an unknown namespace (most: `=1x=>` 75, `=>` 61, `args` 57, `id` 57, `n` 43); 16 unresolved (most: `com.fulcrologic.fulcro.inspect.devtool-api/db-changed` 3, `com.fulcrologic.fulcro.inspect.devtool-api/optimistic-action` 3, `com.fulcrologic.fulcro.inspect.devtool-api/send-failed` 3)
+- **pedestal** resolution rate 99.6%, 420 usages in an unknown namespace (most: `request-inspection` 36, `interceptor-1` 28, `interceptor-2` 22, `t` 18, `this` 18); 22 unresolved (most: `io.pedestal.log/-register` 4, `io.pedestal.http.route.sawtooth.impl/create-matcher-from-routes` 2, `io.pedestal.log/counter` 2)
+- **ring** resolution rate 100.0%, 101 usages in an unknown namespace (most: `response` 15, `request` 13, `socket` 12, `_` 7, `listener` 6); 0 unresolved (most: none)
+- **shadow-cljs** resolution rate 99.5%, 972 usages in an unknown namespace (most: `env` 70, `bind` 54, `x` 50, `object` 42, `render` 40); 29 unresolved (most: `shadow.lazy/Loadable.` 3, `demo.browser/bla` 2, `shadow.build.api/has-tests?` 2)
+- **usermanager** resolution rate 100.0%, 10 usages in an unknown namespace (most: `database` 3, `db` 2, `user-without-id` 2, `id` 1, `params` 1); 0 unresolved (most: none)
+- **xtdb-v1** resolution rate 99.9%, 799 usages in an unknown namespace (most: `kv-store` 97, `this` 79, `node` 73, `dir` 59, `db-dir` 38); 8 unresolved (most: `user/xtdb-node` 4, `xtdb.soak.config/weather-api-token` 2, `xtdb.api/start-cluster-node` 1)
 
 ## Per repo
 
@@ -168,7 +172,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### re-frame
 - most frequent unresolved: none
 - most frequent unknown: `this` 13, `_` 5, `event` 3, `id` 2, `->interceptor` 1, `add-post-event-callback` 1, `after` 1, `arg` 1, `assemble-epochs` 1, `assoc-coeffect` 1, `assoc-effect` 1, `callback-fn` 1, `clear-cofx` 1, `clear-event` 1, `clear-flow` 1
-- adapters: multimethods (defmethod) 6 edges, implementations (protocol implementations) 73 edges, events (re-frame.core) 287 edges, routes off, data_attributes off, system off, schemas (spec) 7 edges, key_flow (keywords in code) 1728 edges, key_tables (map literals in code) 0 edges, client_routes (reitit in ClojureScript or secretary) 0 edges, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
+- adapters: multimethods (defmethod) 6 edges, implementations (protocol implementations) 73 edges, events (re-frame.core) 359 edges, routes off, data_attributes off, system off, schemas (spec) 7 edges, key_flow (keywords in code) 1728 edges, key_tables (map literals in code) 0 edges, client_routes (reitit in ClojureScript or secretary) 0 edges, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
 
 ### reagent
 - most frequent unresolved: none
