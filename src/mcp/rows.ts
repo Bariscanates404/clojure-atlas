@@ -145,7 +145,7 @@ export function resolve(g: Graph, kinds: readonly string[], query: string): Grap
     const hits = (g.byName.get(variant) ?? []).filter((n) => kinds.includes(n.kind));
     if (hits.length) return hits;
   }
-  if (kinds.includes('definition') && !q.includes('/')) {
+  if (kinds.includes('definition') && (!q.includes('/') || q === '/')) {
     return (g.byKind.get('definition') ?? []).filter((n) => n.name.endsWith(`/${q}`));
   }
   return [];
@@ -153,9 +153,9 @@ export function resolve(g: Graph, kinds: readonly string[], query: string): Grap
 
 
 export function countBy(rows: Row[], key: (r: Row) => string): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const r of rows) out[key(r)] = (out[key(r)] ?? 0) + 1;
-  return Object.fromEntries(Object.entries(out).sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])));
+  const out = new Map<string, number>();
+  for (const r of rows) out.set(key(r), (out.get(key(r)) ?? 0) + 1);
+  return Object.fromEntries([...out].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])));
 }
 
 export function ambiguous(name: string, query: string, title: string, nodes: GraphNode[], argName: string): QueryResult {

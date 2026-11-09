@@ -842,3 +842,44 @@ describe('a name that resolves to several nodes is ambiguous, never the first hi
     assert.deepEqual(r.matches.sort(), ['event::cart/open', 'subscription::cart/open']);
   });
 });
+
+// ---------- names that look like something else ----------
+
+describe('odd names', () => {
+  it('a component named like an Object property is counted as itself', () => {
+    const x = new GraphBuilder();
+    const t = x.def('n/t', 'constructor');
+    x.edge(x.def('n/u', 'constructor'), 'calls', t).edge(x.def('n/v', 'toString'), 'calls', t);
+    assert.deepEqual(callers(x.build(), 'n/t').counts, { constructor: 1, toString: 1 });
+    assert.deepEqual(Object.keys(callers(x.build(), 'n/t').counts ?? {}).sort(), ['constructor', 'toString']);
+  });
+
+  it('the var named / is found by its bare name', () => {
+    const g = graph((x) => { x.def('clojure.core//'); x.def('a.b/foo'); });
+    assert.deepEqual(resolve(g, ['definition'], '/').map((n) => n.id), ['definition:clojure.core//']);
+    assert.ok(callers(g, '/').found);
+  });
+
+  it('a not-found definition says to pass a fully qualified name, for every query that takes one', () => {
+    const g = graph((x) => x.def('a/f'));
+    for (const r of [callers(g, 'zz'), blastRadius(g, 'zz'), testsFor(g, 'zz')]) {
+      assert.equal(r.found, false);
+      assert.match(r.notes.join(' '), /fully qualified name \(ns\/name\)/, r.name);
+    }
+    assert.match(permissionRoutes(g, 'zz').notes.join(' '), /exact permission name/);
+  });
+
+  it('a name only continues a write or read verb at a word boundary', () => {
+    for (const name of ['app.x/address-book', 'app.x/settings-fn', 'app.x/created-at', 'app.x/updates']) {
+      assert.equal(writeLikeness('ctx', name, null).why, 'no write signal', name);
+    }
+    assert.equal(readLikeness('ctx', 'app.x/bypass-check', null).why, 'no read signal');
+    assert.equal(readLikeness('ctx', 'app.x/getter', null).why, 'no read signal');
+    for (const name of ['app.x/add', 'app.x/add-item', 'app.x/set!', 'app.x/save-all', 'app.x/update-user!']) {
+      assert.match(writeLikeness('ctx', name, null).why, /name/, name);
+    }
+    for (const name of ['app.x/get', 'app.x/get-user', 'app.x/by-id', 'app.x/->list']) {
+      assert.match(readLikeness('ctx', name, null).why, /name/, name);
+    }
+  });
+});

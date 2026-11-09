@@ -13,6 +13,8 @@ export { entryOf, resolve, type QueryResult, type Row, type Section } from './ro
 
 const MAX_DEPTH = 3;
 
+const FQN_HINT = 'use a fully qualified name (ns/name)';
+
 // ---------- callers / blast radius ----------
 
 // Every relation through which a change to a definition can reach another: an actual call, a value use, a function
@@ -33,7 +35,7 @@ function callerRows(g: Graph, edges: GraphEdge[]): Row[] {
 export function callers(g: Graph, query: string, opts: { includeReferences?: boolean } = {}): QueryResult {
   const title = `callers of ${query}`;
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('callers', query, title, 'definition', 'use a fully qualified name (ns/name)');
+  if (!hits.length) return notFound('callers', query, title, 'definition', FQN_HINT);
   if (hits.length > 1) return ambiguous('callers', query, title, hits, 'var');
   const target = hits[0];
   const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
@@ -122,7 +124,7 @@ const countLine = (label: string, counts: Map<string, number>, sort: boolean, to
 export function blastRadius(g: Graph, query: string, depth?: number): QueryResult {
   const title = `blast radius of ${query}`;
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('blast_radius', query, title, 'definition');
+  if (!hits.length) return notFound('blast_radius', query, title, 'definition', FQN_HINT);
   if (hits.length > 1) return ambiguous('blast_radius', query, title, hits, 'var');
   const target = hits[0];
   const capped = depth !== undefined && Number.isFinite(depth);
@@ -368,7 +370,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
 export function permissionRoutes(g: Graph, query: string): QueryResult {
   const title = `routes requiring ${query}`;
   const hits = resolve(g, ['permission'], query);
-  if (!hits.length) return notFound('permission_routes', query, title, 'permission');
+  if (!hits.length) return notFound('permission_routes', query, title, 'permission', 'use the exact permission name, with its namespace if it has one');
   if (hits.length > 1) return ambiguous('permission_routes', query, title, hits, 'permission');
   const perm = hits[0];
   const perms = permEdges(inEdges(g, perm.id, ['requires_permission']));
@@ -402,9 +404,10 @@ export interface Likeness {
 }
 
 const TX_NAME = /(^|[-!])(tx|txes|transact)([-!?]|$)/;
-const WRITE_NAME = /(^|-)(save|publish|update|create|set|delete|retract|upsert|add|import|migrate)/;
+// a verb counts only as a whole word: `add` in add-item, not in address-book
+const WRITE_NAME = /(^|-)(save|publish|update|create|set|delete|retract|upsert|add|import|migrate)(?![a-z0-9])/;
 const TEST_FILE = /(^|\/)test\//;
-const READ_NAME = /(^|[-/.>])(get|find|load|query|pull|pattern|by|fetch|read|list)/;
+const READ_NAME = /(^|[-/.>])(get|find|load|query|pull|pattern|by|fetch|read|list)(?![a-z0-9])/;
 
 // How much an unproven attribute reference looks like a write, from its DB context label and caller name.
 export function writeLikeness(context: string, caller: string, file: string | null): Likeness {
@@ -656,7 +659,7 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
   if (!hits.length) {
     const viaBrowser = testsCovering(g, query);
-    if (!viaBrowser.found) return notFound('tests_for', query, title, 'definition, attribute, event, selector or route');
+    if (!viaBrowser.found) return notFound('tests_for', query, title, 'definition, attribute, event, selector or route', FQN_HINT);
     return { ...viaBrowser, name: 'tests_for', title };
   }
   if (hits.length > 1) return ambiguous('tests_for', query, title, hits, 'symbol');
