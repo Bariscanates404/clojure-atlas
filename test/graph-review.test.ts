@@ -235,7 +235,19 @@ describe('context_for_change', () => {
     const r = contextForChange(g, ['docs/readme.md']);
     assert.equal(r.found, false);
     assert.match(r.notes.join(' '), /1 changed file\(s\) of a type this graph does not index \(\.md\)/);
-    assert.match(r.verdict, /risk LOW/);
+    assert.match(r.verdict, /risk UNKNOWN/);
+  });
+
+  it('risk is UNKNOWN, never LOW, when no changed symbol was matched', () => {
+    const none: string[][] = [[], ['docs/readme.md'], [`${file}:45-49`], [`${file}:12-`], ['nowhere/x.clj']];
+    for (const specs of none) {
+      const r = contextForChange(g, specs);
+      assert.equal(r.found, false, specs.join());
+      assert.match(r.verdict, /0 changed symbol\(s\).*risk UNKNOWN/, specs.join());
+      assert.match(r.notes.join(' '), /no changed symbol matched: the risk is not decidable/, specs.join());
+    }
+    assert.match(contextForChange(new GraphBuilder().build(), ['a.clj:1']).verdict, /risk UNKNOWN/);
+    assert.match(contextForChange(g, [`${file}:10-40`]).verdict, /risk (MEDIUM|HIGH)/);
   });
 
   it('every empty section says what it searched', () => {

@@ -862,11 +862,13 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const risk = found.map((x) => x.row);
   const cover = coverageNotes(g, changes, changed, new Set(opts.added ?? []));
   const coverage = cover.uncovered ? ` (${cover.uncovered} of ${changes.length} file(s) not covered)` : '';
-  const level = found.some((x) => x.high) ? 'HIGH' : risk.length ? 'MEDIUM' : cover.uncovered ? 'UNKNOWN' : 'LOW';
+  // nothing matched means nothing was assessed: UNKNOWN, never LOW
+  const level = found.some((x) => x.high) ? 'HIGH' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length ? 'UNKNOWN' : 'LOW';
   const notes = [
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
     ...(tableKeys.weak ? [`${tableKeys.weak} key-sibling row(s) dropped: the key they lack is absent in ${Math.round(WEAK_PATTERN_ABSENT * 100)}%+ of sibling rows, no sibling pattern`] : []),
+    ...(changed.length ? [] : ['no changed symbol matched: the risk is not decidable from this graph, which says nothing about the change']),
     ...cover.notes,
   ];
   return {
