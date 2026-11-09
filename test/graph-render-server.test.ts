@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { BANDS } from '../src/mcp/graph.ts';
-import { parseMcpArgs } from '../src/cli.ts';
+import { parseCommand } from '../src/cli.ts';
 import { DEFAULT_GRAPH } from '../src/build/index.ts';
 import { callers, type QueryResult, type Row } from '../src/mcp/queries.ts';
 import {
@@ -465,8 +465,8 @@ describe('entry point args', () => {
     [['--graph', 'g.json', '--max-distance', '7'], { graph: 'g.json', maxDistance: 7 }],
     [['--max-distance', '0', '--graph', 'x'], { graph: 'x', maxDistance: 0 }],
   ];
-  for (const [argv, expected] of cases) it(argv.join(' '), () => assert.deepEqual(parseMcpArgs(argv), expected));
-  it('no graph serves the project graph a build writes by default', () => assert.deepEqual(parseMcpArgs([]), { graph: DEFAULT_GRAPH }));
-  it('a bad max distance is rejected', () => assert.throws(() => parseMcpArgs(['--graph', 'g', '--max-distance', 'x']), /non-negative integer/));
+  for (const [argv, expected] of cases) it(argv.join(' '), () => assert.deepEqual(parseCommand(['mcp', ...argv]), { cmd: 'mcp', ...expected }));
+  it('no graph serves the project graph a build writes by default', () => assert.deepEqual(parseCommand(['mcp']), { cmd: 'mcp', graph: DEFAULT_GRAPH }));
+  it('a bad max distance is rejected', () => assert.throws(() => parseCommand(['mcp', '--graph', 'g', '--max-distance', 'x']), /non-negative integer/));
 });
 

@@ -182,3 +182,10 @@ export function snapshotOf(root: string, analyzer: string): Snapshot {
 }
 
 export const analyzerVersion = (kondoVersion: string) => `clojure-atlas ${VERSION}, ${kondoVersion}`;
+
+// The analyzer identity of a working tree checked against a graph, without running clj-kondo: this clojure-atlas
+// version with the clj-kondo version the graph records (the release atlas pins comes with its version).
+export function analyzerFor(graphAnalyzer: string | undefined): string {
+  const kondo = graphAnalyzer?.split(', ').slice(1).join(', ');
+  return kondo ? analyzerVersion(kondo) : '';
+}

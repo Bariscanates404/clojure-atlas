@@ -72,13 +72,14 @@ export async function locateKondo(host: KondoHost): Promise<Kondo> {
   if (!existsSync(target)) {
     const url = `https://github.com/clj-kondo/clj-kondo/releases/download/v${KONDO_VERSION}/clj-kondo-${KONDO_VERSION}-${suffix}.zip`;
     let zip: Buffer;
+    host.warn(`downloading clj-kondo ${KONDO_VERSION} (${suffix}) once, to ${target}`);
     try {
       zip = await host.download(url);
     } catch (err) {
       return fromPath(`cannot download ${url} (${(err as Error).message})`);
     }
     const got = createHash('sha256').update(zip).digest('hex');
-    if (got !== sha) throw new Error(`${url}: sha256 ${got}, expected ${sha}; refusing to run it`);
+    if (got !== sha) return fromPath(`${url} answered sha256 ${got}, expected ${sha}; refusing to run it`);
     mkdirSync(path.dirname(target), { recursive: true });
     // renamed into place, so a concurrent build never runs a half-written binary
     const partial = `${target}.${process.pid}.partial`;
@@ -92,20 +93,30 @@ export async function locateKondo(host: KondoHost): Promise<Kondo> {
   return { command: target, version };
 }
 
-const cacheRoot = () => (process.platform === 'win32'
-  ? process.env.LOCALAPPDATA ?? path.join(homedir(), 'AppData', 'Local')
-  : process.env.XDG_CACHE_HOME ?? path.join(homedir(), '.cache'));
+// The per-user cache directory: an absolute XDG_CACHE_HOME (LOCALAPPDATA on Windows), else the platform default. An
+// empty or relative value is as good as unset (the spec says to ignore it); a relative one would put the binary
+// in whatever directory the command runs in.
+export function cacheRoot(env: Record<string, string | undefined>, platform: string, home: string): string {
+  const named = platform === 'win32' ? env.LOCALAPPDATA : env.XDG_CACHE_HOME;
+  if (named && path.isAbsolute(named)) return named;
+  return platform === 'win32' ? path.join(home, 'AppData', 'Local') : path.join(home, '.cache');
+}
+
+export const DOWNLOAD_TIMEOUT_MS = 120_000;
+
+// Fetches a URL into memory, giving up after `timeoutMs` for the whole transfer.
+export const downloader = (timeoutMs: number) => async (url: string): Promise<Buffer> => {
+  const res = await fetch(url, { headers: { 'user-agent': 'clojure-atlas' }, signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+};
 
 export const HOST: KondoHost = {
   platform: process.platform,
   arch: process.arch,
   assets: ASSETS,
-  cacheDir: path.join(cacheRoot(), 'clojure-atlas'),
-  download: async (url) => {
-    const res = await fetch(url, { headers: { 'user-agent': 'clojure-atlas' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return Buffer.from(await res.arrayBuffer());
-  },
+  cacheDir: path.join(cacheRoot(process.env, process.platform, homedir()), 'clojure-atlas'),
+  download: downloader(DOWNLOAD_TIMEOUT_MS),
   version: (command) => {
     try {
       return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();

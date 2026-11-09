@@ -28,6 +28,26 @@ const config = (lintAs: Record<string, string>) => `{:output {:format :json}
  :analysis {:keywords true :context true :protocol-impls true :locals false}}`;
 
 const CHUNK = 300;
+// Windows refuses a command line over 32767 characters; the file names get most of that.
+const CHUNK_CHARS = 24_000;
+
+// Consecutive runs of files, each at most `CHUNK` files and `CHUNK_CHARS` characters of file names (a single longer
+// name still gets a run of its own).
+export function chunkFiles(files: readonly string[], maxFiles = CHUNK, maxChars = CHUNK_CHARS): string[][] {
+  const chunks: string[][] = [];
+  let chars = 0;
+  for (const f of files) {
+    const last = chunks[chunks.length - 1];
+    if (!last || last.length >= maxFiles || chars + f.length + 1 > maxChars) {
+      chunks.push([f]);
+      chars = f.length + 1;
+    } else {
+      last.push(f);
+      chars += f.length + 1;
+    }
+  }
+  return chunks;
+}
 
 function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>): Promise<Analysis> {
   return new Promise((resolve, reject) => {
@@ -54,8 +74,7 @@ function runChunk(cmd: string, root: string, files: string[], lintAs: Record<str
 }
 
 export async function analyze(cmd: string, root: string, files: string[], lintAs: Record<string, string>): Promise<Analysis> {
-  const chunks: string[][] = [];
-  for (let k = 0; k < files.length; k += CHUNK) chunks.push(files.slice(k, k + CHUNK));
+  const chunks = chunkFiles(files);
   const lanes = Math.max(1, Math.min(chunks.length, Math.floor(availableParallelism() / 2)));
   const results: Analysis[] = new Array(chunks.length);
   let nextChunk = 0;

@@ -1,7 +1,7 @@
 // The command line as a user runs it: one node process per command, against a fixture copied into a git checkout.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,8 +12,8 @@ const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src',
 const work = mkdtempSync(path.join(tmpdir(), 'atlas-cli-'));
 after(() => rmSync(work, { recursive: true, force: true }));
 
-const run = (args: string[], opts: { cwd?: string; input?: string } = {}) => {
-  const r = spawnSync(process.execPath, [cli, ...args], { cwd: opts.cwd ?? work, input: opts.input ?? '', encoding: 'utf8' });
+const run = (args: string[], opts: { cwd?: string; input?: string; env?: Record<string, string> } = {}) => {
+  const r = spawnSync(process.execPath, [cli, ...args], { cwd: opts.cwd ?? work, input: opts.input ?? '', encoding: 'utf8', env: { ...process.env, ...opts.env } });
   return { code: r.status, out: r.stdout, err: r.stderr };
 };
 
@@ -73,13 +73,54 @@ describe('clojure-atlas command line', () => {
     assert.match(text, /\n.*1 commit/);
   });
 
-  it('prints the usage: exit 0 when asked, 2 for an unknown command, 1 with the reason on an error', () => {
+  it('prints the usage: exit 0 when asked, 2 for a usage error, 1 with the reason on an error', () => {
     assert.deepEqual([run([]).code, run(['--help']).code], [0, 0]);
+    assert.match(run(['--help']).out, /^usage:\n {2}clojure-atlas build/);
     const bad = run(['frobnicate']);
     assert.equal(bad.code, 2);
-    assert.match(bad.err, /^usage:\n {2}clojure-atlas build/);
+    assert.match(bad.err, /^clojure-atlas: unknown command frobnicate\nusage:\n {2}clojure-atlas build/);
+    assert.equal(run(['build', '.', '-o']).code, 2);
+    assert.equal(run(['mcp', '--max-distance', '5abc']).code, 2);
     const missing = run(['coverage', path.join(work, 'none.json')]);
     assert.equal(missing.code, 1);
-    assert.match(missing.err, /^clojure-atlas: ENOENT/);
+    assert.match(missing.err, /^clojure-atlas: no graph at .*none\.json; run `clojure-atlas build` first/);
+  });
+
+  it('--version prints the package version, and build --help builds nothing', () => {
+    const v = run(['--version']);
+    assert.equal(v.code, 0);
+    assert.equal(v.out.trim(), JSON.parse(readFileSync(path.join(path.dirname(cli), '..', 'package.json'), 'utf8')).version);
+    const dir = path.join(work, 'helpless');
+    mkdirSync(dir);
+    assert.equal(run(['build', '--help'], { cwd: dir }).code, 0);
+    assert.equal(existsSync(path.join(dir, '.clojure-atlas')), false);
+  });
+
+  it('says what is wrong for a missing graph, a garbage graph, a missing directory, a directory as output and a broken .mcp.json', () => {
+    const mcp = run(['mcp', '--graph', path.join(work, 'none.gz')]);
+    assert.equal(mcp.code, 1);
+    assert.match(mcp.err, /no graph at .*none\.gz; run `clojure-atlas build` first/);
+    const garbage = path.join(work, 'garbage.gz');
+    writeFileSync(garbage, 'garbage');
+    assert.match(run(['coverage', garbage]).err, /garbage\.gz is not a readable graph .*run `clojure-atlas build` again/);
+    assert.match(run(['build', path.join(work, 'nope')]).err, /nope is not a directory/);
+    assert.match(run(['build', repo, '-o', work]).err, /is a directory; name the graph file/);
+    const dir = path.join(work, 'badmcp');
+    mkdirSync(dir);
+    writeFileSync(path.join(dir, '.mcp.json'), 'null');
+    const init = run(['init', '--yes'], { cwd: dir });
+    assert.equal(init.code, 1);
+    assert.match(init.err, /^clojure-atlas: \.mcp\.json is not a JSON object/);
+  });
+
+  it('mcp --repo needs no clj-kondo: the analyzer comes from the graph', () => {
+    const cache = path.join(work, 'empty-cache');
+    mkdirSync(cache);
+    const r = run(['mcp', '--graph', graph, '--repo', repo], {
+      input: `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} })}\n`,
+      env: { XDG_CACHE_HOME: cache, LOCALAPPDATA: cache, PATH: path.dirname(process.execPath) },
+    });
+    assert.equal(r.code, 0, r.err);
+    assert.deepEqual(readdirSync(cache), []);
   });
 });

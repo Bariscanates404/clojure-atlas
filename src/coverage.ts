@@ -13,8 +13,9 @@ export interface CoverageRow {
   resolved: number;
   unresolved: number;
   unknown: number;
-  // resolution rate of var usages in recognized project namespaces: resolved / (resolved + unresolved)
-  resolutionRate: number;
+  // resolution rate of var usages in recognized project namespaces: resolved / (resolved + unresolved); null when
+  // there were none, which is not 100%
+  resolutionRate: number | null;
   adapters: Record<string, number>;
   nodes: number;
   edges: number;
@@ -36,7 +37,7 @@ export function coverageRow(doc: AtlasDocument, graphBytes: number): CoverageRow
     resolved: u.resolved,
     unresolved: u.unresolved,
     unknown: u.unknown,
-    resolutionRate: inProject ? (100 * u.resolved) / inProject : 100,
+    resolutionRate: inProject ? (100 * u.resolved) / inProject : null,
     // edges an adapter added; nodes for one that adds no edges (key tables)
     adapters: Object.fromEntries(Object.entries(doc.stats.adapters).map(([k, a]) => [k, doc.capabilities.find((c) => c.name === k)?.edge_kinds?.length ? a.edges : a.nodes])),
     nodes: doc.nodes.length,
@@ -47,7 +48,7 @@ export function coverageRow(doc: AtlasDocument, graphBytes: number): CoverageRow
   };
 }
 
-const pct = (x: number) => `${x.toFixed(1)}%`;
+export const pct = (x: number | null) => (x === null ? 'n/a' : `${x.toFixed(1)}%`);
 const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
 
 export function coverageTable(rows: readonly CoverageRow[]): string {
