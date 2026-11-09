@@ -2,7 +2,7 @@
 // read-only `git rev-list --count` in a local clone when one is configured; without a clone a differing
 // sha is reported as STALE with an unknown distance, never as fresh.
 import { execFileSync } from 'node:child_process';
-import type { Snapshot } from '../snapshot.ts';
+import { UNVERSIONED, type Snapshot } from '../snapshot.ts';
 import type { Graph } from './graph.ts';
 
 export const DEFAULT_MAX_DISTANCE = 20;
@@ -22,7 +22,8 @@ export interface Staleness {
   header: string | null;
 }
 
-const short = (s: string) => s.slice(0, 10);
+// A full hex sha is shortened to ten characters; any other name (a branch, a tag) is shown whole.
+const short = (s: string) => (/^[0-9a-f]{11,}$/i.test(s) ? s.slice(0, 10) : s);
 
 export function gitDistance(repoDir: string): (graphSha: string, base: string) => number | null {
   return (graphSha, base) => {
@@ -50,7 +51,9 @@ export function sameCommit(a: string, b: string): boolean {
 function treeDifference(g: Graph, now: Snapshot): string | null {
   const s = g.doc.source;
   if (!s.snapshot || s.snapshot === now.id) return null;
-  const why = [
+  // git could not read the tree: what changed in it is unknown, not zero
+  const unreadable = now.sha === UNVERSIONED && s.sha !== UNVERSIONED;
+  const why = unreadable ? ['git could not read the working tree (no repository there, or git failed), so what changed in it is unknown'] : [
     ...(sameCommit(s.sha, now.sha) ? [] : [`commit ${short(now.sha)} (graph ${short(s.sha)})`]),
     ...((s.dirty_files ?? 0) || now.dirty.length ? [`${now.dirty.length} uncommitted file(s) now, ${s.dirty_files ?? 0} at build`] : []),
     ...(s.config_hash && s.config_hash !== now.configHash ? ['the clj-kondo or .clojure-atlas.edn config changed'] : []),

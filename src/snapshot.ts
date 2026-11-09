@@ -95,8 +95,11 @@ export function changedPaths(status: string): string[] {
   return out.filter((f) => !f.startsWith('.clojure-atlas/')).sort();
 }
 
+// The sha of a tree git could not name (no repository, or git failed).
+export const UNVERSIONED = 'unversioned';
+
 export function snapshotOf(root: string, analyzer: string): Snapshot {
-  const sha = git(root, 'rev-parse', 'HEAD')?.trim() || 'unversioned';
+  const sha = git(root, 'rev-parse', 'HEAD')?.trim() || UNVERSIONED;
   const branch = git(root, 'rev-parse', '--abbrev-ref', 'HEAD')?.trim();
   const ref = branch && branch !== 'HEAD' ? branch : null;
   const status = git(root, 'status', '--porcelain=v1', '-z', '--untracked-files=all') ?? '';

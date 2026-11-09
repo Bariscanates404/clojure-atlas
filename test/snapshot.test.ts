@@ -9,7 +9,7 @@ import { BUILT_IN_LINT_AS, effectiveLintAs } from '../src/build/kondo.ts';
 import { graphFromJson } from '../src/mcp/graph.ts';
 import { graphInfo } from '../src/mcp/server.ts';
 import { gitDistance, staleness } from '../src/mcp/staleness.ts';
-import { changedPaths, configSources, projectKnownSymbols, snapshotOf } from '../src/snapshot.ts';
+import { changedPaths, configSources, projectKnownSymbols, snapshotOf, UNVERSIONED } from '../src/snapshot.ts';
 
 const root = mkdtempSync(path.join(tmpdir(), 'atlas-snapshot-'));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -86,5 +86,23 @@ describe('snapshot', () => {
     assert.equal(st.stale, true);
     assert.match(st.header ?? '', /^STALE: the working tree is not the snapshot this graph describes \(\d+ uncommitted file\(s\) now/);
     assert.match(graphInfo(g, undefined, {}), /config [0-9a-f]{12} from \.clj-kondo\/config\.edn, vendor\/kondo\/config\.edn/);
+  });
+
+  it('a working tree git cannot read is reported as unknown, never as zero uncommitted files', () => {
+    const built = snapshotOf(root, 'v1');
+    const g = graphFromJson(JSON.stringify({
+      format: 'code-graph', version: 2, capabilities: [], nodes: [], edges: [],
+      source: { sha: built.sha, snapshot: built.id, dirty_files: 0, config_hash: built.configHash, config_sources: built.configSources, analyzer: 'v1' },
+    }));
+    const unreadable = { ...built, id: 'x', sha: UNVERSIONED, dirty: [] };
+    const header = staleness(g, undefined, { snapshot: () => unreadable }).header ?? '';
+    assert.match(header, /^STALE: .*git could not read the working tree/);
+    assert.doesNotMatch(header, /uncommitted|unversione\b/);
+  });
+
+  it('a commit name that is not a long hex sha is shown whole', () => {
+    const g = graphFromJson(JSON.stringify({ format: 'code-graph', version: 2, capabilities: [], nodes: [], edges: [], source: { sha: 'a'.repeat(40) } }));
+    assert.match(staleness(g, 'release-candidate-1').header ?? '', /base release-candidate-1;/);
+    assert.match(staleness(g, 'b'.repeat(40)).header ?? '', /base b{10};/);
   });
 });

@@ -1,7 +1,7 @@
 // The code-graph MCP server: its tool table over the shared stdio JSON-RPC core.
 import { realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { missingArguments, stdioServer, type Args, type ToolOutput } from './stdio.ts';
+import { invalidArguments, missingArguments, stdioServer, type Args, type PropSchema, type ToolOutput } from './stdio.ts';
 import { loadGraph, type Graph } from './graph.ts';
 import {
   attributeUsage, blastRadius, callers, contextForChange, eventFlow, permissionRoutes, routeAuthz, testsCovering, testsFor,
@@ -206,13 +206,20 @@ export function graphInfo(g: Graph, base: string | undefined, opts: ServerOption
   return lines.join('\n');
 }
 
+const badArguments = (name: string, props: object, args: Args): ToolOutput | null => {
+  const invalid = invalidArguments(props as Record<string, PropSchema>, args);
+  return invalid.length ? { text: `${name}: invalid argument(s): ${invalid.join('; ')}`, isError: true } : null;
+};
+
 export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions = {}): ToolOutput {
   const base = typeof args.base === 'string' ? args.base : undefined;
-  if (name === 'graph_info') return { text: graphInfo(g, base, opts), isError: false };
+  if (name === 'graph_info') return badArguments(name, { base: common.base }, args) ?? { text: graphInfo(g, base, opts), isError: false };
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return { text: `unknown tool ${name}`, isError: true };
   const missing = missingArguments(tool.required, args);
   if (missing.length) return { text: `${name}: missing required argument(s) ${missing.join(', ')}`, isError: true };
+  const invalid = badArguments(name, { ...tool.props, ...common }, args);
+  if (invalid) return invalid;
   const res = tool.run(g, args, opts);
   const st = staleness(g, base, opts);
   const header = st.header;

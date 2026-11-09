@@ -54,6 +54,7 @@ export const MAX_LIMIT = 500;
 export const DEFAULT_MAX_TOKENS = { concise: 1500, detailed: 4000 } as const;
 export const CHARS_PER_TOKEN = 4;
 const DETAIL_TOP = 5;
+const MAX_QUERY_CHARS = 80;
 
 const BAND_CODE: Record<string, string> = { static_proven: 'S', declared: 'D', heuristic: 'H', unknown: '?' };
 const LEGEND = 'legend: [S] static_proven  [D] declared  [H] heuristic (name or pattern match; the cited line is the evidence)  [?] unknown, not provable';
@@ -124,7 +125,15 @@ function groupKey(r: Row, by: GroupBy): string {
   return '';
 }
 
-function treeOrder(rows: Row[]): { row: Row; level: number }[] {
+interface Placed {
+  row: Row;
+  level: number;
+  group: string;
+  // the rows a tree row hangs under, root first
+  trail: Row[];
+}
+
+function treeOrder(rows: Row[]): { row: Row; trail: Row[] }[] {
   const ids = new Set(rows.map((r) => r.id));
   const kids = new Map<string, Row[]>();
   const roots: Row[] = [];
@@ -135,12 +144,12 @@ function treeOrder(rows: Row[]): { row: Row; level: number }[] {
       kids.set(r.parentId, k);
     } else roots.push(r);
   }
-  const out: { row: Row; level: number }[] = [];
-  const walk = (r: Row, level: number) => {
-    out.push({ row: r, level });
-    for (const c of rankRows(kids.get(r.id) ?? [])) walk(c, level + 1);
+  const out: { row: Row; trail: Row[] }[] = [];
+  const walk = (r: Row, trail: Row[]) => {
+    out.push({ row: r, trail });
+    for (const c of rankRows(kids.get(r.id) ?? [])) walk(c, [...trail, r]);
   };
-  for (const r of rankRows(roots)) walk(r, 0);
+  for (const r of rankRows(roots)) walk(r, []);
   return out;
 }
 
@@ -163,20 +172,24 @@ interface SectionOpts {
   offset: number;
 }
 
-function displayOrder(s: Section, known: Row[], by: GroupBy): { row: Row; level: number; group: string }[] {
-  if (s.ordered) return known.map((row) => ({ row, level: 0, group: '' }));
+// How a section is grouped: an ordered section never is, and "component" falls back to none when no row has one.
+const groupingOf = (s: Section, groupBy: GroupBy): GroupBy => (s.ordered || (groupBy === 'component' && !s.rows.some((r) => r.component)) ? 'none' : groupBy);
+
+// The known rows of a section in the order every format pages them.
+function displayOrder(s: Section, known: Row[], by: GroupBy): Placed[] {
+  if (s.ordered) return known.map((row) => ({ row, level: 0, group: '', trail: [] }));
   if (s.tree) {
     let current = '';
-    const flat = treeOrder(known).map(({ row, level }) => {
-      if (level === 0) current = groupKey(row, by);
-      return { row, level, group: current };
+    const flat = treeOrder(known).map(({ row, trail }) => {
+      if (!trail.length) current = groupKey(row, by);
+      return { row, level: trail.length, group: current, trail };
     });
     const groups = [...new Set(flat.map((x) => x.group))];
     return groups.flatMap((g) => flat.filter((x) => x.group === g));
   }
   const ranked = rankRows(known);
   const groups = [...new Set(ranked.map((r) => groupKey(r, by)))];
-  return groups.flatMap((g) => ranked.filter((r) => groupKey(r, by) === g).map((row) => ({ row, level: 0, group: g })));
+  return groups.flatMap((g) => ranked.filter((r) => groupKey(r, by) === g).map((row) => ({ row, level: 0, group: g, trail: [] })));
 }
 
 function renderSection(s: Section, o: SectionOpts, lv: Level): string[] {
@@ -186,7 +199,7 @@ function renderSection(s: Section, o: SectionOpts, lv: Level): string[] {
   const out = [known.length
     ? `${s.name} (${s.rows.length}${s.rows.length > 1 ? ` ${bandMix(s.rows)}` : ''})`
     : `${s.name}: none proven (${unknown.length} uncertain)`];
-  const by: GroupBy = s.ordered || (o.groupBy === 'component' && !s.rows.some((r) => r.component)) ? 'none' : o.groupBy;
+  const by = groupingOf(s, o.groupBy);
   if (!lv.rows) {
     if (lv.groups && by !== 'none') {
       const counts = new Map<string, number>();
@@ -205,6 +218,10 @@ function renderSection(s: Section, o: SectionOpts, lv: Level): string[] {
   for (const x of ordered) totals.set(x.group, (totals.get(x.group) ?? 0) + 1);
   const page = ordered.slice(o.offset, o.offset + o.limit);
   const withDetail = (i: number) => lv.details && (!!s.ordered || (o.format === 'detailed' && i < DETAIL_TOP));
+  const rowAt = (row: Row, level: number, number: number | null, detail: boolean, indent: string, inGroup: boolean): string => (level === 0
+    ? rowLine(row, number, detail, indent, inGroup)
+    : `${indent}${'    '.repeat(level - 1)}  └─ ${edgeWord(row)} ${rowLine(row, null, detail, '', inGroup)}`);
+  if (ordered.length && !page.length) out.push(`  offset ${o.offset} is past the end of the ${ordered.length} row(s)`);
   let lastGroup: string | null = null;
   page.forEach((x, i) => {
     const grouped = by !== 'none';
@@ -214,8 +231,11 @@ function renderSection(s: Section, o: SectionOpts, lv: Level): string[] {
     }
     const indent = grouped ? '    ' : '  ';
     const inGroup = by === 'component';
-    if (x.level === 0) out.push(rowLine(x.row, o.offset + i + 1, withDetail(i), indent, inGroup));
-    else out.push(`${indent}${'    '.repeat(x.level - 1)}  └─ ${edgeWord(x.row)} ${rowLine(x.row, null, withDetail(i), '', inGroup)}`);
+    if (i === 0 && x.trail.length) {
+      out.push(`${indent}(continued from the previous page: the rows below hang under)`);
+      x.trail.forEach((t, level) => out.push(rowAt(t, level, null, false, indent, inGroup)));
+    }
+    out.push(rowAt(x.row, x.level, o.offset + i + 1, withDetail(i), indent, inGroup));
   });
   const rest = ordered.length - o.offset - page.length;
   if (rest > 0) out.push(`  +${rest} more (next page: offset=${o.offset + page.length} section="${shortName(s)}")`);
@@ -238,11 +258,14 @@ function sectionOpts(o: RenderOptions): SectionOpts {
 function frame(res: QueryResult, o: RenderOptions, sections: Section[]): { head: string[]; tail: string[] } {
   const head: string[] = [];
   if (o.header) head.push(o.header);
-  head.push(`${res.name.toUpperCase()} ${res.query} — ${res.verdict}`);
+  // a very long query is named once in full by the caller; the answer quotes a short form so the verdict fits the budget
+  const query = res.query.length > MAX_QUERY_CHARS ? `${res.query.slice(0, MAX_QUERY_CHARS)}... (${res.query.length} chars)` : res.query;
+  const quoted = (text: string) => text.split(res.query).join(query);
+  head.push(`${res.name.toUpperCase()} ${query} — ${quoted(res.verdict)}`);
   const counted = sections.filter((s) => s.rows.length && !(s.name === 'definition' && s.rows.length === 1));
   if (counted.length) head.push(`counts: ${counted.map((s) => `${shortName(s)}=${s.rows.length} [${bandMix(s.rows)}]`).join('  ')}`);
   if (o.format === 'detailed') head.push(LEGEND);
-  for (const n of res.notes) head.push(`note: ${n}`);
+  for (const n of res.notes) head.push(`note: ${quoted(n)}`);
   if (o.section && !sections.length) head.push(`no section matches ${JSON.stringify(o.section)}; sections: ${res.sections.map(shortName).join(', ')}`);
   const tail: string[] = [];
   if (!res.found && !res.sections.length) tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
@@ -265,11 +288,17 @@ function renderJson(res: QueryResult, opts: RenderOptions): string {
   const paged = opts.limit !== undefined || offset > 0;
   const sections = res.sections.filter((s) => sectionMatches(s, opts.section));
   const most = Math.max(0, ...sections.map((s) => s.rows.length));
+  // the same page as the text formats: known rows in display order, then the section's first UNKNOWN rows
+  const page = (s: Section, limit: number): Row[] => {
+    const known = s.rows.filter((r) => r.band !== 'unknown');
+    const unknown = s.rows.filter((r) => r.band === 'unknown');
+    return [...displayOrder(s, known, groupingOf(s, opts.groupBy ?? 'component')).slice(offset, offset + limit).map((x) => x.row), ...unknown.slice(0, limit)];
+  };
   const shape = (limit: number, truncated: boolean): string => JSON.stringify({
     ...res,
     sections: sections.map((s) => {
-      const rows = s.rows.slice(offset, offset + limit);
-      return rows.length === s.rows.length ? s : { ...s, rows, total: s.rows.length, offset };
+      if (offset === 0 && limit >= s.rows.length) return s;
+      return { ...s, rows: page(s, limit), total: s.rows.length, offset };
     }),
     ...(truncated ? { truncated: `rows cut to fit ${Math.floor(budget / CHARS_PER_TOKEN)} tokens; page with offset= and limit=` } : {}),
   });

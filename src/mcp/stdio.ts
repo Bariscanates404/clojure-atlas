@@ -3,7 +3,9 @@
 // tool server needs. A server hands over its identity, its tool list and one `callTool`; a tool may answer
 // synchronously or with a promise.
 
-export const DEFAULT_PROTOCOL = '2025-06-18';
+// Newest first: a client asking for a version not listed gets the newest, and decides whether it can speak it.
+export const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+export const DEFAULT_PROTOCOL = SUPPORTED_PROTOCOLS[0];
 
 export type Args = Record<string, unknown>;
 
@@ -36,6 +38,38 @@ export function missingArguments(required: readonly string[], args: Args): strin
   return required.filter((k) => !present(args[k]));
 }
 
+// One tool property of an input schema: the part of JSON Schema the tools use.
+export interface PropSchema {
+  type?: string;
+  enum?: readonly string[];
+  items?: { type?: string };
+}
+
+const typeOf = (v: unknown): string => (Array.isArray(v) ? 'array' : typeof v);
+
+// What is wrong with one argument value, or null.
+function problem(k: string, schema: PropSchema, v: unknown): string | null {
+  const got = typeOf(v);
+  if (schema.type !== 'array') {
+    if (schema.type && got !== schema.type) return `${k} must be a ${schema.type}, got ${got}`;
+    return schema.enum && !schema.enum.includes(v as string) ? `${k} must be one of ${schema.enum.join(', ')}, got ${JSON.stringify(v)}` : null;
+  }
+  // a lone string stands for a list of one string, as the tools read it
+  if (!Array.isArray(v)) return schema.items?.type === 'string' && got === 'string' ? null : `${k} must be a list, got ${got}`;
+  const wrong = schema.items?.type ? v.find((x) => typeOf(x) !== schema.items?.type) : undefined;
+  return wrong === undefined ? null : `${k} must be a list of ${schema.items?.type}, got a list with a ${typeOf(wrong)}`;
+}
+
+// What is wrong with the arguments a call passes, one sentence each: a present (non-null) value of the wrong type or
+// outside its enum. Arguments the schema does not list are left alone.
+export function invalidArguments(props: Record<string, PropSchema>, args: Args): string[] {
+  return Object.entries(props).flatMap(([k, schema]) => {
+    const v = args[k];
+    const p = v === undefined || v === null ? null : problem(k, schema, v);
+    return p === null ? [] : [p];
+  });
+}
+
 export interface StdioServer<C> {
   // One parsed message in, the response out (null for a notification); a promise when the tool call is async.
   handleMessage: (ctx: C, msg: unknown) => unknown;
@@ -53,6 +87,8 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
     if (typeof msg !== 'object' || msg === null || Array.isArray(msg)) return fail(null, -32600, 'invalid request');
     const req = msg as JsonRpcRequest;
     const isNotification = req.id === undefined;
+    if (!isNotification && req.id !== null && typeof req.id !== 'string' && typeof req.id !== 'number') return fail(null, -32600, 'invalid request: id must be a string, a number or null');
+    if (req.jsonrpc !== '2.0') return isNotification ? null : fail(req.id, -32600, 'invalid request: jsonrpc must be "2.0"');
     if (typeof req.method !== 'string') return isNotification ? null : fail(req.id, -32600, 'invalid request: no method');
     // JSON-RPC: a notification (no id) is never answered, whatever its method
     if (isNotification) return null;
@@ -60,7 +96,7 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
       case 'initialize': {
         const requested = req.params?.protocolVersion;
         return reply(req.id, {
-          protocolVersion: typeof requested === 'string' ? requested : DEFAULT_PROTOCOL,
+          protocolVersion: typeof requested === 'string' && SUPPORTED_PROTOCOLS.includes(requested) ? requested : DEFAULT_PROTOCOL,
           capabilities: { tools: {} },
           serverInfo: { name: def.name, version: def.version },
           ...(def.instructions !== undefined ? { instructions: def.instructions } : {}),
@@ -74,6 +110,7 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
         const name = req.params?.name;
         const args = (req.params?.arguments ?? {}) as Args;
         if (typeof name !== 'string') return fail(req.id, -32602, 'tools/call needs params.name');
+        if (!def.listTools().some((t) => (t as { name?: unknown }).name === name)) return fail(req.id, -32602, `unknown tool ${name}`);
         const done = ({ text, isError }: ToolOutput) => reply(req.id, { content: [{ type: 'text', text }], isError });
         try {
           const out = def.callTool(ctx, name, args);
@@ -91,7 +128,7 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
     if (!line.trim()) return null;
     let msg: unknown;
     try {
-      msg = JSON.parse(line);
+      msg = JSON.parse(line.startsWith('\uFEFF') ? line.slice(1) : line);
     } catch (err) {
       process.stderr.write(`${def.name}: unparsable message: ${(err as Error).message}\n`);
       return fail(null, -32700, 'parse error');
@@ -104,6 +141,12 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
       void Promise.resolve(handleLine(ctx, line)).then((res) => {
         if (res) process.stdout.write(`${JSON.stringify(res)}\n`);
       });
+    });
+    // a client that closed our stdout is gone: end quietly instead of dying on the unhandled write error
+    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EPIPE') process.exit(0);
+      process.stderr.write(`${def.name}: cannot write to stdout: ${err.message}\n`);
+      process.exit(1);
     });
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (chunk: string) => lines.push(chunk));

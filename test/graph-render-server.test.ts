@@ -244,6 +244,52 @@ describe('render: paging and budget', () => {
   });
 });
 
+describe('render: paging tells the truth', () => {
+  const tree = () => result(0, {
+    sections: [{ name: 'affected', tree: true, rows: [
+      row(1, { depth: 1, kind: 'calls', parentId: 'definition:target' }),
+      row(2, { depth: 2, kind: 'calls', parentId: 'definition:r1' }),
+      row(3, { depth: 3, kind: 'calls', parentId: 'definition:r2' }),
+      row(4, { depth: 1, kind: 'calls', parentId: 'definition:target' }),
+    ] }],
+  });
+
+  it('a tree page that starts inside a subtree first shows the rows it hangs under', () => {
+    const lines = render(tree(), { groupBy: 'none', limit: 2, offset: 1 }).split('\n');
+    const at = (re: RegExp) => lines.findIndex((l) => re.test(l));
+    assert.ok(at(/continued from the previous page/) >= 0, lines.join('\n'));
+    assert.ok(at(/r1 /) > at(/continued/) && at(/r1 /) < at(/└─ called by r2/), lines.join('\n'));
+    assert.ok(at(/└─ called by r3/) > at(/└─ called by r2/));
+    assert.equal(lines.filter((l) => /^ +\d+\. /.test(l)).length, 0, 'the context root carries no number');
+  });
+
+  it('a page that starts at a root has no context', () => {
+    assert.doesNotMatch(render(tree(), { groupBy: 'none', limit: 3 }), /continued/);
+  });
+
+  it('an offset past the end says so instead of printing a bare header', () => {
+    const text = render(result(3), { offset: 10 });
+    assert.match(text, /offset 10 is past the end of the 3 row\(s\)/);
+  });
+
+  it('json and text page the same known rows, unknown rows stay in every page', () => {
+    const r = result(0, { sections: [{ name: 's', rows: [row(0, { band: 'unknown', reason: 'dynamic' }), row(1, { band: 'heuristic' }), row(2), row(3)] }] });
+    const text = render(r, { groupBy: 'none', limit: 1, offset: 1 });
+    assert.match(rowLines(text)[0], /^ {2}2\. r3 /);
+    const json = JSON.parse(render(r, { format: 'json', groupBy: 'none', limit: 1, offset: 1 })) as { sections: { rows: { label: string }[]; total: number }[] };
+    assert.deepEqual(json.sections[0].rows.map((x) => x.label), ['r3', 'r0']);
+    assert.equal(json.sections[0].total, 4);
+  });
+
+  it('a key query longer than the budget still keeps its verdict', () => {
+    const q = 'k'.repeat(10000);
+    const r = result(0, { query: q, verdict: `0 proven producer or consumer sites of :${q} in this graph`, sections: [], found: false, notes: [`nothing for ${q}`] });
+    const text = render(r);
+    assert.match(text, /0 proven producer or consumer sites of :k+.* in this graph/);
+    assert.ok(text.length <= DEFAULT_MAX_TOKENS.concise * CHARS_PER_TOKEN);
+  });
+});
+
 describe('render: every row line of a real query is cited', () => {
   it('callers with mixed bands', () => {
     const g = new GraphBuilder();
@@ -428,7 +474,28 @@ describe('MCP server', () => {
     }
   });
 
-  it('an unknown tool is a tool error', () => assert.match(call('nope', {}).result.content[0].text, /unknown tool nope/));
+  it('an unknown tool is invalid params on the wire and a tool error from callTool', () => {
+    assert.equal((handleMessage(g, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'nope' } }) as { error: { code: number } }).error.code, -32602);
+    assert.match(callTool(g, 'nope', {}).text, /unknown tool nope/);
+  });
+  it('a wrong-typed optional argument is an error naming it, never silently ignored', () => {
+    const bad: [string, Record<string, unknown>, RegExp][] = [
+      ['blast_radius', { var: 'x', depth: '1' }, /depth must be a number, got string/],
+      ['callers', { var: 'x', limit: '3' }, /limit must be a number/],
+      ['callers', { var: 'x', group_by: 'bogus' }, /group_by must be one of component, file, none/],
+      ['callers', { var: 'x', response_format: 'xml' }, /response_format must be one of concise, detailed, json/],
+      ['signature_impact', { fn: 'x', arities: ['1'] }, /arities must be a list of number/],
+      ['callers', { var: 'x', include_references: 'yes' }, /include_references must be a boolean/],
+      ['graph_info', { base: 5 }, /base must be a string/],
+    ];
+    for (const [name, args, why] of bad) {
+      const r = callTool(g, name, args);
+      assert.equal(r.isError, true, name);
+      assert.match(r.text, why);
+      assert.ok(r.text.startsWith(`${name}: invalid argument(s): `), r.text);
+    }
+    assert.equal(callTool(g, 'callers', { var: 'x', limit: 3, group_by: 'file', depth: null }).isError, false);
+  });
   it('tools/call without a name is invalid params', () => {
     assert.deepEqual((handleMessage(g, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: {} }) as { error: unknown }).error, { code: -32602, message: 'tools/call needs params.name' });
   });
