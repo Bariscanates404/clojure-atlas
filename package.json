@@ -1,0 +1,39 @@
+{
+  "name": "clojure-atlas",
+  "version": "0.1.0",
+  "description": "A structural map of any Clojure, ClojureScript or .cljc codebase, served to AI coding agents as MCP tools.",
+  "license": "MIT",
+  "author": "Barış Can Ateş",
+  "type": "module",
+  "bin": {
+    "clojure-atlas": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "clojure",
+    "clojurescript",
+    "mcp",
+    "code-graph",
+    "clj-kondo",
+    "ai-agents"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "coverage": "node scripts/coverage.ts",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "clj-kondo": "2025.10.23"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2"
+  }
+}
