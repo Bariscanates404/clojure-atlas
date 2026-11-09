@@ -14,7 +14,8 @@ interface Site {
   threaded: boolean;
 }
 
-const THREADING = new Set(['->', '->>', 'cond->', 'cond->>', 'some->', 'some->>', 'doto', 'as->']);
+const THREADING = new Set(['->', '->>', 'cond->', 'cond->>', 'some->', 'some->>', 'doto']);
+const COND_THREADING = new Set(['cond->', 'cond->>']);
 const BINDING_FORMS = new Set(['let', 'loop', 'binding', 'when-let', 'if-let', 'when-some', 'if-some', 'doseq', 'for', 'with-open', 'with-redefs', 'letfn']);
 const FN_FORMS = new Set(['fn', 'defn', 'defn-', 'defmacro', 'defmethod', 'bound-fn']);
 const DESTRUCTURE_KEYS = new Set([':keys', ':strs', ':syms', ':as', ':or']);
@@ -31,6 +32,8 @@ function coreHead(ctx: Context, file: string, list: Form): string | undefined {
 // A map in a binding position: a let-style binding target or a function parameter.
 function isDestructuring(ctx: Context, file: string, map: Form): boolean {
   const p = ctx.parentOf(file, map.row, map.col);
+  // a map in the key slot of a binding map destructures a nested value: {{:keys [c]} :child}
+  if (p?.parent.t === 'map' && p.index % 2 === 0) return isDestructuring(ctx, file, p.parent);
   if (!p || p.parent.t !== 'vector') return false;
   const owner = ctx.parentOf(file, p.parent.row, p.parent.col)?.parent;
   const head = owner && owner.t === 'list' ? textOf(owner.children[0]) : undefined;
@@ -42,9 +45,23 @@ function isDestructuring(ctx: Context, file: string, map: Form): boolean {
   return !!grand && grand.t === 'list' && FN_FORMS.has(textOf(grand.children[0]) ?? '');
 }
 
+// Whether the form at `index` of `parent` is a step the threaded value passes through: not the head, not the value
+// that starts the thread, not a cond-> test and not an as-> form (which names its value explicitly).
+// The :keys, :or or :as of a binding map, as opposed to a data key that happens to be named so.
+function isBindingKey(ctx: Context, k: Keyword): boolean {
+  const at = ctx.parentOf(k.file, k.row, k.col);
+  return !k.destructured && !!at && at.parent.t === 'map' && at.index % 2 === 0 && isDestructuring(ctx, k.file, at.parent);
+}
+
+function isThreadStep(parent: Form, index: number): boolean {
+  const head = parent.t === 'list' ? textOf(parent.children[0]) : undefined;
+  if (!head || !THREADING.has(head)) return false;
+  return COND_THREADING.has(head) ? index >= 3 && index % 2 === 1 : index >= 2;
+}
+
 function isThreaded(ctx: Context, file: string, list: Form): boolean {
-  const p = ctx.parentOf(file, list.row, list.col)?.parent;
-  return !!p && p.t === 'list' && THREADING.has(textOf(p.children[0]) ?? '') && p.children[0] !== list;
+  const at = ctx.parentOf(file, list.row, list.col);
+  return !!at && isThreadStep(at.parent, at.index);
 }
 
 const site = (role: Role, via: string, threaded = false): Site => ({ role, via, threaded });
@@ -73,7 +90,7 @@ export function classify(ctx: Context, k: Keyword): Site[] {
   if (parent.t !== 'list') return [];
   if (index === 0) return [site('consumes_key', 'keyword-fn')];
   // (-> m :a :b): each keyword is a lookup step
-  if (index >= 2 && THREADING.has(textOf(parent.children[0]) ?? '') && textOf(parent.children[0]) !== 'as->') return [site('consumes_key', 'keyword-fn', true)];
+  if (isThreadStep(parent, index)) return [site('consumes_key', 'keyword-fn', true)];
   const fn = coreHead(ctx, k.file, parent);
   if (!fn) return [];
   const threaded = isThreaded(ctx, k.file, parent);
@@ -159,7 +176,7 @@ export const mapKeys: Adapter = {
     const other = new Map<string, number>();
     for (const k of ctx.analysis.keywords) {
       const name = keywordName(k);
-      if (DESTRUCTURE_KEYS.has(name)) continue;
+      if (DESTRUCTURE_KEYS.has(name) && isBindingKey(ctx, k)) continue;
       const sites = classify(ctx, k);
       if (!sites.length) other.set(name, (other.get(name) ?? 0) + 1);
       for (const s of sites) {

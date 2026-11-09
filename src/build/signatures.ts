@@ -30,27 +30,47 @@ export interface CallArg {
 
 type Name = (f: Form) => string;
 
-// {:keys [a b] :as m :or {a 1}} and {x :k}: the keys it takes, its alias and the keys with a default.
-function mapParam(m: Form, name: Name): Omit<Param, 'kind'> {
+const LET_FORMS = new Set(['let', 'loop', 'if-let', 'when-let', 'if-some', 'when-some', 'doseq', 'for']);
+const FN_FORMS = new Set(['fn', 'fn*']);
+
+const mentions = (f: Form, sym: string): boolean => {
+  const u = unwrap(f);
+  return (u.t === 'symbol' && u.text === sym) || kids(u).some((c) => mentions(c, sym));
+};
+
+// {:keys [a b] :as m :or {a 1}} and {x :k}, {{:keys [c]} :child}: the keys it takes, its alias and the keys with a
+// default. A :strs or :syms entry takes keys this list cannot name, so the result is partial.
+function mapParam(m: Form, name: Name): Omit<Param, 'kind'> & { partial: boolean } {
   const xs = flatChildren(m);
   const keys: string[] = [];
+  const local = new Map<string, string>();
   let as: string | undefined;
-  let defaults: string[] = [];
+  let or: Form[] = [];
+  let partial = false;
   for (let i = 0; i + 1 < xs.length; i += 2) {
     const k = unwrap(xs[i]);
     const v = unwrap(xs[i + 1]);
-    const kt = textOf(k) ?? '';
-    if (k.t === 'keyword' && /^:(.+\/)?keys$/.test(kt) && v.t === 'vector') {
+    // kondo resolves ::alias/keys to the namespace written in full
+    const kt = k.t === 'keyword' ? name(k) : '';
+    if (/^:(.+\/)?keys$/.test(kt) && v.t === 'vector') {
       const ns = kt.includes('/') ? `${kt.slice(1, kt.indexOf('/'))}/` : '';
-      for (const s of flatChildren(v)) if (textOf(s)) keys.push(`:${ns}${(textOf(s) ?? '').replace(/^:/, '')}`);
-    } else if (kt === ':as') as = textOf(v);
-    else if (kt === ':or' && v.t === 'map') defaults = flatChildren(v).filter((_, j) => j % 2 === 0).map((s) => `:${textOf(unwrap(s))}`);
-    else if (k.t === 'symbol' && v.t === 'keyword') keys.push(name(v));
+      for (const s of flatChildren(v)) {
+        const sym = (textOf(s) ?? '').replace(/^:/, '');
+        if (!sym) continue;
+        keys.push(`:${ns}${sym}`);
+        local.set(sym, `:${ns}${sym}`);
+      }
+    } else if (/^:(.+\/)?(strs|syms)$/.test(kt)) partial = true;
+    else if (kt === ':as') as = textOf(v);
+    else if (kt === ':or' && v.t === 'map') or = flatChildren(v).filter((_, j) => j % 2 === 0);
+    else if ((k.t === 'symbol' || k.t === 'map' || k.t === 'vector') && v.t === 'keyword') keys.push(name(v));
   }
-  return { keys, ...(as ? { as } : {}), ...(defaults.length ? { defaults } : {}) };
+  const defaults = or.map((s) => local.get(textOf(unwrap(s)) ?? '') ?? `:${textOf(unwrap(s))}`);
+  return { keys, ...(as ? { as } : {}), ...(defaults.length ? { defaults } : {}), partial };
 }
 
-// The keys `sym` is read by in the body ((:k sym), (get sym :k), (get-in sym [:k ...])) and every other use of it.
+// The keys `sym` is read by in the body ((:k sym), (get sym :k), (get-in sym [:k ...])) and every other use of it. A
+// let, loop or fn that binds the name again hides the parameter from what follows.
 function readsOf(body: readonly Form[], sym: string, name: Name): { reads: string[]; escapes: string[] } {
   const reads = new Set<string>();
   const escapes = new Set<string>();
@@ -67,16 +87,43 @@ function readsOf(body: readonly Form[], sym: string, name: Name): { reads: strin
         else escapes.add('get-in with a computed path');
       } else escapes.add(h && index > 0 ? `passed to ${h}` : 'used as a value');
     }
+    const head = f.t === 'list' ? textOf(kids(f)[0]) : undefined;
+    if (head && LET_FORMS.has(head) && kids(f)[1]?.t === 'vector') return visitLet(f);
+    if (head && FN_FORMS.has(head)) return visitFn(f);
     kids(f).forEach((c, i) => visit(c, f, i));
+  };
+  // binding inits are read while the name still means the parameter; the first pair that rebinds it ends the scope
+  const visitLet = (f: Form): void => {
+    const bindings = kids(f)[1];
+    const pairs = kids(bindings);
+    for (let i = 0; i + 1 < pairs.length; i += 2) {
+      visit(pairs[i + 1], bindings, i + 1);
+      if (mentions(pairs[i], sym)) return;
+    }
+    kids(f).slice(2).forEach((c, i) => visit(c, f, i + 2));
+  };
+  // a parameter vector that names it hides it from the body: the rest of a single-arity fn, one arity of a multi-arity one
+  const visitFn = (f: Form): void => {
+    const parts = kids(f);
+    for (let i = 0; i < parts.length; i++) {
+      const c = parts[i];
+      const arity = c.t === 'list' && kids(c)[0]?.t === 'vector' ? c : undefined;
+      const params = c.t === 'vector' ? c : arity && kids(arity)[0];
+      if (!params) visit(c, f, i);
+      else if (mentions(params, sym)) {
+        if (c.t === 'vector') return;
+      } else if (arity) kids(arity).forEach((x, j) => visit(x, arity, j));
+      else visit(c, f, i);
+    }
   };
   body.forEach((f) => visit(f, undefined, 0));
   return { reads: [...reads].sort(), escapes: [...escapes].sort() };
 }
 
-function withReads(p: Param, alias: string | undefined, body: readonly Form[], name: Name): Param {
-  if (!alias) return p.kind === 'map' || p.kind === 'kwargs' ? { ...p, reads_complete: true } : p;
+function withReads(p: Param, alias: string | undefined, body: readonly Form[], name: Name, partial = false): Param {
+  if (!alias) return p.kind === 'map' || p.kind === 'kwargs' ? { ...p, reads_complete: !partial } : p;
   const r = readsOf(body, alias, name);
-  return { ...p, ...(r.reads.length ? { reads: r.reads } : {}), reads_complete: !r.escapes.length, ...(r.escapes.length ? { escapes: r.escapes } : {}) };
+  return { ...p, ...(r.reads.length ? { reads: r.reads } : {}), reads_complete: !r.escapes.length && !partial, ...(r.escapes.length ? { escapes: r.escapes } : {}) };
 }
 
 function arity(params: Form, body: readonly Form[], name: Name): Arity {
@@ -89,15 +136,15 @@ function arity(params: Form, body: readonly Form[], name: Name): Arity {
       variadic = true;
       const rest = xs[i + 1] && unwrap(xs[i + 1]);
       if (rest?.t === 'map') {
-        const m = mapParam(rest, name);
-        out.push(withReads({ kind: 'kwargs', ...m }, m.as, body, name));
+        const { partial, ...m } = mapParam(rest, name);
+        out.push(withReads({ kind: 'kwargs', ...m }, m.as, body, name, partial));
       } else out.push({ kind: 'rest', ...(rest && textOf(rest) ? { name: textOf(rest) } : {}) });
       break;
     }
     if (x.t === 'symbol') out.push(withReads({ kind: 'symbol', name: x.text }, x.text === '_' ? undefined : x.text, body, name));
     else if (x.t === 'map') {
-      const m = mapParam(x, name);
-      out.push(withReads({ kind: 'map', ...m }, m.as, body, name));
+      const { partial, ...m } = mapParam(x, name);
+      out.push(withReads({ kind: 'map', ...m }, m.as, body, name, partial));
     } else if (x.t === 'vector') out.push({ kind: 'vector' });
     else out.push({ kind: 'other' });
   }

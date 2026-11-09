@@ -15,7 +15,7 @@ export type Atom = 'symbol' | 'keyword' | 'string' | 'number' | 'char' | 'regex'
 
 export type Form =
   | (Pos & { t: Coll; children: Form[]; ns?: string })
-  | (Pos & { t: Wrap; children: Form[]; tag?: string })
+  | (Pos & { t: Wrap; children: Form[]; tag?: string; splice?: boolean })
   | (Pos & { t: Atom; text: string });
 
 export interface ReadResult {
@@ -148,11 +148,12 @@ export function readForms(src: string): ReadResult {
       }
       if (d === '?') {
         next();
-        if (peek() === '@') next();
+        const splice = peek() === '@';
+        if (splice) next();
         skipSpace();
         if (peek() !== '(') fail('reader conditional without a list');
         next();
-        return done({ t: 'cond', children: children(')') } as const);
+        return done({ t: 'cond', children: children(')'), ...(splice ? { splice } : {}) } as const);
       }
       if (d === ':') {
         next();
@@ -216,12 +217,26 @@ export function unwrap(f: Form): Form {
   return f;
 }
 
-// Branches of a reader conditional flatten to every platform's form, so an adapter sees both.
+// The values a reader conditional can stand for, one per branch. A splicing one (#?@) contributes its branches'
+// elements, a nested one flattens in turn.
+const isCond = (f: Form): f is Form & { t: 'cond' } => f.t === 'cond';
+
+const branches = (cond: Form & { t: 'cond' }): Form[] =>
+  cond.children.filter((_, k) => k % 2 === 1).flatMap((x) => {
+    const u = unwrap(x);
+    if (isCond(u)) return branches(u);
+    return cond.splice ? kids(u) : [x];
+  });
+
+// The elements of a collection with its reader conditionals resolved. In a sequence every platform's branch is
+// listed so an adapter sees both. In a map the slots pair up as key and value, so a conditional there is one slot
+// holding its first branch; a splicing one still contributes whole pairs.
 export function flatChildren(f: Form): Form[] {
   return kids(f).flatMap((c) => {
     const u = unwrap(c);
-    if (u.t !== 'cond') return [c];
-    return u.children.filter((_, k) => k % 2 === 1).flatMap((x) => (unwrap(x).t === 'cond' ? flatChildren(unwrap(x)) : [x]));
+    if (!isCond(u)) return [c];
+    const all = branches(u);
+    return f.t === 'map' && !u.splice ? all.slice(0, 1) : all;
   });
 }
 

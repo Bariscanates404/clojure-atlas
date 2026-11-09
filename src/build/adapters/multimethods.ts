@@ -10,15 +10,18 @@ import { CORE_NS, defId, groupBy, nsId, type Adapter, type Container, type Conte
 export const methodId = (multi: string, dispatch: string) => `dispatch_arm:${multi}@${dispatch}`;
 
 interface Method {
+  id: string;
   use: VarUse;
   multi: string;
   dispatch: string;
   span: Span;
 }
 
+// Every defmethod. Two of the same multimethod and dispatch value (a clj and a cljs file, or an arm defined again) are
+// two arms: the first in file order keeps the plain id and a later one adds its position.
 export function methods(ctx: Context): Method[] {
   const forms = groupBy(ctx.analysis.varUses.filter((u) => u.name === 'defmethod' && CORE_NS.test(u.to)), (u) => u.file);
-  return ctx.analysis.varUses
+  const all = ctx.analysis.varUses
     .filter((u) => u.defmethod)
     .map((use) => {
       const form = (forms.get(use.file) ?? []).find((f) => contains(f, use.nameRow, use.nameCol));
@@ -27,19 +30,27 @@ export function methods(ctx: Context): Method[] {
       const written = list ? kids(list)[2] : undefined;
       const resolved = written && written.t === 'keyword' ? ctx.keywordAt(use.file, written.row, written.col) : undefined;
       return { use, multi: `${use.to}/${use.name}`, dispatch: resolved ?? use.dispatch ?? '?', span: form ?? use };
-    });
+    })
+    .sort((a, b) => (a.span.file < b.span.file ? -1 : a.span.file > b.span.file ? 1 : a.span.row - b.span.row || a.span.col - b.span.col));
+  const taken = new Set<string>();
+  return all.map((m) => {
+    const plain = methodId(m.multi, m.dispatch);
+    const id = taken.has(plain) ? `${plain}#${m.span.file}:${m.span.row}` : plain;
+    taken.add(id);
+    return { ...m, id };
+  });
 }
 
 export const multimethods: Adapter = {
   name: 'multimethods',
   edgeKinds: ['defines', 'may_dispatch_to'],
   detect: (ctx) => (ctx.analysis.varUses.some((u) => u.defmethod) ? 'defmethod' : null),
-  containers: (ctx): Container[] => methods(ctx).map((m) => ({ id: methodId(m.multi, m.dispatch), span: m.span })),
+  containers: (ctx): Container[] => methods(ctx).map((m) => ({ id: m.id, span: m.span })),
   run: (ctx) => {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     for (const m of methods(ctx)) {
-      const id = methodId(m.multi, m.dispatch);
+      const { id } = m;
       const component = ctx.componentOf(m.span.file);
       nodes.push({
         id, kind: 'dispatch_arm', name: `${m.multi.split('/').pop()} ${m.dispatch}`, file: m.span.file, line: m.span.row, end_line: m.span.endRow,

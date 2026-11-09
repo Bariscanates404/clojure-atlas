@@ -2,14 +2,17 @@
 // (system-map entries, component/using). registers links a key to the code that starts it, depends_on to the
 // keys it needs.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
-import { contains, flatChildren, formAt, kids, unwrap, walk, type Form } from '../reader.ts';
+import { contains, flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { defId, type Adapter, type Context } from '../model.ts';
-import { methodId, methods } from './multimethods.ts';
+import { methods } from './multimethods.ts';
 
 const IG = 'integrant.core';
 const IG_METHODS = /^integrant\.core\/(init-key|halt-key!|suspend-key!|resume-key|resolve-key|prep-key|expand-key|assert-key)$/;
 const MOUNT = /^mount\.(core|lite)\/defstate$/;
 const COMPONENT = 'com.stuartsierra.component';
+
+// A dispatch value written as one keyword or a vector of keywords; an unresolved ::alias/x is not a key name yet.
+const isKeywordKey = (dispatch: string) => /^:[^:]/.test(dispatch) || /^\[:[^:\s]\S*( :[^:\s]\S*)*\]$/.test(dispatch);
 
 const systemKeyId = (name: string) => `system_key:${name}`;
 
@@ -55,11 +58,15 @@ function integrantConfig(ctx: Context, file: string, name: (k: Form) => string):
         continue;
       }
       const xs = flatChildren(m);
-      const entries: { key: string; at: Form; refs: Form[] }[] = [];
+      const entries: { key: string; at: Form; refs: { to: string; line: number }[] }[] = [];
       for (let k = 0; k + 1 < xs.length; k += 2) {
         const key = keyName(xs[k]);
         if (!key) continue;
-        const refs = [...walk([xs[k + 1]])].map((f) => igRefTarget(ctx, file, f)).filter((f): f is Form => !!f && f.t === 'keyword');
+        const refs = [...walk([xs[k + 1]])].flatMap((f) => {
+          const target = igRefTarget(ctx, file, f);
+          const ref = target && keyName(target);
+          return target && ref ? [{ to: ref, line: target.row }] : [];
+        });
         entries.push({ key, at: xs[k], refs });
       }
       if (!entries.some((e) => e.refs.length)) {
@@ -68,12 +75,19 @@ function integrantConfig(ctx: Context, file: string, name: (k: Form) => string):
       }
       for (const e of entries) {
         keys.push({ name: e.key, file, line: e.at.row, library: 'integrant' });
-        for (const r of e.refs) deps.push({ from: e.key, to: name(r), file, line: r.row });
+        for (const r of e.refs) deps.push({ from: e.key, to: r.to, file, line: r.line });
       }
     }
   };
   visit(ctx.forms(file));
   return { keys, deps };
+}
+
+// The n-th argument (0-based) of a call. Inside a -> step the threaded value is the first argument and is not written.
+function argAt(ctx: Context, file: string, call: Form, n: number): Form | undefined {
+  const parent = ctx.parentOf(file, call.row, call.col)?.parent;
+  const threaded = parent?.t === 'list' && parent.children[0] !== call && /^(some)?->$/.test(textOf(parent.children[0]) ?? '');
+  return kids(call)[1 + n - (threaded ? 1 : 0)];
 }
 
 function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep[] } {
@@ -84,7 +98,7 @@ function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep
     const form = formAt(ctx.forms(call.file), call.row, call.col);
     if (!form) continue;
     const name = (k: Form) => ctx.nameOf(call.file, k);
-    const depMap = kids(form)[2];
+    const depMap = argAt(ctx, call.file, form, 1);
     const pairs = call.name === 'system-map' ? kids(form).slice(1) : depMap ? flatChildren(unwrap(depMap)) : [];
     for (let k = 0; k + 1 < pairs.length; k += 2) {
       const key = unwrap(pairs[k]);
@@ -97,7 +111,7 @@ function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep
         const use = head && ctx.useAt(call.file, head.row, head.col);
         return use?.to === COMPONENT && use.name === 'using';
       });
-      const depForm = call.name === 'system-using' ? value : using && kids(using)[2];
+      const depForm = call.name === 'system-using' ? value : using && argAt(ctx, call.file, using, 1);
       const targets = depForm ? flatChildren(unwrap(depForm)).filter((_, i) => unwrap(depForm).t !== 'map' || i % 2 === 1) : [];
       for (const t of targets.map(unwrap)) if (t.t === 'keyword') deps.push({ from: keyName, to: name(t), file: call.file, line: t.row });
       if (call.name !== 'system-map') continue;
@@ -121,9 +135,9 @@ export const systemKeys: Adapter = {
   run: (ctx) => {
     const keys: Key[] = [];
     const edges: GraphEdge[] = [];
-    for (const m of methods(ctx).filter((x) => IG_METHODS.test(x.multi) && x.dispatch.startsWith(':'))) {
+    for (const m of methods(ctx).filter((x) => IG_METHODS.test(x.multi) && isKeywordKey(x.dispatch))) {
       keys.push({ name: m.dispatch, file: m.span.file, line: m.span.row, library: 'integrant' });
-      edges.push({ from: systemKeyId(m.dispatch), to: methodId(m.multi, m.dispatch), kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row, attrs: { via: m.multi.split('/')[1] } });
+      edges.push({ from: systemKeyId(m.dispatch), to: m.id, kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row, attrs: { via: m.multi.split('/')[1] } });
     }
     const igFiles = new Set(ctx.analysis.nsUses.filter((u) => u.to === IG).map((u) => u.file));
     const deps: Dep[] = [];
