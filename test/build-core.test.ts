@@ -28,4 +28,11 @@ describe('core graph corner cases', () => {
     assert.deepEqual(x?.attrs?.platforms, ['clj', 'cljs']);
     assert.equal(doc.nodes.find((n) => n.id === 'definition:app.dup/y')?.attrs?.platforms, undefined);
   });
+
+  it('an :as-alias require loads nothing, one that also refers does', () => {
+    const requires = edges('namespace:app.core', 'namespace:app.specs', 'requires');
+    assert.deepEqual(requires, [], 'only names app.specs for ::specs/kw');
+    assert.equal(edges('namespace:app.core', 'namespace:app.compat', 'requires').length, 1);
+    assert.equal(edges('namespace:app.core', 'namespace:app.util', 'requires').length, 1);
+  });
 });

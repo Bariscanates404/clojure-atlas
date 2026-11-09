@@ -3,9 +3,9 @@
 // names (calls, references, passes_callback, registers_handler, expands_via, rebinds) and tests (a deftest -> what it uses).
 import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../mcp/keyflow.ts';
-import type { VarDef, VarUse } from './analysis.ts';
+import type { NsUse, VarDef, VarUse } from './analysis.ts';
 import { defId, nsId, type Context, type Owner, type Rows } from './model.ts';
-import { formAt, kids } from './reader.ts';
+import { formAt, kids, textOf } from './reader.ts';
 import { classify } from './relations.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
 
@@ -41,6 +41,14 @@ function assertionHeads(ctx: Context): (u: VarUse) => boolean {
     if (head) byFile.set(u.file, (byFile.get(u.file) ?? new Set()).add(`${head.row}:${head.col}`));
   }
   return (u) => byFile.get(u.file)?.has(`${u.nameRow}:${u.nameCol}`) ?? false;
+}
+
+// `[lib :as-alias x]` only names a namespace for ::x/kw keywords; nothing is loaded, unless the same vector also
+// says :as or :refer.
+function loadsNamespace(ctx: Context, u: NsUse): boolean {
+  const spec = ctx.parentOf(u.file, u.row, u.col)?.parent;
+  const words = spec?.t === 'vector' ? kids(spec).map(textOf) : [];
+  return !words.includes(':as-alias') || words.includes(':as') || words.includes(':refer');
 }
 
 const isTestDef = (d: VarDef) => d.test || /(^|\/)(deftest|defspec)$/.test(d.definedBy ?? '');
@@ -98,7 +106,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     edges.push({ from: nsId(d.ns), to: node.id, kind: 'defines', band: 'static_proven', file: d.file, line: d.row });
   }
   for (const u of ctx.analysis.nsUses) {
-    if (ctx.projectNs.has(u.to) && u.to !== u.from) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
+    if (ctx.projectNs.has(u.to) && u.to !== u.from && loadsNamespace(ctx, u)) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
   }
 
   const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [] };
