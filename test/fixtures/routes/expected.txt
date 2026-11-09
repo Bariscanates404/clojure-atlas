@@ -32,13 +32,14 @@ node definition:web.mounts/app [definition] src/web/mounts.clj:14 {"defined_by":
 node definition:web.mounts/outer [definition] src/web/mounts.clj:19 {"defined_by":"compojure.core/defroutes"}
 node definition:web.mounts/pages [definition] src/web/mounts.clj:9 {"defined_by":"compojure.core/defroutes"}
 node definition:web.mounts/user-routes [definition] src/web/mounts.clj:5 {"defined_by":"compojure.core/defroutes"}
-node definition:web.pedestal-app/table [definition] src/web/pedestal_app.clj:5 {"defined_by":"clojure.core/def"}
+node definition:web.pedestal-app/common-interceptors [definition] src/web/pedestal_app.clj:5 {"defined_by":"clojure.core/def"}
+node definition:web.pedestal-app/table [definition] src/web/pedestal_app.clj:7 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/app [definition] src/web/reitit_app.clj:13 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/routes [definition] src/web/reitit_app.clj:5 {"defined_by":"clojure.core/def"}
 node key::body [key] undefined:undefined
 node key::conn [key] undefined:undefined
 node key::data [key] undefined:undefined
-node key::get [key] undefined:undefined {"other_uses":4}
+node key::get [key] undefined:undefined {"other_uses":5}
 node key::handler [key] undefined:undefined
 node key::interceptors [key] undefined:undefined
 node key::middleware [key] undefined:undefined
@@ -56,12 +57,13 @@ node route:ANY /ping @web.reitit-app/app [route] src/web/reitit_app.clj:6 {"meth
 node route:GET / @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:10 {"method":"get","path":"/","full_path":"/api/users/:id/","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
 node route:GET / @web.mounts/user-routes/v1/api/users [route] src/web/mounts.clj:6 {"method":"get","path":"/","full_path":"/v1/api/users/","base":"web.mounts/user-routes","mount":"/v1/api/users","library":"compojure"}
 node route:GET /a @web.data-more/r2 [route] src/web/data_more.clj:12 {"method":"get","path":"/a","full_path":"/a","base":"web.data-more/r2","mount":"","library":"pedestal, reitit"}
+node route:GET /admin @web.pedestal-app/table [route] src/web/pedestal_app.clj:11 {"method":"get","path":"/admin","full_path":"/admin","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
 node route:GET /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:9 {"method":"get","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:GET /api/users @web.data-more/api [route] src/web/data_more.clj:8 {"method":"get","path":"/api/users","full_path":"/api/users","base":"web.data-more/api","mount":"","library":"pedestal, reitit"}
 node route:GET /health @web.compojure-app/app [route] src/web/compojure_app.clj:6 {"method":"get","path":"/health","full_path":"/health","base":"web.compojure-app/app","mount":"","library":"compojure"}
-node route:GET /health @web.pedestal-app/table [route] src/web/pedestal_app.clj:8 {"method":"get","path":"/health","full_path":"/health","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
+node route:GET /health @web.pedestal-app/table [route] src/web/pedestal_app.clj:10 {"method":"get","path":"/health","full_path":"/health","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
 node route:GET /home @web.reitit-app/app [route] src/web/reitit_app.clj:7 {"method":"get","path":"/home","full_path":"/home","base":"web.reitit-app/app","mount":"","library":"reitit"}
-node route:GET /items @web.pedestal-app/table [route] src/web/pedestal_app.clj:7 {"method":"get","path":"/items","full_path":"/items","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
+node route:GET /items @web.pedestal-app/table [route] src/web/pedestal_app.clj:9 {"method":"get","path":"/items","full_path":"/items","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
 node route:GET /m @web.data-more/r4 [route] src/web/data_more.clj:20 {"method":"get","path":"/m","full_path":"/m","base":"web.data-more/r4","mount":"","library":"pedestal, reitit"}
 node route:GET /me @web.mounts/user-routes/v1/api/users [route] src/web/mounts.clj:7 {"method":"get","path":"/me","full_path":"/v1/api/users/me","base":"web.mounts/user-routes","mount":"/v1/api/users","library":"compojure"}
 node route:GET /p @web.mounts/pages/v1/api [route] src/web/mounts.clj:10 {"method":"get","path":"/p","full_path":"/v1/api/p","base":"web.mounts/pages","mount":"/v1/api","library":"compojure"}
@@ -137,9 +139,12 @@ edge definition:web.mounts/pages -calls-> definition:web.more-handlers/other sta
 edge definition:web.mounts/pages -calls-> definition:web.more-handlers/page static_proven src/web/mounts.clj:10 {"arity":1,"arity_band":"static_proven"}
 edge definition:web.mounts/user-routes -calls-> definition:web.more-handlers/root static_proven src/web/mounts.clj:6 {"arity":1,"arity_band":"static_proven"}
 edge definition:web.mounts/user-routes -passes_callback-> definition:web.more-handlers/show static_proven src/web/mounts.clj:7 {"via":"GET"}
-edge definition:web.pedestal-app/table -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7
-edge definition:web.pedestal-app/table -references-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
-edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
+edge definition:web.pedestal-app/common-interceptors -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:5
+edge definition:web.pedestal-app/table -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:9
+edge definition:web.pedestal-app/table -references-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:10
+edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:11
+edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:9
+edge definition:web.pedestal-app/table -references-> definition:web.pedestal-app/common-interceptors static_proven src/web/pedestal_app.clj:11
 edge definition:web.reitit-app/app -references-> definition:web.reitit-app/routes static_proven src/web/reitit_app.clj:13
 edge definition:web.reitit-app/routes -produces_key-> key::get static_proven src/web/reitit_app.clj:10 {"via":"map-literal"}
 edge definition:web.reitit-app/routes -produces_key-> key::get static_proven src/web/reitit_app.clj:7 {"via":"map-literal"}
@@ -192,7 +197,8 @@ edge namespace:web.mounts -defines-> definition:web.mounts/outer static_proven s
 edge namespace:web.mounts -defines-> definition:web.mounts/pages static_proven src/web/mounts.clj:9
 edge namespace:web.mounts -defines-> definition:web.mounts/user-routes static_proven src/web/mounts.clj:5
 edge namespace:web.mounts -requires-> namespace:web.more-handlers static_proven src/web/mounts.clj:3
-edge namespace:web.pedestal-app -defines-> definition:web.pedestal-app/table static_proven src/web/pedestal_app.clj:5
+edge namespace:web.pedestal-app -defines-> definition:web.pedestal-app/common-interceptors static_proven src/web/pedestal_app.clj:5
+edge namespace:web.pedestal-app -defines-> definition:web.pedestal-app/table static_proven src/web/pedestal_app.clj:7
 edge namespace:web.pedestal-app -requires-> namespace:web.handlers static_proven src/web/pedestal_app.clj:3
 edge namespace:web.reitit-app -defines-> definition:web.reitit-app/app static_proven src/web/reitit_app.clj:13
 edge namespace:web.reitit-app -defines-> definition:web.reitit-app/routes static_proven src/web/reitit_app.clj:5
@@ -202,16 +208,18 @@ edge route:GET / @web.compojure-app/app/api/users/:id -routes_to-> definition:we
 edge route:GET / @web.mounts/user-routes/v1/api/users -routes_to-> definition:web.more-handlers/root static_proven src/web/mounts.clj:6
 edge route:GET /a @web.data-more/r2 -guarded_by-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:14 {"order":0,"level":"router-data","inherited_from":"router :data"}
 edge route:GET /a @web.data-more/r2 -routes_to-> definition:web.more-handlers/show static_proven src/web/data_more.clj:12
+edge route:GET /admin @web.pedestal-app/table -guarded_by-> definition:web.pedestal-app/common-interceptors static_proven src/web/pedestal_app.clj:11 {"order":0,"level":"route"}
+edge route:GET /admin @web.pedestal-app/table -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:11
 edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:9 {"order":1,"level":"route"}
 edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:8 {"order":0,"level":"route","inherited_from":"/api"}
 edge route:GET /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/list-items static_proven src/web/reitit_app.clj:10
 edge route:GET /api/users @web.data-more/api -routes_to-> definition:web.more-handlers/db heuristic src/web/data_more.clj:8
 edge route:GET /api/users @web.data-more/api -routes_to-> definition:web.more-handlers/list-users static_proven src/web/data_more.clj:8
 edge route:GET /health @web.compojure-app/app -routes_to-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6
-edge route:GET /health @web.pedestal-app/table -routes_to-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
+edge route:GET /health @web.pedestal-app/table -routes_to-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:10
 edge route:GET /home @web.reitit-app/app -routes_to-> definition:web.handlers/health static_proven src/web/reitit_app.clj:7
-edge route:GET /items @web.pedestal-app/table -guarded_by-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7 {"order":0,"level":"route"}
-edge route:GET /items @web.pedestal-app/table -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
+edge route:GET /items @web.pedestal-app/table -guarded_by-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:9 {"order":0,"level":"route"}
+edge route:GET /items @web.pedestal-app/table -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:9
 edge route:GET /m @web.data-more/r4 -guarded_by-> definition:web.more-handlers/mw heuristic src/web/data_more.clj:20 {"order":0,"level":"method"}
 edge route:GET /m @web.data-more/r4 -routes_to-> definition:web.more-handlers/show static_proven src/web/data_more.clj:20
 edge route:GET /me @web.mounts/user-routes/v1/api/users -routes_to-> definition:web.more-handlers/show static_proven src/web/mounts.clj:7
@@ -234,6 +242,6 @@ edge route:POST /api/items @web.reitit-app/app -routes_to-> definition:web.handl
 edge route:POST /avatar @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11
 edge route:POST /b @web.data-more/r2 -guarded_by-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:14 {"order":0,"level":"router-data","inherited_from":"router :data"}
 edge route:POST /b @web.data-more/r2 -routes_to-> definition:web.more-handlers/other static_proven src/web/data_more.clj:13
-usages resolved=42 unresolved=0 unknown=0 not-vars=0 external=67
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, pedestal, reitit:37 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:38 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+usages resolved=45 unresolved=0 unknown=0 not-vars=0 external=69
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, pedestal, reitit:39 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:38 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=7 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

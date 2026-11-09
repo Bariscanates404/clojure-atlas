@@ -241,6 +241,16 @@ function interceptorChain(ctx: Context, file: string, items: readonly Form[]): {
   return { guards: chainOf(ctx, file, items.slice(0, -1)).links, handlers: handlerLinks(ctx, file, items[items.length - 1]) };
 }
 
+// The elements of an interceptor chain written as a vector, or as (conj interceptors ... handler), pedestal's idiom
+// for adding a handler to shared interceptors; null for any other form.
+function chainElements(ctx: Context, file: string, f: Form): Form[] | null {
+  if (f.t === 'vector') return flatChildren(f);
+  if (f.t !== 'list') return null;
+  const head = f.children[0];
+  const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
+  return use && CORE_NS.test(use.to) && use.name === 'conj' ? f.children.slice(1) : null;
+}
+
 // ---------- compojure ----------
 
 // The forms a branching or sequencing form may return its value from (the test of a conditional is never one).
@@ -407,7 +417,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     if (verb && METHOD_KEYS.has(verb) && xs[2]) {
       // pedestal table route: [path :verb handler-or-interceptor-vector & options]
       const target = unwrap(xs[2]);
-      const chain = target.t === 'vector' ? interceptorChain(ctx, file, flatChildren(target)) : { guards: [], handlers: handlerLinks(ctx, file, target) };
+      const items = chainElements(ctx, file, target);
+      const chain = items ? interceptorChain(ctx, file, items) : { guards: [], handlers: handlerLinks(ctx, file, target) };
       emit(verb.slice(1).toUpperCase(), chain.handlers, [...scope.guards, ...chain.guards.map((l) => ({ ...l, level: 'route' }))], addChecks(ctx, file, scope.authz, scope.checks));
       return;
     }
