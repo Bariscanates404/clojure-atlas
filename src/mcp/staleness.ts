@@ -2,12 +2,15 @@
 // read-only `git rev-list --count` in a local clone when one is configured; without a clone a differing
 // sha is reported as STALE with an unknown distance, never as fresh.
 import { execFileSync } from 'node:child_process';
+import type { Snapshot } from '../snapshot.ts';
 import type { Graph } from './graph.ts';
 
 export const DEFAULT_MAX_DISTANCE = 20;
 
 export interface StalenessOptions {
   repoDir?: string;
+  // the working tree's snapshot (src/snapshot.ts), compared with the graph's when both are known
+  snapshot?: () => Snapshot;
   maxDistance?: number;
   // Commits reachable from `base` but not from `graphSha`; null when git cannot tell. Injectable for tests.
   distance?: (graphSha: string, base: string) => number | null;
@@ -43,7 +46,27 @@ export function sameCommit(a: string, b: string): boolean {
   return x.length >= 7 && y.length >= 7 ? x.startsWith(y) || y.startsWith(x) : x === y;
 }
 
+// What differs between the working tree and the snapshot the graph was built from, or null when nothing does.
+function treeDifference(g: Graph, now: Snapshot): string | null {
+  const s = g.doc.source;
+  if (!s.snapshot || s.snapshot === now.id) return null;
+  const why = [
+    ...(sameCommit(s.sha, now.sha) ? [] : [`commit ${short(now.sha)} (graph ${short(s.sha)})`]),
+    ...((s.dirty_files ?? 0) || now.dirty.length ? [`${now.dirty.length} uncommitted file(s) now, ${s.dirty_files ?? 0} at build`] : []),
+    ...(s.config_hash && s.config_hash !== now.configHash ? ['the clj-kondo or .clojure-atlas.edn config changed'] : []),
+    ...(s.analyzer && s.analyzer !== now.analyzer ? [`analyzer ${now.analyzer} (graph ${s.analyzer})`] : []),
+  ];
+  return `STALE: the working tree is not the snapshot this graph describes (${why.join('; ') || 'contents differ'}); rebuild with clojure-atlas build.`;
+}
+
 export function staleness(g: Graph, base: string | undefined, opts: StalenessOptions = {}): Staleness {
+  const tree = opts.snapshot ? treeDifference(g, opts.snapshot()) : null;
+  const byBase = stalenessToBase(g, base, opts);
+  if (!tree) return byBase;
+  return { stale: true, distance: byBase.distance, header: [tree, byBase.header].filter(Boolean).join('\n') };
+}
+
+function stalenessToBase(g: Graph, base: string | undefined, opts: StalenessOptions): Staleness {
   const sha = g.doc.source.sha;
   if (!base || !base.trim()) return { stale: false, distance: null, header: null };
   if (sameCommit(sha, base)) return { stale: false, distance: 0, header: null };

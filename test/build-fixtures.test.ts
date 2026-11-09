@@ -1,14 +1,17 @@
 // Each fixture under test/fixtures is a small Clojure codebase; its expected.txt holds every graph row the builder
 // must produce for it (nodes, edges, usage counts, adapter switches), reviewed against the sources by hand.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
+import { buildGraph } from '../src/build/index.ts';
 import { parseDocument } from '../src/mcp/graph.ts';
 import { buildFixture, fixtureDir, rowsText } from './helpers/atlas-fixture.ts';
 
 const FIXTURES: [string, string][] = [
   ['core', 'definitions, defines, requires, calls vs references, tests, protocol impls, not-vars, language namespaces'],
+  ['project-config', "the project's .clj-kondo lint-as honored: a def-like macro and a defrecord-like macro; record constructors ->R, map->R, R. and the class; a usage of a var its namespace never defines is unresolved"],
   ['relations', 'calls vs references vs passed callbacks (vector, partial, comp, apply, alias, closure, empty map), a handler registered with add-watch, macro expansion, binding/with-redefs as UNKNOWN, dispatch candidates for defmulti, extend-type, extend-protocol, reify'],
   ['multimethods', 'defmethod nodes, resolved keyword dispatch, heuristic dispatch edges, a library multimethod'],
   ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event'],
@@ -30,4 +33,17 @@ describe('builder fixtures', () => {
       assert.doesNotThrow(() => parseDocument(JSON.parse(JSON.stringify(doc))), 'the MCP loader accepts the document');
     });
   }
+});
+
+describe("the project's own clj-kondo config", () => {
+  const copy = mkdtempSync(path.join(tmpdir(), 'atlas-no-config-'));
+  after(() => rmSync(copy, { recursive: true, force: true }));
+
+  it('is what resolves the macro-made definitions: without it they are unknown symbols', async () => {
+    cpSync(path.join(fixtureDir('project-config'), 'src'), path.join(copy, 'src'), { recursive: true });
+    const u = (await buildGraph(copy)).stats.usages;
+    assert.deepEqual([u.resolved, u.unresolved, u.unknown], [6, 1, 7]);
+    assert.deepEqual(u.topUnresolved, [['app.macros/never-defined', 1]]);
+    assert.deepEqual(u.topUnknown, [['Variable', 3], ['widget', 2], ['->Variable', 1], ['map->Variable', 1]]);
+  });
 });

@@ -6,8 +6,10 @@ import { gzipSync } from 'node:zlib';
 import { ADAPTERS } from './adapters/index.ts';
 import { assemble, type AtlasDocument } from './assemble.ts';
 import { EMPTY_CONFIG, parseConfig } from './config.ts';
-import { componentOf, gitInfo, listFiles } from './files.ts';
-import { analyze } from './kondo.ts';
+import { componentOf, listFiles } from './files.ts';
+import { analyze, effectiveLintAs } from './kondo.ts';
+import { kondo } from './kondo-binary.ts';
+import { analyzerVersion, projectKnownSymbols, snapshotOf } from '../snapshot.ts';
 import { readPlaywright } from './typescript.ts';
 import { createContext } from './model.ts';
 
@@ -21,13 +23,17 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
   const files = listFiles(root);
   const configFile = path.join(root, CONFIG_FILE);
   const config = existsSync(configFile) ? parseConfig(readFileSync(configFile, 'utf8')) : EMPTY_CONFIG;
-  const analysis = await analyze(root, files.sources, config.lintAs);
+  const k = await kondo();
+  const analysis = await analyze(k.command, root, files.sources, effectiveLintAs(projectKnownSymbols(root), config.lintAs));
   const sources = new Map<string, string>();
   for (const f of [...files.sources, ...files.edn]) sources.set(f, readFileSync(path.join(root, f), 'utf8'));
   const playwright = readTs(root, files.packageJsons, files.typescript);
   const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f));
-  const git = gitInfo(root);
-  const doc = assemble(ctx, ADAPTERS, { repo_name: path.basename(root), ref: git.ref, sha: git.sha, built_at: new Date().toISOString() }, {
+  const snap = snapshotOf(root, analyzerVersion(k.version));
+  const doc = assemble(ctx, ADAPTERS, {
+    repo_name: path.basename(root), ref: snap.ref, sha: snap.sha, built_at: new Date().toISOString(),
+    snapshot: snap.id, dirty_files: snap.dirty.length, config_hash: snap.configHash, config_sources: snap.configSources, analyzer: snap.analyzer,
+  }, {
     sources: files.sources.length, edn: files.edn.length, skipped_large: files.skippedLarge.length,
   });
   doc.stats.build_ms = Date.now() - started;

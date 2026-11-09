@@ -35,9 +35,6 @@
     "coverage": "node scripts/coverage.ts",
     "prepack": "npm run build"
   },
-  "dependencies": {
-    "clj-kondo": "2025.10.23"
-  },
   "devDependencies": {
     "@types/node": "22.20.5",
     "esbuild": "0.25.10",

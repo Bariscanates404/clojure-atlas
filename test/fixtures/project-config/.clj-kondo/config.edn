@@ -1,0 +1,2 @@
+{:lint-as {app.macros/defthing clojure.core/def
+           app.macros/deftrecord clojure.core/defrecord}}

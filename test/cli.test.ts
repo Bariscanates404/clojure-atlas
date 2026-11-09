@@ -6,6 +6,8 @@ import path from 'node:path';
 import { componentOf, listFiles } from '../src/build/files.ts';
 import { MCP_ENTRY, withMcpEntry } from '../src/cli.ts';
 import { coverageTable, type CoverageRow } from '../src/coverage.ts';
+import { readFileSync } from 'node:fs';
+import { VERSION } from '../src/version.ts';
 
 describe('init', () => {
   it('adds the server to a new .mcp.json', () => {
@@ -62,5 +64,11 @@ describe('coverage table', () => {
     const lines = coverageTable([row]).split('\n');
     assert.equal(lines.length, 3);
     assert.equal(lines[2], '| demo | 3 | 0 | 9 | 19 | 1 | 0 | 95.0% | 2 | 1 | 1.5 s | 2 KB |');
+  });
+});
+
+describe('version', () => {
+  it('is the package.json version', () => {
+    assert.equal(VERSION, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
   });
 });

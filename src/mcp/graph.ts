@@ -51,6 +51,12 @@ export interface GraphSource {
   ref?: string | null;
   sha: string;
   built_at?: string;
+  // what the graph was built from beyond the commit (see src/snapshot.ts)
+  snapshot?: string;
+  dirty_files?: number;
+  config_hash?: string;
+  config_sources?: string[];
+  analyzer?: string;
 }
 
 export interface GraphDocument {

@@ -1,6 +1,5 @@
 // The files a build reads: Clojure sources for kondo, .edn files for system configs, and the module roots
 // (directories with their own deps.edn, project.clj, ...) that name each file's component.
-import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -54,21 +53,4 @@ export function componentOf(moduleRoots: readonly string[], file: string): strin
     if (r && file.startsWith(`${r}/`) && (!best || r.length > best.length)) best = r;
   }
   return best;
-}
-
-export interface GitInfo {
-  sha: string;
-  ref: string | null;
-}
-
-export function gitInfo(root: string): GitInfo {
-  const git = (...args: string[]) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  try {
-    const sha = git('rev-parse', 'HEAD');
-    const ref = git('rev-parse', '--abbrev-ref', 'HEAD');
-    return { sha, ref: ref === 'HEAD' ? null : ref };
-  } catch (err) {
-    process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message.split('\n')[0]}); the graph records sha "unversioned"\n`);
-    return { sha: 'unversioned', ref: null };
-  }
 }

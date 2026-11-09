@@ -10,9 +10,9 @@ import {
 import { keyFlow, keySiblings, signatureImpact } from './keyflow.ts';
 import { PAGING_PROPS, render, renderOptionsOf, withSource, type GroupBy } from './render.ts';
 import { staleness, type StalenessOptions } from './staleness.ts';
+import { VERSION } from '../version.ts';
 
-export const SERVER_NAME = 'clojure-atlas';
-export const SERVER_VERSION = '0.1.0';
+const SERVER_NAME = 'clojure-atlas';
 
 export interface ServerOptions extends StalenessOptions {
   // directory a base_graph must live in (the served graph's directory); unset: only the file name is checked
@@ -199,6 +199,8 @@ export function graphInfo(g: Graph, base: string | undefined, opts: ServerOption
   const lines = [
     ...(st.header ? [st.header] : []),
     `graph ${s.repo_name ?? '?'} @ ${s.ref ?? '?'} sha ${s.sha} built ${s.built_at ?? '?'}: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges`,
+    ...(s.snapshot ? [`snapshot ${s.snapshot}: ${s.dirty_files ?? 0} uncommitted file(s), analyzer ${s.analyzer ?? '?'}`] : []),
+    ...(s.config_hash ? [`config ${s.config_hash.slice(0, 12)} from ${(s.config_sources ?? []).join(', ') || 'no project config files'}`] : []),
     ...g.doc.capabilities.map((c) => `  ${c.name}: ${c.status}${c.edges !== undefined ? `, ${c.edges} edges` : ''}${c.bands ? ` ${JSON.stringify(c.bands)}` : ''}${c.note ? ` (${c.note})` : ''}`),
   ];
   return lines.join('\n');
@@ -227,7 +229,7 @@ interface GraphContext {
 
 const server = stdioServer<GraphContext>({
   name: SERVER_NAME,
-  version: SERVER_VERSION,
+  version: VERSION,
   listTools: toolList,
   callTool: (ctx, name, args) => callTool(ctx.graph, name, args, ctx.opts),
 });

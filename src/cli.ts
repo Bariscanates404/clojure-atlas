@@ -9,6 +9,8 @@ import { buildGraph, DEFAULT_GRAPH, writeGraph } from './build/index.ts';
 import { coverageRow, coverageTable } from './coverage.ts';
 import { loadGraph } from './mcp/graph.ts';
 import { serveStdio } from './mcp/server.ts';
+import { kondo } from './build/kondo-binary.ts';
+import { analyzerVersion, snapshotOf } from './snapshot.ts';
 
 const USAGE = `usage:
   clojure-atlas build [dir] [-o ${DEFAULT_GRAPH}]
@@ -66,7 +68,12 @@ async function main(argv: string[]): Promise<void> {
     const a = parseMcpArgs(rest);
     const g = loadGraph(a.graph);
     process.stderr.write(`clojure-atlas: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges at ${g.doc.source.sha.slice(0, 10)}\n`);
-    serveStdio(g, { repoDir: a.repo, maxDistance: a.maxDistance, graphDir: path.dirname(a.graph) });
+    const repo = a.repo;
+    const analyzer = repo ? analyzerVersion((await kondo()).version) : '';
+    serveStdio(g, {
+      repoDir: repo, maxDistance: a.maxDistance, graphDir: path.dirname(a.graph),
+      ...(repo ? { snapshot: () => snapshotOf(repo, analyzer) } : {}),
+    });
     return;
   }
   if (cmd === 'coverage') {
