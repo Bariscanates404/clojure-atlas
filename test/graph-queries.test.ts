@@ -83,6 +83,34 @@ describe('callers', () => {
     assert.ok(labels(callers(g, 'core/save', { includeReferences: true })).includes('api/ref'));
   });
 
+  it('counts a caller once however many call sites it has, and agrees with blast radius', () => {
+    const x = new GraphBuilder();
+    const t = x.def('a/t');
+    const c = x.def('a/c');
+    const d = x.def('a/d');
+    x.edge(c, 'calls', t).edge(c, 'calls', t, { band: 'heuristic' }).edge(c, 'calls', t).edge(d, 'calls', t);
+    const gx = x.build();
+    const r = callers(gx, 'a/t');
+    assert.match(r.verdict, /^2 direct caller\(s\)/);
+    assert.deepEqual(labels(r, 'callers').sort(), ['a/c', 'a/d']);
+    assert.equal(rows(r, 'callers').find((y) => y.label === 'a/c')?.band, 'static_proven', 'the strongest band of its sites');
+    assert.match(rows(r, 'callers').find((y) => y.label === 'a/c')?.detail ?? '', /3 sites/);
+    assert.match(blastRadius(gx, 'a/t').verdict, /^2 caller\(s\)/);
+  });
+
+  it('a definition only referenced or passed as a callback says so instead of reading as unused', () => {
+    const r = callers(g, 'core/save');
+    assert.match(r.notes.join(' '), /1 more definition\(s\) reference it without calling it.*include_references/);
+    assert.doesNotMatch(callers(g, 'core/save', { includeReferences: true }).notes.join(' '), /reference it without calling it/);
+    assert.doesNotMatch(callers(g, 'ui/a').notes.join(' '), /without calling it/);
+    const x = new GraphBuilder();
+    const cb = x.def('a/cb');
+    x.edge(x.def('a/user'), 'passes_callback', cb);
+    const only = callers(x.build(), 'a/cb');
+    assert.match(only.verdict, /^0 direct caller/);
+    assert.match(only.notes.join(' '), /1 more definition\(s\) reference it/);
+  });
+
   it('a definition nobody calls has an empty, found answer', () => {
     const r = callers(g, 'ui/a');
     assert.ok(r.found);
@@ -186,10 +214,37 @@ describe('blast radius', () => {
     assert.match(r.notes.join(' '), /callers continue beyond depth 2/);
   });
 
-  const depthForms: [number, string][] = [[0, 'depth 1)'], [-5, 'depth 1)'], [1.7, 'depth 1)'], [99, 'depth 99)'], [Number.NaN, 'all depths)']];
+  const depthForms: [number, string][] = [[1.7, 'depth 1)'], [99, 'depth 99)'], [Number.NaN, 'all depths)']];
   for (const [given, shown] of depthForms) {
     it(`depth ${given} is shown as ${shown}`, () => assert.ok(blastRadius(g, 'core/t', given).title.endsWith(shown)));
   }
+
+  it('a fractional depth is read down and says so', () => {
+    assert.match(blastRadius(g, 'core/t', 1.7).notes.join(' '), /depth 1\.7 was read as 1/);
+    assert.doesNotMatch(blastRadius(g, 'core/t', 2).notes.join(' '), /was read as/);
+  });
+
+  for (const depth of [0, -5]) {
+    it(`depth ${depth} is stated as invalid, not walked as depth 1`, () => {
+      for (const r of [blastRadius(g, 'core/t', depth), testsFor(g, 'core/t', depth)]) {
+        assert.equal(r.found, false, r.name);
+        assert.match(r.verdict, new RegExp(`depth ${depth} is not valid: pass 1 or more`), r.name);
+        assert.deepEqual(r.sections, [], r.name);
+      }
+    });
+  }
+
+  it('tests_for says when it cut a depth above 3', () => {
+    assert.match(testsFor(g, 'core/t', 7).notes.join(' '), /depth 7 was cut to 3/);
+    assert.doesNotMatch(testsFor(g, 'core/t', 3).notes.join(' '), /was cut/);
+  });
+
+  it('the shallow section states the depth it really searched', () => {
+    const searched = (r: QueryResult) => r.sections.find((x) => x.name === 'affected')?.searched;
+    assert.match(searched(blastRadius(g, 'core/t', 1)) ?? '', /up to depth 1$/);
+    assert.match(searched(blastRadius(g, 'core/t', 3)) ?? '', /up to depth 2$/);
+    assert.match(searched(blastRadius(g, 'core/t')) ?? '', /up to depth 2$/);
+  });
 
   it('summary notes carry counts per depth and per component', () => {
     const notes = blastRadius(g, 'core/t').notes.join('\n');
@@ -223,6 +278,19 @@ describe('blast radius', () => {
   });
 
   it('every row is cited', () => everyRowCited(blastRadius(g, 'core/t', 3)));
+
+  it('a node reached by a heuristic and a proven path at one depth gets the proven band, in any edge order', () => {
+    for (const heuristicFirst of [true, false]) {
+      const x = new GraphBuilder();
+      const [t, viaH, viaP, z] = ['n/t', 'n/x', 'n/y', 'n/z'].map((n) => x.def(n));
+      x.edge(viaH, 'calls', t, { band: 'heuristic' }).edge(viaP, 'calls', t);
+      if (heuristicFirst) x.edge(z, 'calls', viaH).edge(z, 'calls', viaP);
+      else x.edge(z, 'calls', viaP).edge(z, 'calls', viaH);
+      const hit = rows(blastRadius(x.build(), 'n/t')).find((y) => y.label === 'n/z');
+      assert.equal(hit?.band, 'static_proven', `heuristic path first: ${heuristicFirst}`);
+      assert.equal(hit?.depth, 2);
+    }
+  });
 
   it('a node at the shallowest depth wins when two paths reach it', () => {
     const x = new GraphBuilder();
@@ -799,5 +867,79 @@ describe('a name that resolves to several nodes is ambiguous, never the first hi
     assert.equal(r.found, false);
     assert.match(r.verdict, /ambiguous \(2 matches\)/);
     assert.deepEqual(r.matches.sort(), ['event::cart/open', 'subscription::cart/open']);
+  });
+});
+
+// ---------- names that look like something else ----------
+
+describe('odd names', () => {
+  it('a component named like an Object property is counted as itself', () => {
+    const x = new GraphBuilder();
+    const t = x.def('n/t', 'constructor');
+    x.edge(x.def('n/u', 'constructor'), 'calls', t).edge(x.def('n/v', 'toString'), 'calls', t);
+    assert.deepEqual(callers(x.build(), 'n/t').counts, { constructor: 1, toString: 1 });
+    assert.deepEqual(Object.keys(callers(x.build(), 'n/t').counts ?? {}).sort(), ['constructor', 'toString']);
+  });
+
+  it('the var named / is found by its bare name', () => {
+    const g = graph((x) => { x.def('clojure.core//'); x.def('a.b/foo'); });
+    assert.deepEqual(resolve(g, ['definition'], '/').map((n) => n.id), ['definition:clojure.core//']);
+    assert.ok(callers(g, '/').found);
+  });
+
+  it('a not-found definition says to pass a fully qualified name, for every query that takes one', () => {
+    const g = graph((x) => x.def('a/f'));
+    for (const r of [callers(g, 'zz'), blastRadius(g, 'zz'), testsFor(g, 'zz')]) {
+      assert.equal(r.found, false);
+      assert.match(r.notes.join(' '), /fully qualified name \(ns\/name\)/, r.name);
+    }
+    assert.match(permissionRoutes(g, 'zz').notes.join(' '), /exact permission name/);
+  });
+
+  it('a name only continues a write or read verb at a word boundary', () => {
+    for (const name of ['app.x/address-book', 'app.x/settings-fn', 'app.x/created-at', 'app.x/updates']) {
+      assert.equal(writeLikeness('ctx', name, null).why, 'no write signal', name);
+    }
+    assert.equal(readLikeness('ctx', 'app.x/bypass-check', null).why, 'no read signal');
+    assert.equal(readLikeness('ctx', 'app.x/getter', null).why, 'no read signal');
+    for (const name of ['app.x/add', 'app.x/add-item', 'app.x/set!', 'app.x/save-all', 'app.x/update-user!']) {
+      assert.match(writeLikeness('ctx', name, null).why, /name/, name);
+    }
+    for (const name of ['app.x/get', 'app.x/get-user', 'app.x/by-id', 'app.x/->list']) {
+      assert.match(readLikeness('ctx', name, null).why, /name/, name);
+    }
+  });
+});
+
+// ---------- route answers that are weaker than they look ----------
+
+describe('route authz states how sure it is', () => {
+  const x = new GraphBuilder();
+  const guessed = x.route('GET', '/admin/users');
+  const proven = x.route('GET', '/users/{id}');
+  const nomethod = x.node('route', '/x', { id: 'route:/x', attrs: { path: '/x' } });
+  const perm = x.node('permission', 'p');
+  x.edge(guessed, 'requires_permission', perm, { band: 'heuristic' }).edge(proven, 'requires_permission', perm);
+  const g = x.build();
+
+  it('a heuristic permission edge is not stated as plain "requires"', () => {
+    const r = routeAuthz(g, 'GET /admin/users');
+    assert.match(r.verdict, /^requires p \(HEURISTIC: confirm at the cited line\)/);
+    assert.doesNotMatch(routeAuthz(g, 'GET /users/{id}').verdict, /HEURISTIC/);
+  });
+
+  it('a route with no recorded method is still found by a method query, and says so', () => {
+    const r = routeAuthz(g, 'GET /x');
+    assert.equal(r.found, true);
+    assert.deepEqual(r.matches, [nomethod]);
+    assert.match(r.notes.join(' '), /1 matched route\(s\) have no recorded method/);
+    assert.doesNotMatch(routeAuthz(g, '/x').notes.join(' '), /no recorded method/);
+  });
+
+  it('a partial path match is said to be partial, an exact one is not', () => {
+    const partial = routeAuthz(g, '/users');
+    assert.deepEqual([...partial.matches].sort(), [guessed, proven].sort());
+    assert.match(partial.notes.join(' '), /matched as part of the path/);
+    assert.doesNotMatch(routeAuthz(g, '/users/{id}').notes.join(' '), /matched as part of the path/);
   });
 });

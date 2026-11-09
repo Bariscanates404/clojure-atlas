@@ -13,24 +13,51 @@ export { entryOf, resolve, type QueryResult, type Row, type Section } from './ro
 
 const MAX_DEPTH = 3;
 
+const FQN_HINT = 'use a fully qualified name (ns/name)';
+
+// A depth below 1 asks for no walk at all: that is stated, never silently raised to 1.
+function invalidDepth(name: string, query: string, title: string, depth: number): QueryResult {
+  const verdict = `depth ${depth} is not valid: pass 1 or more${name === 'blast_radius' ? ', or omit it to walk to the end' : ''}`;
+  return { name, query, title, found: false, verdict, matches: [], sections: [], notes: [verdict], next: [] };
+}
+
+const fractionNote = (depth: number, used: number): string[] =>
+  Number.isInteger(depth) ? [] : [`depth ${depth} was read as ${used}`];
+
 // ---------- callers / blast radius ----------
 
 // Every relation through which a change to a definition can reach another: an actual call, a value use, a function
 // passed as a callback or registered as a handler, a macro expansion, a dispatch candidate and a dynamic rebinding.
 const DEPENDENCY_KINDS = ['calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'may_dispatch_to', 'rebinds'] as const;
 
+// One row per calling definition and relation kind, however many sites it has: its strongest edge (earliest site on a
+// tie), with the number of sites in the detail.
+function callerRows(g: Graph, edges: GraphEdge[]): Row[] {
+  const byCaller = new Map<string, GraphEdge[]>();
+  for (const e of edges) byCaller.set(`${e.kind}\0${e.from}`, [...(byCaller.get(`${e.kind}\0${e.from}`) ?? []), e]);
+  return [...byCaller.values()].map((sites) => {
+    const [best] = [...sites].sort((a, b) => BANDS.indexOf(a.band) - BANDS.indexOf(b.band) || compareText(a.file, b.file) || (a.line ?? 0) - (b.line ?? 0));
+    return edgeRow(g, best.from, best, sites.length > 1 ? { detail: `${sites.length} sites, strongest shown` } : {});
+  });
+}
+
 export function callers(g: Graph, query: string, opts: { includeReferences?: boolean } = {}): QueryResult {
   const title = `callers of ${query}`;
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('callers', query, title, 'definition', 'use a fully qualified name (ns/name)');
+  if (!hits.length) return notFound('callers', query, title, 'definition', FQN_HINT);
   if (hits.length > 1) return ambiguous('callers', query, title, hits, 'var');
   const target = hits[0];
   const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
-  const rows = inEdges(g, target.id, kinds).map((e) => {
-    const r = edgeRow(g, e.from, e);
-    return { ...r, cross: !!r.component && r.component !== target.component };
-  });
+  const rows = callerRows(g, inEdges(g, target.id, kinds)).map((r) => ({ ...r, cross: !!r.component && r.component !== target.component }));
   rows.sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)];
+  if (!opts.includeReferences) {
+    const called = new Set(rows.map((r) => r.id));
+    const referencing = new Set(inEdges(g, target.id, DEPENDENCY_KINDS).map((e) => e.from).filter((from) => !called.has(from)));
+    if (referencing.size) {
+      notes.push(`${referencing.size} more definition(s) reference it without calling it (value use, callback, handler, macro, dispatch, rebinding): pass include_references=true to list them`);
+    }
+  }
   const comps = new Set(rows.map((r) => r.component ?? '(no component)'));
   const entries = rows.filter((r) => r.entry).length;
   return {
@@ -45,7 +72,7 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
       { name: opts.includeReferences ? 'callers and references' : 'callers', rows, searched: 'call edges into this definition' },
     ],
     counts: countBy(rows, (r) => r.component ?? '(no component)'),
-    notes: [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)],
+    notes,
     next: [call('blast_radius', { var: target.name, depth: 2 }), call('tests_for', { symbol: target.name })],
   };
 }
@@ -58,23 +85,34 @@ interface Reach {
   edge: GraphEdge;
 }
 
-// Reverse breadth-first walk over calls and references, each node once at its shallowest depth.
+// Of two ways to reach one node at one depth, the stronger band wins; on a tie the smaller parent id and then the
+// earlier site, so the answer never depends on the order edges were read in.
+const strongerReach = (a: Reach, b: Reach): boolean =>
+  BANDS.indexOf(a.band) !== BANDS.indexOf(b.band) ? BANDS.indexOf(a.band) < BANDS.indexOf(b.band)
+    : a.via !== b.via ? a.via < b.via
+      : compareText(a.edge.file, b.edge.file) < 0 || (a.edge.file === b.edge.file && (a.edge.line ?? 0) < (b.edge.line ?? 0));
+
+// Reverse breadth-first walk over calls and references, each node once at its shallowest depth and, at that depth,
+// by its strongest path.
 function reverseReach(g: Graph, start: string, max: number): { reached: Reach[]; beyond: boolean } {
   const seen = new Set<string>([start]);
   const reached: Reach[] = [];
   let frontier: { id: string; band: Band }[] = [{ id: start, band: 'static_proven' }];
   for (let d = 1; d <= max && frontier.length; d++) {
-    const next: { id: string; band: Band }[] = [];
+    const level = new Map<string, Reach>();
     for (const f of frontier) {
       for (const e of inEdges(g, f.id, DEPENDENCY_KINDS)) {
         if (seen.has(e.from)) continue;
-        seen.add(e.from);
-        const band = weakest(f.band, e.band);
-        reached.push({ id: e.from, band, depth: d, via: f.id, edge: e });
-        next.push({ id: e.from, band });
+        const candidate: Reach = { id: e.from, band: weakest(f.band, e.band), depth: d, via: f.id, edge: e };
+        const prev = level.get(e.from);
+        if (!prev || strongerReach(candidate, prev)) level.set(e.from, candidate);
       }
     }
-    frontier = next;
+    for (const r of level.values()) {
+      seen.add(r.id);
+      reached.push(r);
+    }
+    frontier = [...level.values()].map((r) => ({ id: r.id, band: r.band }));
   }
   const beyond = frontier.some((f) => inEdges(g, f.id, DEPENDENCY_KINDS).some((e) => !seen.has(e.from)));
   return { reached, beyond };
@@ -94,12 +132,13 @@ const countLine = (label: string, counts: Map<string, number>, sort: boolean, to
 // Transitive callers until no new caller appears; an explicit `depth` caps the walk. Cycles stop at the first visit.
 export function blastRadius(g: Graph, query: string, depth?: number): QueryResult {
   const title = `blast radius of ${query}`;
+  if (depth !== undefined && depth < 1) return invalidDepth('blast_radius', query, title, depth);
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('blast_radius', query, title, 'definition');
+  if (!hits.length) return notFound('blast_radius', query, title, 'definition', FQN_HINT);
   if (hits.length > 1) return ambiguous('blast_radius', query, title, hits, 'var');
   const target = hits[0];
   const capped = depth !== undefined && Number.isFinite(depth);
-  const max = capped ? Math.max(1, Math.floor(depth)) : Number.POSITIVE_INFINITY;
+  const max = capped ? Math.floor(depth) : Number.POSITIVE_INFINITY;
   const { reached, beyond } = reverseReach(g, target.id, max);
   const rows = reached.map((r) => {
     const row = edgeRow(g, r.id, r.edge, {
@@ -120,7 +159,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   }
   const shallow = rows.filter((r) => (r.depth ?? 0) <= SHALLOW_DEPTH);
   const deeper = rows.filter((r) => (r.depth ?? 0) > SHALLOW_DEPTH);
-  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)];
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows), ...(capped ? fractionNote(depth, max) : [])];
   if (rows.length) {
     notes.push(countLine('by depth', byDepth, false, byDepth.size));
     notes.push(countLine('by component', byComp, true));
@@ -133,7 +172,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   notes.push('potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings): a path here may never run');
   if (deeper.length) notes.push(`${deeper.length} caller(s) at depth ${SHALLOW_DEPTH + 1}+ are in section "deeper": page with section="deeper" offset= limit=`);
   const scope = capped ? `depth ${max}` : 'all depths';
-  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${SHALLOW_DEPTH}` }];
+  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${Math.min(max, SHALLOW_DEPTH)}` }];
   if (deeper.length) sections.push({ name: 'deeper', rows: deeper, tree: true });
   return {
     name: 'blast_radius',
@@ -183,24 +222,37 @@ function routeMethod(n: GraphNode): string | null {
   return typeof m === 'string' ? m.replace(/^:/, '').toUpperCase() : null;
 }
 
-export function findRoutes(g: Graph, query: string): GraphNode[] {
+export interface RouteMatch {
+  routes: GraphNode[];
+  // matched as whole segments inside a longer path, not as the path itself
+  partial: boolean;
+  // matched a method query although the route records no method
+  methodless: number;
+}
+
+export function matchRoutes(g: Graph, query: string): RouteMatch {
   const byId = g.byId.get(query.trim()) ?? g.byId.get(`route:${query.trim()}`);
-  if (byId && byId.kind === 'route') return [byId];
+  if (byId && byId.kind === 'route') return { routes: [byId], partial: false, methodless: 0 };
   const { method, path } = canonicalRoute(query);
-  const routes = (g.byKind.get('route') ?? []).filter((n) => !method || routeMethod(n) === method || routeMethod(n) === 'ANY');
+  // a route that records no method may answer any method: it is kept and counted, never dropped as if absent
+  const routes = (g.byKind.get('route') ?? []).filter((n) => !method || routeMethod(n) === method || routeMethod(n) === 'ANY' || routeMethod(n) === null);
+  const countMethodless = (found: GraphNode[]) => (method ? found.filter((n) => routeMethod(n) === null).length : 0);
   const exact = routes.filter((n) => routePaths(n).includes(path));
-  if (exact.length) return exact;
+  if (exact.length) return { routes: exact, partial: false, methodless: countMethodless(exact) };
   // otherwise the query's segments must appear as whole consecutive segments of the path: "/font" finds
   // /article/{p}/font, but "/" or "/fo" finds nothing
   const want = path.split('/').filter((x) => x !== '');
-  if (!want.length) return [];
+  if (!want.length) return { routes: [], partial: false, methodless: 0 };
   const has = (p: string) => {
     const segs = p.split('/').filter((x) => x !== '');
     for (let i = 0; i + want.length <= segs.length; i++) if (want.every((w, k) => segs[i + k] === w)) return true;
     return false;
   };
-  return routes.filter((n) => routePaths(n).some(has));
+  const found = routes.filter((n) => routePaths(n).some(has));
+  return { routes: found, partial: found.length > 0, methodless: countMethodless(found) };
 }
+
+export const findRoutes = (g: Graph, query: string): GraphNode[] => matchRoutes(g, query).routes;
 
 // route_authz answers this many matching routes in full; the rest are counted
 const MAX_ROUTE_ANSWERS = 10;
@@ -265,7 +317,9 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
   if (!permE.length && !exempt.length && routeAuthzMissing(g)) return { state: 'unknown', text: ROUTE_AUTHZ_MISSING };
   if (permE.length) {
     const unknown = permE.some((e) => e.band === 'unknown');
-    const text = `requires ${permissionExpression(g, permE)}${unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : ''}`;
+    const guessed = !unknown && permE.some((e) => e.band === 'heuristic');
+    const caveat = unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : guessed ? ' (HEURISTIC: confirm at the cited line)' : '';
+    const text = `requires ${permissionExpression(g, permE)}${caveat}`;
     return { state: unknown ? 'unknown' : 'permission', text };
   }
   if (exempt.length) return { state: 'exempt', text: `exempt: ${exempt.map((e) => g.byId.get(e.to)?.name ?? e.to).join('; ')}` };
@@ -294,7 +348,8 @@ export function routeSiblings(g: Graph, route: GraphNode): { text: string; odd: 
 
 export function routeAuthz(g: Graph, query: string): QueryResult {
   const title = `route authz of ${query}`;
-  const found = findRoutes(g, query);
+  const match = matchRoutes(g, query);
+  const found = match.routes;
   if (!found.length) return notFound('route_authz', query, title, 'route', 'paths match with :param and {param} segments treated alike');
   const routes = found.slice(0, MAX_ROUTE_ANSWERS);
   const sections: Section[] = [];
@@ -303,6 +358,8 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
   const next: string[] = [];
   if (found.length > routes.length) notes.push(`${found.length} routes match; the first ${routes.length} are answered, pass a longer path or a method for the rest`);
   else if (routes.length > 1) notes.push(`${routes.length} routes match; each served copy is listed separately`);
+  if (match.partial) notes.push(`matched as part of the path: ${routes.length > 1 ? 'these routes are' : 'this route is'} longer than ${JSON.stringify(query)}`);
+  if (match.methodless) notes.push(`${match.methodless} matched route(s) have no recorded method: the method in the query could not be checked for them`);
   for (const r of routes) {
     const a = r.attrs ?? {};
     const where = [a.base && `base ${String(a.base)}`, a.mount && `mount ${String(a.mount)}`].filter(Boolean).join(', ');
@@ -341,7 +398,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
 export function permissionRoutes(g: Graph, query: string): QueryResult {
   const title = `routes requiring ${query}`;
   const hits = resolve(g, ['permission'], query);
-  if (!hits.length) return notFound('permission_routes', query, title, 'permission');
+  if (!hits.length) return notFound('permission_routes', query, title, 'permission', 'use the exact permission name, with its namespace if it has one');
   if (hits.length > 1) return ambiguous('permission_routes', query, title, hits, 'permission');
   const perm = hits[0];
   const perms = permEdges(inEdges(g, perm.id, ['requires_permission']));
@@ -375,9 +432,10 @@ export interface Likeness {
 }
 
 const TX_NAME = /(^|[-!])(tx|txes|transact)([-!?]|$)/;
-const WRITE_NAME = /(^|-)(save|publish|update|create|set|delete|retract|upsert|add|import|migrate)/;
+// a verb counts only as a whole word: `add` in add-item, not in address-book
+const WRITE_NAME = /(^|-)(save|publish|update|create|set|delete|retract|upsert|add|import|migrate)(?![a-z0-9])/;
 const TEST_FILE = /(^|\/)test\//;
-const READ_NAME = /(^|[-/.>])(get|find|load|query|pull|pattern|by|fetch|read|list)/;
+const READ_NAME = /(^|[-/.>])(get|find|load|query|pull|pattern|by|fetch|read|list)(?![a-z0-9])/;
 
 // How much an unproven attribute reference looks like a write, from its DB context label and caller name.
 export function writeLikeness(context: string, caller: string, file: string | null): Likeness {
@@ -622,17 +680,21 @@ export function isUnitTest(n: GraphNode | undefined): boolean {
 
 const TESTS_FOR_LIMITS = 'static links only: tests reaching the target through multimethods, resolve/apply or HTTP fixtures are not counted; 0 tests means no static link, not untested';
 
+const testsBeyondNote = (max: number): string => `callers continue beyond depth ${max}; tests further out are not listed`;
+
 export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResult {
   const title = `tests for ${query}`;
+  if (depth < 1) return invalidDepth('tests_for', query, title, depth);
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
   if (!hits.length) {
     const viaBrowser = testsCovering(g, query);
-    if (!viaBrowser.found) return notFound('tests_for', query, title, 'definition, attribute, event, selector or route');
+    if (!viaBrowser.found) return notFound('tests_for', query, title, 'definition, attribute, event, selector or route', FQN_HINT);
     return { ...viaBrowser, name: 'tests_for', title };
   }
   if (hits.length > 1) return ambiguous('tests_for', query, title, hits, 'symbol');
   const target = hits[0];
-  const max = Math.max(1, Math.min(MAX_DEPTH, Math.floor(Number.isFinite(depth) ? depth : MAX_DEPTH)));
+  const asked = Number.isFinite(depth) ? Math.floor(depth) : MAX_DEPTH;
+  const max = Math.min(MAX_DEPTH, asked);
   // seeds: the definition itself, or the readers/writers/dispatchers/subscribers of a non-code target
   const seeds: { id: string; band: Band }[] = target.kind === 'definition'
     ? [{ id: target.id, band: 'static_proven' }]
@@ -666,8 +728,9 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
     if (!ns.has(comp)) ns.set(comp, new Set());
     ns.get(comp)?.add(r.label.slice(0, i));
   }
-  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows])];
-  if (beyond) notes.push(`callers continue beyond depth ${max}; tests further out are not listed`);
+  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows]), ...fractionNote(depth, asked)];
+  if (asked > max) notes.push(`depth ${depth} was cut to ${max}, the most this query walks`);
+  if (beyond) notes.push(testsBeyondNote(max));
   for (const [comp, set] of ns) notes.push(`run in ${comp}: ${[...set].sort().join(' ')}`);
   const direct = unitRows.filter((r) => r.depth === 1).length;
   return {
@@ -795,19 +858,22 @@ function attributeRows(g: Graph, changed: GraphNode[]): { attrs: Row[]; risk: Ri
 }
 
 // Tests to run, each naming the changed symbol it reaches (parentLabel, the nearest one when it reaches several), and
-// the changed definitions no test reaches.
-function testRows(g: Graph, changed: GraphNode[]): { run: Row[]; add: Row[] } {
+// the changed definitions no test reaches; tests_for's own depth, and its note when callers go further out.
+function testRows(g: Graph, changed: GraphNode[]): { run: Row[]; add: Row[]; beyond: boolean } {
   const runById = new Map<string, Row>();
   const add: Row[] = [];
+  let beyond = false;
   for (const n of changed.filter((x) => x.kind === 'definition' && !x.roles?.includes('test'))) {
-    const ts = testsFor(g, n.id, 2).sections.flatMap((s) => s.rows);
+    const answer = testsFor(g, n.id);
+    beyond ||= answer.notes.includes(testsBeyondNote(MAX_DEPTH));
+    const ts = answer.sections.flatMap((s) => s.rows);
     for (const r of ts) {
       const prev = runById.get(r.id);
       if (prev === undefined || (r.depth ?? 0) < (prev.depth ?? 0)) runById.set(r.id, { ...r, parentId: n.id, parentLabel: n.name });
     }
     if (!ts.length) add.push(nodeRow(n, { detail: 'no test reaches it statically' }));
   }
-  return { run: [...runById.values()], add };
+  return { run: [...runById.values()], add, beyond };
 }
 
 // Notes on what the graph cannot speak for: files with no node on the changed lines, added files, file types it never indexes.
@@ -838,7 +904,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const { outside, broken } = outsideCallers(g, changed, new Set(opts.deleted ?? []));
   const { routeIds, authz, risk: routeRisk } = routeAuthzRows(g, changed);
   const { attrs, risk: attrRisk } = attributeRows(g, changed);
-  const { run, add } = testRows(g, changed);
+  const { run, add, beyond } = testRows(g, changed);
   const entryRisk = risks(outside.filter((x) => x.cross && x.entry).map((r) => ({ ...r, detail: `entry point in another component calls ${r.parentLabel}` })), false);
   const tableKeys = changeKeyRows(g, changes);
   const keyRows = [...changeSignatureRows(g, changed.filter((x) => x.kind === 'definition')), ...tableKeys.rows];
@@ -846,11 +912,14 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const risk = found.map((x) => x.row);
   const cover = coverageNotes(g, changes, changed, new Set(opts.added ?? []));
   const coverage = cover.uncovered ? ` (${cover.uncovered} of ${changes.length} file(s) not covered)` : '';
-  const level = found.some((x) => x.high) ? 'HIGH' : risk.length ? 'MEDIUM' : cover.uncovered ? 'UNKNOWN' : 'LOW';
+  // nothing matched means nothing was assessed: UNKNOWN, never LOW
+  const level = found.some((x) => x.high) ? 'HIGH' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length ? 'UNKNOWN' : 'LOW';
   const notes = [
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
     ...(tableKeys.weak ? [`${tableKeys.weak} key-sibling row(s) dropped: the key they lack is absent in ${Math.round(WEAK_PATTERN_ABSENT * 100)}%+ of sibling rows, no sibling pattern`] : []),
+    ...(beyond ? [testsBeyondNote(MAX_DEPTH)] : []),
+    ...(changed.length ? [] : ['no changed symbol matched: the risk is not decidable from this graph, which says nothing about the change']),
     ...cover.notes,
   ];
   return {
@@ -867,7 +936,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
       { name: 'route authz', rows: authz, ordered: true, searched: 'routes defined or handled by the changed code' },
       { name: 'attributes', rows: attrs, searched: 'reads and writes of the changed code' },
       { name: 'signatures and key siblings', short: 'keys', rows: keyRows, ordered: true, searched: 'callers of changed definitions with an undefined arity or a never-passed key; table rows on the changed lines lacking a sibling key' },
-      { name: 'tests to run', rows: run, searched: 'unit tests up to depth 2 and browser tests' },
+      { name: 'tests to run', rows: run, searched: `unit tests up to depth ${MAX_DEPTH} and browser tests` },
       { name: 'tests to add', rows: add, ordered: true, searched: 'changed definitions with no static test' },
     ],
     counts: { changed: changed.length, 'callers outside': outside.length, routes: routeIds.size, 'tests to run': run.length, 'tests to add': add.length },

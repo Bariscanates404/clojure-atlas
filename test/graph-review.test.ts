@@ -85,7 +85,7 @@ describe('tests_for', () => {
     assert.deepEqual(labels(d1, 'clojure.test').sort(), ['t.core-test/direct', 't.core-test/guessed']);
   });
 
-  const clamp: [number, number][] = [[0, 1], [9, 3], [Number.NaN, 3]];
+  const clamp: [number, number][] = [[9, 3], [Number.NaN, 3]];
   for (const [given, used] of clamp) {
     it(`depth ${given} is used as ${used}`, () => assert.match(testsFor(g, 'core/f', given).sections[0].searched ?? '', new RegExp(`depth ${used}$`)));
   }
@@ -231,11 +231,38 @@ describe('context_for_change', () => {
     assert.deepEqual(labels(r, 'tests to add'), ['api.routes/drop']);
   });
 
+  it('tests to run reach as deep as tests_for does by default, and say when callers go further', () => {
+    const b = new GraphBuilder();
+    const target = b.def('lib/target', 'components/lib', { file: 'lib.clj', line: 1, end_line: 5 });
+    const chain = ['lib/a', 'lib/b', 'lib/c'].map((n) => b.def(n));
+    const deep = b.def('lib-test/deep', 'components/lib', { roles: ['test'], attrs: { defined_by: 'clojure.test/deftest' } });
+    const far = b.def('lib-test/far', 'components/lib', { roles: ['test'], attrs: { defined_by: 'clojure.test/deftest' } });
+    b.edge(chain[0], 'calls', target).edge(chain[1], 'calls', chain[0]).edge(deep, 'calls', chain[1]).edge(chain[2], 'calls', deep).edge(far, 'calls', chain[2]);
+    const gx = b.build();
+    assert.deepEqual(labels(testsFor(gx, 'lib/target'), 'clojure.test'), ['lib-test/deep']);
+    const r = contextForChange(gx, ['lib.clj']);
+    assert.deepEqual(labels(r, 'tests to run'), ['lib-test/deep']);
+    assert.deepEqual(labels(r, 'tests to add'), []);
+    assert.match(r.notes.join(' '), /tests further out are not listed/);
+  });
+
   it('a file the graph does not know is reported, not silently empty', () => {
     const r = contextForChange(g, ['docs/readme.md']);
     assert.equal(r.found, false);
     assert.match(r.notes.join(' '), /1 changed file\(s\) of a type this graph does not index \(\.md\)/);
-    assert.match(r.verdict, /risk LOW/);
+    assert.match(r.verdict, /risk UNKNOWN/);
+  });
+
+  it('risk is UNKNOWN, never LOW, when no changed symbol was matched', () => {
+    const none: string[][] = [[], ['docs/readme.md'], [`${file}:45-49`], [`${file}:12-`], ['nowhere/x.clj']];
+    for (const specs of none) {
+      const r = contextForChange(g, specs);
+      assert.equal(r.found, false, specs.join());
+      assert.match(r.verdict, /0 changed symbol\(s\).*risk UNKNOWN/, specs.join());
+      assert.match(r.notes.join(' '), /no changed symbol matched: the risk is not decidable/, specs.join());
+    }
+    assert.match(contextForChange(new GraphBuilder().build(), ['a.clj:1']).verdict, /risk UNKNOWN/);
+    assert.match(contextForChange(g, [`${file}:10-40`]).verdict, /risk (MEDIUM|HIGH)/);
   });
 
   it('every empty section says what it searched', () => {
