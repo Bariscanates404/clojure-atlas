@@ -6,6 +6,7 @@ node definition:app.core/log! [definition] src/app/core.clj:4 {"defined_by":"clo
 node definition:app.core/make-logger [definition] src/app/core.clj:19 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.core/never-runs [definition] src/app/core.clj:23 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.core/on-change [definition] src/app/core.clj:35 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.core/only-in-rich-comment [definition] src/app/core.clj:39 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:app.core/pipeline [definition] src/app/core.clj:11 {"defined_by":"clojure.core/def"}
 node definition:app.core/returns-fn [definition] src/app/core.clj:21 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.core/run-all [definition] src/app/core.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"xs","reads_complete":false,"escapes":["passed to apply"]}],"variadic":false}]}}
@@ -16,6 +17,10 @@ node definition:app.core/test-double [definition] src/app/core.clj:33 {"defined_
 node definition:app.core/threaded [definition] src/app/core.clj:25 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to ->"]}],"variadic":false}]}}
 node definition:app.core/with-log [definition] src/app/core.clj:27 {"defined_by":"clojure.core/defmacro","macro":true}
 node definition:app.core/wrapped [definition] src/app/core.clj:29 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.local/binding [definition] src/app/local.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"v","reads_complete":false,"escapes":["passed to f"]},{"kind":"symbol","name":"f","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:app.local/iterates [definition] src/app/local.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.local/real-rebind [definition] src/app/local.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.local/shadowed [definition] src/app/local.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.shapes/->Box [definition] src/app/shapes.clj:10 {"defined_by":"clojure.core/defrecord"}
 node definition:app.shapes/Box [definition] src/app/shapes.clj:10 {"defined_by":"clojure.core/defrecord"}
 node definition:app.shapes/Named [definition] src/app/shapes.clj:9 {"defined_by":"clojure.core/defprotocol"}
@@ -32,6 +37,7 @@ node implementation:src/app/shapes.clj:13:28 [implementation] src/app/shapes.clj
 node key::n [key] undefined:undefined
 node key::x [key] undefined:undefined
 node namespace:app.core [namespace] src/app/core.clj:1
+node namespace:app.local [namespace] src/app/local.clj:1
 node namespace:app.shapes [namespace] src/app/shapes.clj:1
 edge definition:app.core/aliased -references-> definition:app.core/log! static_proven src/app/core.clj:16 {"via":"alias"}
 edge definition:app.core/handlers -references-> definition:app.core/log! static_proven src/app/core.clj:7
@@ -52,6 +58,12 @@ edge definition:app.core/threaded -calls-> definition:app.core/log! static_prove
 edge definition:app.core/with-log -calls-> definition:app.core/log! static_proven src/app/core.clj:27
 edge definition:app.core/wrapped -calls-> definition:app.core/audit static_proven src/app/core.clj:29 {"arity":1,"arity_band":"static_proven"}
 edge definition:app.core/wrapped -expands_via-> definition:app.core/with-log static_proven src/app/core.clj:29
+edge definition:app.local/iterates -references-> definition:app.core/handlers static_proven src/app/local.clj:9
+edge definition:app.local/real-rebind -calls-> definition:app.core/audit static_proven src/app/local.clj:11 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.local/real-rebind -rebinds-> definition:app.core/*sink* unknown src/app/local.clj:11 {"via":"binding"}
+edge definition:app.local/shadowed -calls-> definition:app.core/audit static_proven src/app/local.clj:7 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.local/shadowed -calls-> definition:app.local/binding static_proven src/app/local.clj:7 {"arity":2,"arity_band":"static_proven"}
+edge definition:app.local/shadowed -references-> definition:app.core/log! static_proven src/app/local.clj:7
 edge definition:app.shapes/anon -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:13
 edge definition:app.shapes/area -may_dispatch_to-> dispatch_arm:app.shapes/area@:app.shapes/circle heuristic src/app/shapes.clj:4 {"dispatch":":app.shapes/circle"}
 edge definition:app.shapes/area -may_dispatch_to-> dispatch_arm:app.shapes/area@:app.shapes/shape heuristic src/app/shapes.clj:5 {"dispatch":":app.shapes/shape"}
@@ -72,6 +84,7 @@ edge namespace:app.core -defines-> definition:app.core/log! static_proven src/ap
 edge namespace:app.core -defines-> definition:app.core/make-logger static_proven src/app/core.clj:19
 edge namespace:app.core -defines-> definition:app.core/never-runs static_proven src/app/core.clj:23
 edge namespace:app.core -defines-> definition:app.core/on-change static_proven src/app/core.clj:35
+edge namespace:app.core -defines-> definition:app.core/only-in-rich-comment static_proven src/app/core.clj:39
 edge namespace:app.core -defines-> definition:app.core/pipeline static_proven src/app/core.clj:11
 edge namespace:app.core -defines-> definition:app.core/returns-fn static_proven src/app/core.clj:21
 edge namespace:app.core -defines-> definition:app.core/run-all static_proven src/app/core.clj:13
@@ -84,6 +97,11 @@ edge namespace:app.core -defines-> definition:app.core/with-log static_proven sr
 edge namespace:app.core -defines-> definition:app.core/wrapped static_proven src/app/core.clj:29
 edge namespace:app.core -references-> definition:app.core/state static_proven src/app/core.clj:37
 edge namespace:app.core -registers_handler-> definition:app.core/on-change static_proven src/app/core.clj:37 {"via":"add-watch"}
+edge namespace:app.local -defines-> definition:app.local/binding static_proven src/app/local.clj:5
+edge namespace:app.local -defines-> definition:app.local/iterates static_proven src/app/local.clj:9
+edge namespace:app.local -defines-> definition:app.local/real-rebind static_proven src/app/local.clj:11
+edge namespace:app.local -defines-> definition:app.local/shadowed static_proven src/app/local.clj:7
+edge namespace:app.local -requires-> namespace:app.core static_proven src/app/local.clj:3
 edge namespace:app.shapes -defines-> definition:app.shapes/->Box static_proven src/app/shapes.clj:10
 edge namespace:app.shapes -defines-> definition:app.shapes/Box static_proven src/app/shapes.clj:10
 edge namespace:app.shapes -defines-> definition:app.shapes/Named static_proven src/app/shapes.clj:9
@@ -101,6 +119,6 @@ edge namespace:app.shapes -passes_callback-> definition:app.shapes/area static_p
 edge namespace:app.shapes -references-> definition:app.shapes/Box static_proven src/app/shapes.clj:11
 edge namespace:app.shapes -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:11
 edge namespace:app.shapes -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:12
-usages resolved=27 unresolved=0 unknown=1 not-vars=1 external=45
+usages resolved=33 unresolved=0 unknown=0 not-vars=1 external=53
 adapters multimethods=defmethod:4 implementations=protocol implementations:9 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:2 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
-files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
+files sources=3 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

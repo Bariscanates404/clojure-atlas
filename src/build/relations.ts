@@ -5,7 +5,7 @@
 import type { Band } from '../mcp/graph.ts';
 import type { VarUse } from './analysis.ts';
 import { textOf, type Form } from './reader.ts';
-import { isSpecialForm, UNKNOWN_NS, type Context } from './model.ts';
+import { CORE_NS, isSpecialForm, UNKNOWN_NS, type Context } from './model.ts';
 
 export type Relation = 'calls' | 'references' | 'passes_callback' | 'registers_handler' | 'expands_via' | 'rebinds';
 
@@ -15,7 +15,8 @@ export interface Classified {
   via?: string;
 }
 
-const BINDINGS = new Set(['let', 'loop', 'when-let', 'if-let', 'when-some', 'if-some', 'letfn', 'with-open', 'doseq', 'for']);
+// binding forms that name their value: the right-hand side of a pair is aliased (for and doseq iterate theirs)
+const ALIASING = new Set(['let', 'loop', 'when-let', 'if-let', 'when-some', 'if-some', 'letfn', 'with-open']);
 const REBINDINGS = new Set(['binding', 'with-redefs', 'with-bindings']);
 const DEFINING = new Set(['def', 'defonce']);
 // functions that store their last argument as a handler; the arguments before it (ids, interceptors, keys) are values
@@ -25,6 +26,14 @@ const REGISTRARS = new Set([
 ]);
 
 const headOf = (f: Form | undefined) => (f && f.t === 'list' ? textOf(f.children[0])?.replace(/^.*\//, '') : undefined);
+
+// The clojure.core name a list's head resolves to, else undefined: a user's own `binding` or a local that shadows
+// one is not the macro, whatever its text says.
+function coreHeadOf(ctx: Context, file: string, f: Form | undefined): string | undefined {
+  const sym = f && f.t === 'list' ? f.children[0] : undefined;
+  const use = sym?.t === 'symbol' ? ctx.useAt(file, sym.row, sym.col) : undefined;
+  return use && CORE_NS.test(use.to) ? use.name : undefined;
+}
 
 // The collection holding the form at this place, seen through reader conditionals: #?(:clj f :cljs f) sits where f would.
 function placeOf(ctx: Context, file: string, row: number, col: number) {
@@ -40,7 +49,7 @@ export function classify(ctx: Context, u: VarUse): Classified {
   const head = headOf(parent);
   if (parent?.t === 'list' && at?.index === 0) return { kind: 'calls', band: 'static_proven' };
   // (apply f args): a call with an argument count known only at runtime
-  if (head === 'apply' && at?.index === 1) return { kind: 'calls', band: 'heuristic', via: 'apply' };
+  if (coreHeadOf(ctx, u.file, parent) === 'apply' && at?.index === 1) return { kind: 'calls', band: 'heuristic', via: 'apply' };
   // kondo gives an argument count to a call it sees through a macro: (-> x f)
   if (u.arity !== undefined) return { kind: 'calls', band: 'static_proven' };
   if (parent?.t === 'list' && head && DEFINING.has(head)) return { kind: 'references', band: 'static_proven', via: 'alias' };
@@ -58,9 +67,9 @@ export function classify(ctx: Context, u: VarUse): Classified {
   }
   if (parent?.t === 'vector') {
     const owner = placeOf(ctx, u.file, parent.row, parent.col)?.parent;
-    const binder = headOf(owner);
+    const binder = coreHeadOf(ctx, u.file, owner);
     if (binder && REBINDINGS.has(binder) && (at?.index ?? 0) % 2 === 0) return { kind: 'rebinds', band: 'unknown', via: binder };
-    if (binder && BINDINGS.has(binder) && (at?.index ?? 0) % 2 === 1) return { kind: 'references', band: 'static_proven', via: 'alias' };
+    if (binder && ALIASING.has(binder) && (at?.index ?? 0) % 2 === 1) return { kind: 'references', band: 'static_proven', via: 'alias' };
   }
   return { kind: 'references', band: 'static_proven' };
 }

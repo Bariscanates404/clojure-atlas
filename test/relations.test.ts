@@ -22,4 +22,27 @@ describe('relation semantics through the MCP', () => {
     assert.ok(blast.notes.some((n) => /potential impact over known dependency relations/.test(n)));
     assert.ok(blast.sections.some((s) => s.rows.some((r) => r.label === 'app.shapes/describe')));
   });
+
+  it('reads the rich comment as code that is not run: no calls, no definitions', async () => {
+    const doc = await buildFixture('relations');
+    const g = graphFromJson(JSON.stringify(doc));
+    assert.deepEqual(callers(g, 'app.core/only-in-rich-comment', { includeReferences: true }).sections[1].rows, []);
+    assert.deepEqual(blastRadius(g, 'app.core/only-in-rich-comment').sections.flatMap((s) => s.rows), []);
+    assert.ok(!doc.nodes.some((n) => n.id === 'definition:app.core/scratch'));
+    assert.ok(!doc.edges.some((e) => e.file === 'src/app/core.clj' && (e.line ?? 0) >= 42 && e.kind !== 'defines'));
+  });
+
+  it('knows binding and for by the var the name resolves to, and does not call a loop collection an alias', async () => {
+    const doc = await buildFixture('relations');
+    const from = (id: string) => doc.edges.filter((e) => e.from === `definition:app.local/${id}` && e.to.startsWith('definition:app.core/')).map((e) => `${e.kind} ${e.to} ${JSON.stringify(e.attrs?.via ?? null)}`).sort();
+    assert.deepEqual(from('shadowed'), ['calls definition:app.core/audit null', 'references definition:app.core/log! null']);
+    assert.deepEqual(from('real-rebind'), ['calls definition:app.core/audit null', 'rebinds definition:app.core/*sink* "binding"']);
+    assert.deepEqual(from('iterates'), ['references definition:app.core/handlers null']);
+  });
+
+  it('does not count a protocol method parameter as a usage of an unknown name', async () => {
+    const doc = await buildFixture('relations');
+    assert.equal(doc.stats.usages.unknown, 0);
+    assert.deepEqual(doc.stats.usages.topUnknown, []);
+  });
 });
