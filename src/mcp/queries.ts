@@ -8,6 +8,7 @@ import {
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
+import { isTestFile } from './testfile.ts';
 
 export { entryOf, resolve, type QueryResult, type Row, type Section } from './rows.ts';
 
@@ -434,7 +435,6 @@ export interface Likeness {
 const TX_NAME = /(^|[-!])(tx|txes|transact)([-!?]|$)/;
 // a verb counts only as a whole word: `add` in add-item, not in address-book
 const WRITE_NAME = /(^|-)(save|publish|update|create|set|delete|retract|upsert|add|import|migrate)(?![a-z0-9])/;
-const TEST_FILE = /(^|\/)test\//;
 const READ_NAME = /(^|[-/.>])(get|find|load|query|pull|pattern|by|fetch|read|list)(?![a-z0-9])/;
 
 // How much an unproven attribute reference looks like a write, from its DB context label and caller name.
@@ -447,7 +447,7 @@ export function writeLikeness(context: string, caller: string, file: string | nu
   else if (/:db\/id-map/.test(context)) { score += 4; why.push('map with :db/id'); }
   if (TX_NAME.test(name)) { score += 3; why.push(`name ${name}`); }
   if (WRITE_NAME.test(name)) { score += 2; if (!why.some((w) => w.startsWith('name'))) why.push(`name ${name}`); }
-  if (file && TEST_FILE.test(file)) { score -= 5; why.push('test code'); }
+  if (isTestFile(file)) { score -= 5; why.push('test code'); }
   return { score, why: why.join(', ') || 'no write signal' };
 }
 
@@ -457,7 +457,7 @@ export function readLikeness(context: string, caller: string, file: string | nul
   const why: string[] = [];
   if (/@datomic\.api\/(q|pull|entity)|non-write-position/.test(context)) { score += 6; why.push(`${context}`); }
   if (READ_NAME.test(name)) { score += 2; why.push(`name ${name}`); }
-  if (file && TEST_FILE.test(file)) { score -= 5; why.push('test code'); }
+  if (isTestFile(file)) { score -= 5; why.push('test code'); }
   return { score, why: why.join(', ') || 'no read signal' };
 }
 

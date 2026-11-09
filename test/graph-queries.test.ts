@@ -662,6 +662,10 @@ describe('write and read likeness', () => {
     assert.equal(writeLikeness('no-db-context', 'a/save-x', 'c/test/t.clj').why, 'name save-x, test code');
   });
   it('test code reads rank below source reads', () => assert.ok(readLikeness('no-db-context', 'a/get', 'c/test/t.clj').score < readLikeness('no-db-context', 'a/get', null).score));
+  it('a tests/ directory and a _tests file are test code, like the rest of the graph says', () => {
+    assert.equal(writeLikeness('no-db-context', 'a/save-x', 'tests/helpers.clj').why, 'name save-x, test code');
+    assert.equal(readLikeness('no-db-context', 'a/get', 'src/a/core_tests.clj').why, 'name get, test code');
+  });
 });
 
 // ---------- events ----------
