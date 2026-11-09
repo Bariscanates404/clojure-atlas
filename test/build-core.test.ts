@@ -35,4 +35,9 @@ describe('core graph corner cases', () => {
     assert.equal(edges('namespace:app.core', 'namespace:app.compat', 'requires').length, 1);
     assert.equal(edges('namespace:app.core', 'namespace:app.util', 'requires').length, 1);
   });
+
+  it('every call site on a line is an edge of its own', () => {
+    const calls = edges(def('twice'), def('helper'), 'calls');
+    assert.deepEqual(calls.map((e) => e.attrs?.arity), [1, 2]);
+  });
 });
