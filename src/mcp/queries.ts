@@ -638,6 +638,8 @@ export function isUnitTest(n: GraphNode | undefined): boolean {
 
 const TESTS_FOR_LIMITS = 'static links only: tests reaching the target through multimethods, resolve/apply or HTTP fixtures are not counted; 0 tests means no static link, not untested';
 
+const testsBeyondNote = (max: number): string => `callers continue beyond depth ${max}; tests further out are not listed`;
+
 export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResult {
   const title = `tests for ${query}`;
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
@@ -683,7 +685,7 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
     ns.get(comp)?.add(r.label.slice(0, i));
   }
   const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows])];
-  if (beyond) notes.push(`callers continue beyond depth ${max}; tests further out are not listed`);
+  if (beyond) notes.push(testsBeyondNote(max));
   for (const [comp, set] of ns) notes.push(`run in ${comp}: ${[...set].sort().join(' ')}`);
   const direct = unitRows.filter((r) => r.depth === 1).length;
   return {
@@ -811,19 +813,22 @@ function attributeRows(g: Graph, changed: GraphNode[]): { attrs: Row[]; risk: Ri
 }
 
 // Tests to run, each naming the changed symbol it reaches (parentLabel, the nearest one when it reaches several), and
-// the changed definitions no test reaches.
-function testRows(g: Graph, changed: GraphNode[]): { run: Row[]; add: Row[] } {
+// the changed definitions no test reaches; tests_for's own depth, and its note when callers go further out.
+function testRows(g: Graph, changed: GraphNode[]): { run: Row[]; add: Row[]; beyond: boolean } {
   const runById = new Map<string, Row>();
   const add: Row[] = [];
+  let beyond = false;
   for (const n of changed.filter((x) => x.kind === 'definition' && !x.roles?.includes('test'))) {
-    const ts = testsFor(g, n.id, 2).sections.flatMap((s) => s.rows);
+    const answer = testsFor(g, n.id);
+    beyond ||= answer.notes.includes(testsBeyondNote(MAX_DEPTH));
+    const ts = answer.sections.flatMap((s) => s.rows);
     for (const r of ts) {
       const prev = runById.get(r.id);
       if (prev === undefined || (r.depth ?? 0) < (prev.depth ?? 0)) runById.set(r.id, { ...r, parentId: n.id, parentLabel: n.name });
     }
     if (!ts.length) add.push(nodeRow(n, { detail: 'no test reaches it statically' }));
   }
-  return { run: [...runById.values()], add };
+  return { run: [...runById.values()], add, beyond };
 }
 
 // Notes on what the graph cannot speak for: files with no node on the changed lines, added files, file types it never indexes.
@@ -854,7 +859,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const { outside, broken } = outsideCallers(g, changed, new Set(opts.deleted ?? []));
   const { routeIds, authz, risk: routeRisk } = routeAuthzRows(g, changed);
   const { attrs, risk: attrRisk } = attributeRows(g, changed);
-  const { run, add } = testRows(g, changed);
+  const { run, add, beyond } = testRows(g, changed);
   const entryRisk = risks(outside.filter((x) => x.cross && x.entry).map((r) => ({ ...r, detail: `entry point in another component calls ${r.parentLabel}` })), false);
   const tableKeys = changeKeyRows(g, changes);
   const keyRows = [...changeSignatureRows(g, changed.filter((x) => x.kind === 'definition')), ...tableKeys.rows];
@@ -868,6 +873,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
     ...(tableKeys.weak ? [`${tableKeys.weak} key-sibling row(s) dropped: the key they lack is absent in ${Math.round(WEAK_PATTERN_ABSENT * 100)}%+ of sibling rows, no sibling pattern`] : []),
+    ...(beyond ? [testsBeyondNote(MAX_DEPTH)] : []),
     ...(changed.length ? [] : ['no changed symbol matched: the risk is not decidable from this graph, which says nothing about the change']),
     ...cover.notes,
   ];
@@ -885,7 +891,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
       { name: 'route authz', rows: authz, ordered: true, searched: 'routes defined or handled by the changed code' },
       { name: 'attributes', rows: attrs, searched: 'reads and writes of the changed code' },
       { name: 'signatures and key siblings', short: 'keys', rows: keyRows, ordered: true, searched: 'callers of changed definitions with an undefined arity or a never-passed key; table rows on the changed lines lacking a sibling key' },
-      { name: 'tests to run', rows: run, searched: 'unit tests up to depth 2 and browser tests' },
+      { name: 'tests to run', rows: run, searched: `unit tests up to depth ${MAX_DEPTH} and browser tests` },
       { name: 'tests to add', rows: add, ordered: true, searched: 'changed definitions with no static test' },
     ],
     counts: { changed: changed.length, 'callers outside': outside.length, routes: routeIds.size, 'tests to run': run.length, 'tests to add': add.length },

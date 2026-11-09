@@ -231,6 +231,21 @@ describe('context_for_change', () => {
     assert.deepEqual(labels(r, 'tests to add'), ['api.routes/drop']);
   });
 
+  it('tests to run reach as deep as tests_for does by default, and say when callers go further', () => {
+    const b = new GraphBuilder();
+    const target = b.def('lib/target', 'components/lib', { file: 'lib.clj', line: 1, end_line: 5 });
+    const chain = ['lib/a', 'lib/b', 'lib/c'].map((n) => b.def(n));
+    const deep = b.def('lib-test/deep', 'components/lib', { roles: ['test'], attrs: { defined_by: 'clojure.test/deftest' } });
+    const far = b.def('lib-test/far', 'components/lib', { roles: ['test'], attrs: { defined_by: 'clojure.test/deftest' } });
+    b.edge(chain[0], 'calls', target).edge(chain[1], 'calls', chain[0]).edge(deep, 'calls', chain[1]).edge(chain[2], 'calls', deep).edge(far, 'calls', chain[2]);
+    const gx = b.build();
+    assert.deepEqual(labels(testsFor(gx, 'lib/target'), 'clojure.test'), ['lib-test/deep']);
+    const r = contextForChange(gx, ['lib.clj']);
+    assert.deepEqual(labels(r, 'tests to run'), ['lib-test/deep']);
+    assert.deepEqual(labels(r, 'tests to add'), []);
+    assert.match(r.notes.join(' '), /tests further out are not listed/);
+  });
+
   it('a file the graph does not know is reported, not silently empty', () => {
     const r = contextForChange(g, ['docs/readme.md']);
     assert.equal(r.found, false);
