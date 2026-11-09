@@ -55,7 +55,7 @@ edge definition:app.core/test-double -rebinds-> definition:app.core/*sink* unkno
 edge definition:app.core/test-double -rebinds-> definition:app.core/save! unknown src/app/core.clj:33 {"via":"with-redefs"}
 edge definition:app.core/threaded -calls-> definition:app.core/audit static_proven src/app/core.clj:25 {"arity":1,"arity_band":"static_proven"}
 edge definition:app.core/threaded -calls-> definition:app.core/log! static_proven src/app/core.clj:25 {"arity":1,"arity_band":"static_proven"}
-edge definition:app.core/with-log -calls-> definition:app.core/log! static_proven src/app/core.clj:27
+edge definition:app.core/with-log -references-> definition:app.core/log! heuristic src/app/core.clj:27 {"via":"syntax-quote"}
 edge definition:app.core/wrapped -calls-> definition:app.core/audit static_proven src/app/core.clj:29 {"arity":1,"arity_band":"static_proven"}
 edge definition:app.core/wrapped -expands_via-> definition:app.core/with-log static_proven src/app/core.clj:29
 edge definition:app.local/iterates -references-> definition:app.core/handlers static_proven src/app/local.clj:9

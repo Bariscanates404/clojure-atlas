@@ -42,7 +42,18 @@ function placeOf(ctx: Context, file: string, row: number, col: number) {
   return at;
 }
 
+// Whether the form at this place sits in a syntax-quoted template and not under an unquote inside it: the template
+// builds code or data for somewhere else, so the enclosing function does not call what it names.
+function inTemplate(ctx: Context, file: string, row: number, col: number): boolean {
+  for (let at = placeOf(ctx, file, row, col); at; at = placeOf(ctx, file, at.parent.row, at.parent.col)) {
+    if (at.parent.t === 'unquote' || at.parent.t === 'unquote-splicing') return false;
+    if (at.parent.t === 'syntax-quote') return true;
+  }
+  return false;
+}
+
 export function classify(ctx: Context, u: VarUse): Classified {
+  if (inTemplate(ctx, u.file, u.nameRow, u.nameCol)) return { kind: 'references', band: 'heuristic', via: 'syntax-quote' };
   if (u.macro) return { kind: 'expands_via', band: 'static_proven' };
   const at = placeOf(ctx, u.file, u.nameRow, u.nameCol);
   const parent = at?.parent;

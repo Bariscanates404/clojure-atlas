@@ -34,8 +34,8 @@ edge definition:demo.core/f -calls-> definition:demo.core/f static_proven src/de
 edge definition:demo.core/f -calls-> definition:demo.util/helper static_proven src/demo/core.clj:10 {"arity":1,"arity_band":"static_proven"}
 edge definition:demo.core/f -consumes_key-> key::a static_proven src/demo/core.clj:10 {"via":"keyword-fn"}
 edge definition:demo.core/f -passes_callback-> definition:demo.util/helper static_proven src/demo/core.clj:11 {"via":"map"}
-edge definition:demo.core/m -calls-> definition:demo.core/f static_proven src/demo/core.clj:15
-edge definition:demo.core/m -references-> definition:demo.core/table static_proven src/demo/core.clj:15
+edge definition:demo.core/m -references-> definition:demo.core/f heuristic src/demo/core.clj:15 {"via":"syntax-quote"}
+edge definition:demo.core/m -references-> definition:demo.core/table heuristic src/demo/core.clj:15 {"via":"syntax-quote"}
 edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17 {"arity":1,"arity_band":"static_proven"}
 edge definition:demo.core/table -produces_key-> key::a static_proven src/demo/core.clj:7 {"via":"map-literal"}
 edge definition:demo.shared/both -calls-> definition:demo.util/helper static_proven src/demo/shared.cljc:4 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}

@@ -224,14 +224,15 @@ export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions
   const invalid = badArguments(name, { ...tool.props, ...common }, args);
   if (invalid) return invalid;
   const res = tool.run(g, args, opts);
+  const isError = res.badArgument === true;
   const st = staleness(g, base, opts);
   const degraded = degradation(g.doc);
   const degradedText = degraded ? degradedLine(degraded) : undefined;
   const header = [st.header, degradedText].filter(Boolean).join('\n') || null;
   const groupBy = ['component', 'file', 'none'].includes(String(args.group_by)) ? (args.group_by as GroupBy) : undefined;
   const ro = renderOptionsOf(args);
-  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }), { stale: st.stale, notice: st.header, ...(degradedText ? { degraded: degradedText } : {}) }), isError: false };
-  return { text: render(res, { ...ro, groupBy, header }), isError: false };
+  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }), { stale: st.stale, notice: st.header, ...(degradedText ? { degraded: degradedText } : {}) }), isError };
+  return { text: render(res, { ...ro, groupBy, header }), isError };
 }
 
 interface GraphContext {

@@ -142,7 +142,7 @@ edge definition:web.mounts/user-routes -passes_callback-> definition:web.more-ha
 edge definition:web.pedestal-app/common-interceptors -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:5
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:9
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:10
-edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:11
+edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items heuristic src/web/pedestal_app.clj:11 {"via":"syntax-quote"}
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:9
 edge definition:web.pedestal-app/table -references-> definition:web.pedestal-app/common-interceptors static_proven src/web/pedestal_app.clj:11
 edge definition:web.reitit-app/app -references-> definition:web.reitit-app/routes static_proven src/web/reitit_app.clj:13
