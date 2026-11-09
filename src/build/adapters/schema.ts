@@ -9,9 +9,12 @@ import { defId, groupBy, type Adapter, type Container, type Context, type Owner 
 const SPEC = /^(clojure|cljs)\.spec\.alpha$/;
 const SPEC_DEF = /^(clojure|cljs)\.spec\.alpha\/def$/;
 const MALLI = /^malli\./;
+// The schema types of malli's default registry: composite, scalar, comparator and predicate schemas. A def holding a
+// vector with one of these as its head is a schema.
 const MALLI_TYPES = new Set([
-  ':map', ':map-of', ':vector', ':sequential', ':set', ':tuple', ':enum', ':maybe', ':or', ':orn', ':and', ':multi', ':re', ':fn',
-  ':cat', ':catn', ':alt', ':altn', ':=>', ':function', ':schema', ':ref', ':merge', ':union', ':select-keys',
+  ':map', ':map-of', ':vector', ':sequential', ':set', ':tuple', ':enum', ':maybe', ':or', ':orn', ':and', ':not', ':multi', ':re', ':fn',
+  ':cat', ':catn', ':alt', ':altn', ':=>', ':function', ':schema', ':ref', ':merge', ':union', ':select-keys', ':=', ':not=', ':>', ':>=', ':<', ':<=',
+  ':any', ':some', ':nil', ':string', ':int', ':double', ':boolean', ':keyword', ':symbol', ':qualified-keyword', ':qualified-symbol', ':uuid',
 ]);
 
 const schemaId = (name: string) => `schema:${name}`;

@@ -4,7 +4,7 @@
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { contains, flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { defId, type Adapter, type Context } from '../model.ts';
-import { methodId, methods } from './multimethods.ts';
+import { methods } from './multimethods.ts';
 
 const IG = 'integrant.core';
 const IG_METHODS = /^integrant\.core\/(init-key|halt-key!|suspend-key!|resume-key|resolve-key|prep-key|expand-key|assert-key)$/;
@@ -137,7 +137,7 @@ export const systemKeys: Adapter = {
     const edges: GraphEdge[] = [];
     for (const m of methods(ctx).filter((x) => IG_METHODS.test(x.multi) && isKeywordKey(x.dispatch))) {
       keys.push({ name: m.dispatch, file: m.span.file, line: m.span.row, library: 'integrant' });
-      edges.push({ from: systemKeyId(m.dispatch), to: methodId(m.multi, m.dispatch), kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row, attrs: { via: m.multi.split('/')[1] } });
+      edges.push({ from: systemKeyId(m.dispatch), to: m.id, kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row, attrs: { via: m.multi.split('/')[1] } });
     }
     const igFiles = new Set(ctx.analysis.nsUses.filter((u) => u.to === IG).map((u) => u.file));
     const deps: Dep[] = [];
