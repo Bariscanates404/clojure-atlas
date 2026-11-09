@@ -58,6 +58,7 @@ describe('base_graph is a graph file next to the served graph, and errors quote 
     }
   };
   it('a non-graph file name is refused', () => assert.match(asText(() => ask(join(dir, 'secret.txt'))), /^base_graph secret\.txt: not a code-graph file/));
+  it('a missing graph names the file only', () => assert.equal(asText(() => ask(join(graphs, 'gone.json'))), 'base_graph gone.json: no such file'));
   it('a graph outside the graph directory is refused', () => assert.match(asText(() => ask(join(dir, 'outside.json'))), /outside the graph directory/));
   it('an unreadable graph names the file only', () => {
     const msg = asText(() => ask(join(graphs, 'bad.json')));
