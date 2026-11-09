@@ -327,7 +327,7 @@ describe('key_siblings', () => {
   const g = tableGraph();
   it('flags the row lacking :private? and :scope with evidence', () => {
     const r = keySiblings(g, 'components/app/src/paths/dd.cljc');
-    assert.match(r.verdict, /^1 row\(s\) lack a key their siblings have, in 1 table\(s\) with 4 map rows; 1 row\(s\) not map literals \(UNKNOWN\)$/);
+    assert.match(r.verdict, /^1 row\(s\) lack a key their siblings have, in 1 table\(s\) with 4 map rows; 1 row\(s\) not provable \(UNKNOWN\)$/);
     const f = rows(r, 'findings')[0];
     assert.equal(f.label, 'cfg :doc :dynamics: row :path [:docs :els KEY :show-if] lacks :private? :scope');
     assert.equal(f.line, 20);
@@ -415,5 +415,60 @@ describe('server tools and context_for_change', () => {
   it('a version-2 document passes the loader; version 1 still loads', () => {
     assert.equal(parseDocument({ ...new GraphBuilder().doc(), version: 2 }).version, 2);
     assert.equal(parseDocument(new GraphBuilder().doc()).version, 1);
+  });
+});
+
+describe('key_flow and key_siblings answers stay honest', () => {
+  const tableNode = (b: GraphBuilder, file: string, trows: Record<string, unknown>[]) =>
+    b.node('key_table', `tbl ${file}`, { id: `key_table:${file}:1:1`, file, line: 1, end_line: 20, component: 'components/app', attrs: { var: 'tbl', form_line: 1, shape: 'vector', rows: trows } });
+  const plain = (line: number, keys: string[], extra: Record<string, unknown> = {}) => ({ line, keys, tags: {}, vecs: {}, ...extra });
+
+  it('a row with a dynamic key is not reported as lacking a key it may carry; it is an UNKNOWN row', () => {
+    const b = new GraphBuilder();
+    tableNode(b, 'src/app/core.clj', [plain(2, [':a', ':auth']), plain(3, [':a', ':auth']), plain(4, [':a', ':auth']), plain(5, [':a'], { dynamic_keys: 1 }), plain(6, [':a'])]);
+    const r = keySiblings(v2(b), 'src/app/core.clj');
+    assert.deepEqual(rows(r, 'findings').map((f) => f.line), [6]);
+    const unknown = rows(r, 'rows not provable');
+    assert.equal(unknown.length, 1);
+    assert.equal(unknown[0].band, 'unknown');
+    assert.equal(unknown[0].line, 5);
+    assert.match(unknown[0].label, /1 dynamic key\(s\).* :auth/);
+    assert.match(r.verdict, /1 row\(s\) not provable \(UNKNOWN\)/);
+  });
+
+  it('an unqualified query that hits a bare key exactly still names the qualified keys of the same local name', () => {
+    const b = new GraphBuilder();
+    const bare = b.node('key', ':email', { id: 'key::email' });
+    b.node('key', ':user/email', { id: 'key::user/email' });
+    b.node('key', ':other/email', { id: 'key::other/email' });
+    const p = b.def('a/p', 'components/a');
+    b.edge(p, 'produces_key', bare, { file: 'components/a/src/p.clj', line: 1, attrs: { via: 'assoc' } });
+    const r = keyFlow(v2(b), 'email');
+    assert.deepEqual(r.matches, ['key::email']);
+    assert.ok(r.notes.some((n) => /other keys with the local name email: :other\/email, :user\/email/.test(n)), r.notes.join('|'));
+  });
+
+  it('test files are told apart by one predicate: test/, tests/ and _test(s).clj', () => {
+    const b = new GraphBuilder();
+    const k = b.node('key', ':k', { id: 'key::k' });
+    const d = b.def('a/d', 'components/a');
+    const sites = ['src/a/test/x.clj', 'src/a/tests/x.clj', 'src/a/x_test.clj', 'src/a/x_tests.cljc', 'src/a/contest.clj'];
+    sites.forEach((file, i) => b.edge(d, 'consumes_key', k, { file, line: i + 1, attrs: { via: 'get' } }));
+    const r = keyFlow(v2(b), ':k');
+    assert.deepEqual(rows(r, 'in tests').map((x) => x.line).sort(), [1, 2, 3, 4]);
+    assert.deepEqual(rows(r, 'consumers').map((x) => x.file), ['src/a/contest.clj']);
+  });
+
+  it('a bare file name matching several files is ambiguous, an exact path is not', () => {
+    const b = new GraphBuilder();
+    const rs = [plain(2, [':a']), plain(3, [':a']), plain(4, [':a'])];
+    tableNode(b, 'src/app/core.clj', rs);
+    tableNode(b, 'src/web/core.clj', rs);
+    const g = v2(b);
+    const r = keySiblings(g, 'core.clj');
+    assert.equal(r.found, false);
+    assert.match(r.verdict, /matches 2 files/);
+    assert.deepEqual(r.next, ['key_siblings(target="src/app/core.clj")', 'key_siblings(target="src/web/core.clj")']);
+    assert.equal(keySiblings(g, 'src/app/core.clj').found, true);
   });
 });

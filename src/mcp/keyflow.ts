@@ -6,6 +6,9 @@ import { BANDS, inEdges, compareText, weakest } from './graph.ts';
 import {
   ambiguous, call, capabilityNotes, edgeRow, nodeRow, notFound, resolve, type QueryResult, type Row, type Section,
 } from './rows.ts';
+import { isTestFile } from './testfile.ts';
+
+export { isTestFile };
 
 export interface ParamDesc {
   kind: string;
@@ -116,7 +119,6 @@ function paramText(p: ParamDesc): string {
 const arityText = (a: ArityDesc) => `[${a.params.map(paramText).join(' ')}]${a.platform ? ` (${a.platform} only)` : ''}`;
 
 const keyList = (ks: string[]) => `{${ks.join(' ')}}`;
-export const isTestFile = (f: string | null | undefined) => !!f && /(^|\/)test\/|_test\.clj[sc]?$/.test(f);
 const normKey = (k: string) => (k.startsWith(':') ? k : `:${k}`);
 const shortName = (n: GraphNode) => n.name.split('/').pop() ?? n.name;
 
@@ -396,8 +398,10 @@ function resolveKey(g: Graph, query: string): GraphNode[] {
   const exact = g.byId.get(`key:${normKey(q)}`);
   if (exact) return [exact];
   const ln = q.replace(/^:+/, '');
-  return ln.includes('/') ? [] : (g.byKind.get('key') ?? []).filter((n) => localName(n.name) === ln);
+  return ln.includes('/') ? [] : sameLocalName(g, ln);
 }
+
+const sameLocalName = (g: Graph, ln: string): GraphNode[] => (g.byKind.get('key') ?? []).filter((n) => localName(n.name) === ln);
 
 function roleCount(g: Graph, id: string): string {
   const es = inEdges(g, id, KEY_EDGES);
@@ -444,7 +448,11 @@ export function keyFlow(g: Graph, query: string): QueryResult {
       : '';
   if (other) notes.push(`UNKNOWN: ${other} other use(s) of ${key.name} as a value or an argument — not provable as produce or consume; evidence: textual occurrences of ${key.name}`);
   if (!notes.some((n) => /dynamic key access/.test(n))) notes.push(DYNAMIC_NOTE);
-  if (!key.name.slice(1).includes('/')) notes.push(`${key.name} is unqualified: every map using that name is joined here`);
+  if (!key.name.slice(1).includes('/')) {
+    notes.push(`${key.name} is unqualified: every map using that name is joined here`);
+    const qualified = sameLocalName(g, localName(key.name)).filter((n) => n !== key).map((n) => n.name).sort(compareText);
+    if (qualified.length) notes.push(`other keys with the local name ${localName(key.name)}: ${qualified.slice(0, 5).join(', ')}${qualified.length > 5 ? ` +${qualified.length - 5} more` : ''}; query one by its qualified name`);
+  }
   const near = signal ? similarKeys(g, key.name, 3) : [];
   if (near.length) notes.push(`similar keys: ${near.map((n) => `${n.name} (${roleCount(g, n.id)})`).join(', ')}`);
   const table = (g.byKind.get('key_table') ?? []).find((t) => tableRows(t).some((r) => r.keys.includes(key.name)));
@@ -597,7 +605,10 @@ function resolveTables(g: Graph, target: string): GraphNode[] {
   if (!t) return [];
   const byId = g.byId.get(t);
   if (byId?.kind === 'key_table') return [byId];
-  const inFile = (f: string) => all.filter((n) => n.file === f || (!!n.file && n.file.endsWith(`/${f}`)));
+  const inFile = (f: string) => {
+    const exact = all.filter((n) => n.file === f);
+    return exact.length ? exact : all.filter((n) => !!n.file && n.file.endsWith(`/${f}`));
+  };
   const m = t.match(/^(.*?):(\d+)$/);
   if (m) {
     const line = Number.parseInt(m[2], 10);
@@ -619,6 +630,15 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
     const nf = notFound('key_siblings', target, title, 'literal table (3+ map rows)', 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
     return { ...nf, notes: [...notes, ...nf.notes] };
   }
+  const files = [...new Set(tables.map((t) => t.file ?? ''))];
+  if (files.length > 1) {
+    const firstPerFile = files.map((f) => tables.find((t) => (t.file ?? '') === f) as GraphNode);
+    return {
+      ...ambiguous('key_siblings', target, title, firstPerFile, 'target'),
+      verdict: `${JSON.stringify(target)} matches ${files.length} files; pass one repo-relative path`,
+      next: files.slice(0, 3).map((f) => call('key_siblings', { target: f })),
+    };
+  }
   const pool = opts.pool ?? tablePool(g);
   const findings: Row[] = [];
   const tableOut: Row[] = [];
@@ -634,6 +654,15 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
     const strong = (x: SiblingFinding['missing'][number]) => opts.maxAbsent === undefined || (x.of - x.have) / x.of < opts.maxAbsent;
     for (const raw of a.findings) {
       const f = { ...raw, missing: raw.missing.filter(strong) };
+      const dynamic = f.row.dynamic_keys ?? 0;
+      if (dynamic && f.missing.length) {
+        unknown.push({
+          label: `${t.name}: row ${rowLabel(f.row)} has ${dynamic} dynamic key(s) and may carry ${f.missing.map((x) => x.key).join(' ')}`,
+          id: `${t.id}@${f.row.line}`, file: t.file ?? null, line: f.row.line, band: 'unknown', ...(t.component ? { component: t.component } : {}),
+          reason: 'a dynamic key is not provable, so the absence of the sibling keys is not either',
+        });
+        continue;
+      }
       if (!f.missing.length) {
         weak += 1;
         continue;
@@ -669,7 +698,7 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
   const holder = tables.find((t) => findings[0]?.id.startsWith(`${t.id}@`) && typeof t.attrs?.var === 'string') ?? tables.find((t) => typeof t.attrs?.var === 'string');
   return {
     name: 'key_siblings', query: target, title, found: true, matches: tables.map((t) => t.id),
-    verdict: `${findings.length} row(s) lack a key their siblings have, in ${tables.length} table(s) with ${rowCount} map rows${unknown.length ? `; ${unknown.length} row(s) not map literals (UNKNOWN)` : ''}`,
+    verdict: `${findings.length} row(s) lack a key their siblings have, in ${tables.length} table(s) with ${rowCount} map rows${unknown.length ? `; ${unknown.length} row(s) not provable (UNKNOWN)` : ''}`,
     sections: [
       { name: 'findings', rows: findings, ordered: true, searched: `rows missing a key that ${Math.round(MAJORITY * 100)}%+ of siblings or a path sibling have, minus absences shared by same-kind rows` },
       { name: 'tables', rows: tableOut, ordered: true },
