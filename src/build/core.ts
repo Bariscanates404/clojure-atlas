@@ -2,7 +2,7 @@
 // defines (namespace -> definition), requires (namespace -> namespace), each var usage as the relation relations.ts
 // names (calls, references, passes_callback, registers_handler, expands_via, rebinds) and tests (a deftest -> what it uses).
 import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
-import { isTestFile } from '../mcp/keyflow.ts';
+import { isTestFile } from '../shared/testfile.ts';
 import type { NsUse, VarDef, VarUse } from './analysis.ts';
 import { defId, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids, textOf } from './reader.ts';

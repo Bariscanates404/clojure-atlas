@@ -3,14 +3,14 @@
 import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gunzipSync } from 'node:zlib';
 import type { AtlasDocument } from './build/assemble.ts';
 import { buildGraph, DEFAULT_GRAPH, writeGraph } from './build/index.ts';
 import { coverageRow, coverageTable, pct } from './coverage.ts';
-import { loadGraph } from './mcp/graph.ts';
+import { GraphFormatError, loadGraph, type Graph } from './mcp/graph.ts';
 import { serveStdio } from './mcp/server.ts';
 import { analyzerFor, snapshotOf } from './snapshot.ts';
 import { VERSION } from './version.ts';
+import { shortSha } from './shared/sha.ts';
 
 const USAGE = `usage:
   clojure-atlas build [dir] [-o ${DEFAULT_GRAPH}]
@@ -90,15 +90,21 @@ function requireGraph(file: string): string {
   return file;
 }
 
-function readDocument(file: string): AtlasDocument {
+// The one way the command line loads a graph, for the server and for coverage alike: loadGraph checks the
+// format, version and shape, and its complaint gets the way out appended.
+function readGraph(file: string): Graph {
   try {
-    const bytes = readFileSync(requireGraph(file));
-    const text = (file.endsWith('.gz') ? gunzipSync(bytes) : bytes).toString('utf8');
-    return JSON.parse(text) as AtlasDocument;
+    return loadGraph(requireGraph(file));
   } catch (err) {
-    if (!(err instanceof Error) || err.message.startsWith('no graph at')) throw err;
-    throw new Error(`${file} is not a readable graph (${err.message}); run \`clojure-atlas build\` again`);
+    if (err instanceof GraphFormatError) throw new Error(`${err.message}; run \`clojure-atlas build\` again`);
+    throw err;
   }
+}
+
+function readDocument(file: string): AtlasDocument {
+  const doc = readGraph(file).doc as unknown as Partial<AtlasDocument>;
+  if (!doc.stats?.usages) throw new Error(`${file} carries no build statistics, so there is no coverage to show; run \`clojure-atlas build\` again`);
+  return doc as AtlasDocument;
 }
 
 async function build(dir: string, outArg: string | undefined): Promise<void> {
@@ -122,8 +128,8 @@ async function main(argv: string[]): Promise<void> {
   } else if (c.cmd === 'build') {
     await build(c.dir, c.out);
   } else if (c.cmd === 'mcp') {
-    const g = loadGraph(requireGraph(c.graph));
-    process.stderr.write(`clojure-atlas: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges at ${g.doc.source.sha.slice(0, 10)}\n`);
+    const g = readGraph(c.graph);
+    process.stderr.write(`clojure-atlas: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges at ${shortSha(g.doc.source.sha)}\n`);
     const repo = c.repo;
     const analyzer = analyzerFor(g.doc.source.analyzer);
     serveStdio(g, {

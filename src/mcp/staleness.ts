@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { UNVERSIONED, type Snapshot } from '../snapshot.ts';
 import type { Graph } from './graph.ts';
+import { shortSha } from '../shared/sha.ts';
 
 export const DEFAULT_MAX_DISTANCE = 20;
 
@@ -23,7 +24,7 @@ export interface Staleness {
 }
 
 // A full hex sha is shortened to ten characters; any other name (a branch, a tag) is shown whole.
-const short = (s: string) => (/^[0-9a-f]{11,}$/i.test(s) ? s.slice(0, 10) : s);
+const short = shortSha;
 
 export function gitDistance(repoDir: string): (graphSha: string, base: string) => number | null {
   return (graphSha, base) => {

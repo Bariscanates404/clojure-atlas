@@ -2,7 +2,7 @@
 // from the defmulti through a HEURISTIC may_dispatch_to edge (the dispatch value at runtime picks the method).
 // A top-level defmethod owns the usages in its body.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
-import { isTestFile } from '../../mcp/keyflow.ts';
+import { isTestFile } from '../../shared/testfile.ts';
 import type { Span, VarUse } from '../analysis.ts';
 import { contains, formAt, kids } from '../reader.ts';
 import { CORE_NS, defId, groupBy, nsId, type Adapter, type Container, type Context } from '../model.ts';

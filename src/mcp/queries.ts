@@ -8,7 +8,7 @@ import {
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
-import { isTestFile } from './testfile.ts';
+import { isTestFile } from '../shared/testfile.ts';
 
 export { entryOf, resolve, type QueryResult, type Row, type Section } from './rows.ts';
 

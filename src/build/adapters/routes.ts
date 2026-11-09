@@ -2,7 +2,7 @@
 // first element is a literal path, followed into the functions that return route trees and under router :data.
 // Edges: routes_to (handler), guarded_by (middleware, outermost first), and the authz .clojure-atlas.edn declares.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
-import { isTestFile } from '../../mcp/keyflow.ts';
+import { isTestFile } from '../../shared/testfile.ts';
 import type { VarUse } from '../analysis.ts';
 import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
 import { CORE_NS, defId, groupBy, type Adapter, type Context, type Owner } from '../model.ts';

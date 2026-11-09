@@ -6,9 +6,8 @@ import { BANDS, inEdges, compareText, weakest } from './graph.ts';
 import {
   ambiguous, call, capabilityNotes, edgeRow, nodeRow, notFound, resolve, type QueryResult, type Row, type Section,
 } from './rows.ts';
-import { isTestFile } from './testfile.ts';
+import { isTestFile } from '../shared/testfile.ts';
 
-export { isTestFile };
 
 export interface ParamDesc {
   kind: string;

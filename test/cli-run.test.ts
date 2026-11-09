@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { after, describe, it } from 'node:test';
 import { fixtureDir } from './helpers/atlas-fixture.ts';
 
@@ -73,6 +74,17 @@ describe('clojure-atlas command line', () => {
     assert.match(text, /\n.*1 commit/);
   });
 
+  it('the startup line shows a hex commit cut to 10 characters and "unversioned" whole', () => {
+    const doc = JSON.parse(gunzipSync(readFileSync(graph)).toString('utf8'));
+    const line = (sha: string) => {
+      const file = path.join(work, `sha-${sha.length}.json`);
+      writeFileSync(file, JSON.stringify({ ...doc, source: { ...doc.source, sha } }));
+      return run(['mcp', '--graph', file]).err;
+    };
+    assert.match(line('unversioned'), /edges at unversioned\n/);
+    assert.match(line('0123456789abcdef0123456789abcdef01234567'), /edges at 0123456789\n/);
+  });
+
   it('prints the usage: exit 0 when asked, 2 for a usage error, 1 with the reason on an error', () => {
     assert.deepEqual([run([]).code, run(['--help']).code], [0, 0]);
     assert.match(run(['--help']).out, /^usage:\n {2}clojure-atlas build/);
@@ -102,7 +114,19 @@ describe('clojure-atlas command line', () => {
     assert.match(mcp.err, /no graph at .*none\.gz; run `clojure-atlas build` first/);
     const garbage = path.join(work, 'garbage.gz');
     writeFileSync(garbage, 'garbage');
-    assert.match(run(['coverage', garbage]).err, /garbage\.gz is not a readable graph .*run `clojure-atlas build` again/);
+    for (const cmd of [['coverage', garbage], ['mcp', '--graph', garbage]]) {
+      assert.match(run(cmd).err, /garbage\.gz: not valid JSON.*run `clojure-atlas build` again/);
+    }
+    const wrong = path.join(work, 'wrong-format.json');
+    writeFileSync(wrong, JSON.stringify({ format: 'something-else', version: 1 }));
+    for (const cmd of [['coverage', wrong], ['mcp', '--graph', wrong]]) {
+      const r = run(cmd);
+      assert.equal(r.code, 1);
+      assert.match(r.err, /wrong-format\.json.*format.*run `clojure-atlas build` again/);
+    }
+    const bare = path.join(work, 'no-stats.json');
+    writeFileSync(bare, JSON.stringify({ ...JSON.parse(gunzipSync(readFileSync(graph)).toString('utf8')), stats: undefined }));
+    assert.match(run(['coverage', bare]).err, /no-stats\.json carries no build statistics/);
     assert.match(run(['build', path.join(work, 'nope')]).err, /nope is not a directory/);
     assert.match(run(['build', repo, '-o', work]).err, /is a directory; name the graph file/);
     const dir = path.join(work, 'badmcp');
