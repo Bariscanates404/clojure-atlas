@@ -15,7 +15,7 @@ const FIXTURES: [string, string][] = [
   ['relations', 'calls vs references vs passed callbacks (vector, partial, comp, apply, alias, closure, empty map), a handler registered with add-watch, macro expansion, binding/with-redefs as UNKNOWN, dispatch candidates for defmulti, extend-type, extend-protocol, reify'],
   ['multimethods', 'defmethod nodes, resolved keyword dispatch, heuristic dispatch edges, a library multimethod'],
   ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event, the re-frame.alpha re-exports'],
-  ['routes', 'compojure context mounts, reitit route data with middleware, pedestal table routes and interceptors'],
+  ['routes', 'compojure context mounts (also through route vars and non-literal paths), reitit route data with middleware and router interceptors, pedestal table routes and interceptors, handler calls, branching bodies, duplicate routes'],
   ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],
   ['system', 'integrant init-key, refs in edn and code, composite keys, mount defstate, component system-map'],

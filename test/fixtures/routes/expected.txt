@@ -1,4 +1,12 @@
 node definition:web.compojure-app/app [definition] src/web/compojure_app.clj:5 {"defined_by":"compojure.core/defroutes"}
+node definition:web.data-more/api [definition] src/web/data_more.clj:10 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/dup1 [definition] src/web/data_more.clj:16 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/dup2 [definition] src/web/data_more.clj:17 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/r2 [definition] src/web/data_more.clj:12 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/r3 [definition] src/web/data_more.clj:18 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/r4 [definition] src/web/data_more.clj:20 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/table [definition] src/web/data_more.clj:22 {"defined_by":"clojure.core/def"}
+node definition:web.data-more/users [definition] src/web/data_more.clj:7 {"defined_by":"clojure.core/def"}
 node definition:web.handlers/audit [definition] src/web/handlers.clj:9 {"defined_by":"clojure.core/def"}
 node definition:web.handlers/create-item [definition] src/web/handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
 node definition:web.handlers/health [definition] src/web/handlers.clj:2 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
@@ -7,41 +15,128 @@ node definition:web.handlers/show-user [definition] src/web/handlers.clj:3 {"def
 node definition:web.handlers/upload [definition] src/web/handlers.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"req","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:web.handlers/wrap-auth [definition] src/web/handlers.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:web.handlers/wrap-log [definition] src/web/handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.more-handlers/a [definition] src/web/more_handlers.clj:10 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/auth-ic [definition] src/web/more_handlers.clj:12 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.more-handlers/b [definition] src/web/more_handlers.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/db [definition] src/web/more_handlers.clj:3 {"defined_by":"clojure.core/def"}
+node definition:web.more-handlers/layout [definition] src/web/more_handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.more-handlers/list-users [definition] src/web/more_handlers.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_db","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/mw [definition] src/web/more_handlers.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"h","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:web.more-handlers/other [definition] src/web/more_handlers.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/page [definition] src/web/more_handlers.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/profile [definition] src/web/more_handlers.clj:15 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/real-handler [definition] src/web/more_handlers.clj:14 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/root [definition] src/web/more_handlers.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.more-handlers/show [definition] src/web/more_handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:web.mounts/app [definition] src/web/mounts.clj:14 {"defined_by":"compojure.core/defroutes"}
+node definition:web.mounts/outer [definition] src/web/mounts.clj:19 {"defined_by":"compojure.core/defroutes"}
+node definition:web.mounts/pages [definition] src/web/mounts.clj:9 {"defined_by":"compojure.core/defroutes"}
+node definition:web.mounts/user-routes [definition] src/web/mounts.clj:5 {"defined_by":"compojure.core/defroutes"}
 node definition:web.pedestal-app/table [definition] src/web/pedestal_app.clj:5 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/app [definition] src/web/reitit_app.clj:13 {"defined_by":"clojure.core/def"}
 node definition:web.reitit-app/routes [definition] src/web/reitit_app.clj:5 {"defined_by":"clojure.core/def"}
 node key::body [key] undefined:undefined
-node key::get [key] undefined:undefined {"other_uses":2}
+node key::conn [key] undefined:undefined
+node key::data [key] undefined:undefined
+node key::get [key] undefined:undefined {"other_uses":4}
 node key::handler [key] undefined:undefined
+node key::interceptors [key] undefined:undefined
 node key::middleware [key] undefined:undefined
 node key::name [key] undefined:undefined
 node key::post [key] undefined:undefined
 node key::status [key] undefined:undefined
 node namespace:web.compojure-app [namespace] src/web/compojure_app.clj:1
+node namespace:web.data-more [namespace] src/web/data_more.clj:1
 node namespace:web.handlers [namespace] src/web/handlers.clj:1
+node namespace:web.more-handlers [namespace] src/web/more_handlers.clj:1
+node namespace:web.mounts [namespace] src/web/mounts.clj:1
 node namespace:web.pedestal-app [namespace] src/web/pedestal_app.clj:1
 node namespace:web.reitit-app [namespace] src/web/reitit_app.clj:1
 node route:ANY /ping @web.reitit-app/app [route] src/web/reitit_app.clj:6 {"method":"any","path":"/ping","full_path":"/ping","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:GET / @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:10 {"method":"get","path":"/","full_path":"/api/users/:id/","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
+node route:GET / @web.mounts/user-routes/v1/api/users [route] src/web/mounts.clj:6 {"method":"get","path":"/","full_path":"/v1/api/users/","base":"web.mounts/user-routes","mount":"/v1/api/users","library":"compojure"}
+node route:GET /a @web.data-more/r2 [route] src/web/data_more.clj:12 {"method":"get","path":"/a","full_path":"/a","base":"web.data-more/r2","mount":"","library":"pedestal, reitit"}
 node route:GET /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:9 {"method":"get","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
+node route:GET /api/users @web.data-more/api [route] src/web/data_more.clj:8 {"method":"get","path":"/api/users","full_path":"/api/users","base":"web.data-more/api","mount":"","library":"pedestal, reitit"}
 node route:GET /health @web.compojure-app/app [route] src/web/compojure_app.clj:6 {"method":"get","path":"/health","full_path":"/health","base":"web.compojure-app/app","mount":"","library":"compojure"}
 node route:GET /health @web.pedestal-app/table [route] src/web/pedestal_app.clj:8 {"method":"get","path":"/health","full_path":"/health","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
 node route:GET /home @web.reitit-app/app [route] src/web/reitit_app.clj:7 {"method":"get","path":"/home","full_path":"/home","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:GET /items @web.pedestal-app/table [route] src/web/pedestal_app.clj:7 {"method":"get","path":"/items","full_path":"/items","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
+node route:GET /m @web.data-more/r4 [route] src/web/data_more.clj:20 {"method":"get","path":"/m","full_path":"/m","base":"web.data-more/r4","mount":"","library":"pedestal, reitit"}
+node route:GET /me @web.mounts/user-routes/v1/api/users [route] src/web/mounts.clj:7 {"method":"get","path":"/me","full_path":"/v1/api/users/me","base":"web.mounts/user-routes","mount":"/v1/api/users","library":"compojure"}
+node route:GET /p @web.mounts/pages/v1/api [route] src/web/mounts.clj:10 {"method":"get","path":"/p","full_path":"/v1/api/p","base":"web.mounts/pages","mount":"/v1/api","library":"compojure"}
+node route:GET /pu/:id @web.data-more/table [route] src/web/data_more.clj:24 {"method":"get","path":"/pu/:id","full_path":"/pu/:id","base":"web.data-more/table","mount":"","library":"pedestal, reitit"}
+node route:GET /pu/:id/profile @web.data-more/table [route] src/web/data_more.clj:25 {"method":"get","path":"/pu/:id/profile","full_path":"/pu/:id/profile","base":"web.data-more/table","mount":"","library":"pedestal, reitit"}
+node route:GET /q @web.mounts/pages/v1/api [route] src/web/mounts.clj:11 {"method":"get","path":"/q","full_path":"/v1/api/q","base":"web.mounts/pages","mount":"/v1/api","library":"compojure"}
+node route:GET /r @web.mounts/pages/v1/api [route] src/web/mounts.clj:12 {"method":"get","path":"/r","full_path":"/v1/api/r","base":"web.mounts/pages","mount":"/v1/api","library":"compojure"}
 node route:GET /report @web.compojure-app/app [route] src/web/compojure_app.clj:7 {"method":"get","path":"/report","full_path":"/report","base":"web.compojure-app/app","mount":"","library":"compojure"}
+node route:GET /x @web.data-more/r3 [route] src/web/data_more.clj:16 {"method":"get","path":"/x","full_path":"/x","base":"web.data-more/r3","mount":"","library":"pedestal, reitit","conflict":2}
+node route:GET /z @web.mounts/app/v1/api{?} [route] src/web/mounts.clj:16 {"method":"get","path":"/z","full_path":"/v1/api{?}/z","base":"web.mounts/app","mount":"/v1/api{?}","library":"compojure"}
 node route:POST /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:9 {"method":"post","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:POST /avatar @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:11 {"method":"post","path":"/avatar","full_path":"/api/users/:id/avatar","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
+node route:POST /b @web.data-more/r2 [route] src/web/data_more.clj:13 {"method":"post","path":"/b","full_path":"/b","base":"web.data-more/r2","mount":"","library":"pedestal, reitit"}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6 {"arity":0,"arity_band":"static_proven"}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:10 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"id"}]}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:7 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"req"}]}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:7 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.data-more/api -references-> definition:web.data-more/users static_proven src/web/data_more.clj:10
+edge definition:web.data-more/dup1 -produces_key-> key::get static_proven src/web/data_more.clj:16 {"via":"map-literal"}
+edge definition:web.data-more/dup1 -produces_key-> key::handler static_proven src/web/data_more.clj:16 {"via":"map-literal"}
+edge definition:web.data-more/dup1 -references-> definition:web.more-handlers/show static_proven src/web/data_more.clj:16
+edge definition:web.data-more/dup2 -produces_key-> key::get static_proven src/web/data_more.clj:17 {"via":"map-literal"}
+edge definition:web.data-more/dup2 -produces_key-> key::handler static_proven src/web/data_more.clj:17 {"via":"map-literal"}
+edge definition:web.data-more/dup2 -references-> definition:web.more-handlers/other static_proven src/web/data_more.clj:17
+edge definition:web.data-more/r2 -produces_key-> key::data static_proven src/web/data_more.clj:14 {"via":"map-literal"}
+edge definition:web.data-more/r2 -produces_key-> key::get static_proven src/web/data_more.clj:12 {"via":"map-literal"}
+edge definition:web.data-more/r2 -produces_key-> key::handler static_proven src/web/data_more.clj:12 {"via":"map-literal"}
+edge definition:web.data-more/r2 -produces_key-> key::handler static_proven src/web/data_more.clj:13 {"via":"map-literal"}
+edge definition:web.data-more/r2 -produces_key-> key::interceptors static_proven src/web/data_more.clj:14 {"via":"map-literal"}
+edge definition:web.data-more/r2 -produces_key-> key::post static_proven src/web/data_more.clj:13 {"via":"map-literal"}
+edge definition:web.data-more/r2 -references-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:14
+edge definition:web.data-more/r2 -references-> definition:web.more-handlers/other static_proven src/web/data_more.clj:13
+edge definition:web.data-more/r2 -references-> definition:web.more-handlers/show static_proven src/web/data_more.clj:12
+edge definition:web.data-more/r3 -references-> definition:web.data-more/dup1 static_proven src/web/data_more.clj:18
+edge definition:web.data-more/r3 -references-> definition:web.data-more/dup2 static_proven src/web/data_more.clj:18
+edge definition:web.data-more/r4 -calls-> definition:web.more-handlers/mw static_proven src/web/data_more.clj:20 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.data-more/r4 -produces_key-> key::get static_proven src/web/data_more.clj:20 {"via":"map-literal"}
+edge definition:web.data-more/r4 -produces_key-> key::handler static_proven src/web/data_more.clj:20 {"via":"map-literal"}
+edge definition:web.data-more/r4 -produces_key-> key::middleware static_proven src/web/data_more.clj:20 {"via":"map-literal"}
+edge definition:web.data-more/r4 -references-> definition:web.more-handlers/show static_proven src/web/data_more.clj:20
+edge definition:web.data-more/table -calls-> definition:web.more-handlers/real-handler static_proven src/web/data_more.clj:24 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"req"}]}
+edge definition:web.data-more/table -references-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:24
+edge definition:web.data-more/table -references-> definition:web.more-handlers/profile static_proven src/web/data_more.clj:25
+edge definition:web.data-more/users -calls-> definition:web.more-handlers/list-users static_proven src/web/data_more.clj:8 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"h/db"}]}
+edge definition:web.data-more/users -produces_key-> key::get static_proven src/web/data_more.clj:8 {"via":"map-literal"}
+edge definition:web.data-more/users -produces_key-> key::handler static_proven src/web/data_more.clj:8 {"via":"map-literal"}
+edge definition:web.data-more/users -references-> definition:web.more-handlers/db static_proven src/web/data_more.clj:8
 edge definition:web.handlers/audit -produces_key-> key::name static_proven src/web/handlers.clj:9 {"via":"map-literal"}
 edge definition:web.handlers/create-item -produces_key-> key::status static_proven src/web/handlers.clj:8 {"via":"map-literal"}
 edge definition:web.handlers/health -produces_key-> key::status static_proven src/web/handlers.clj:2 {"via":"map-literal"}
 edge definition:web.handlers/list-items -produces_key-> key::status static_proven src/web/handlers.clj:7 {"via":"map-literal"}
 edge definition:web.handlers/show-user -produces_key-> key::body static_proven src/web/handlers.clj:3 {"via":"map-literal"}
 edge definition:web.handlers/show-user -produces_key-> key::status static_proven src/web/handlers.clj:3 {"via":"map-literal"}
+edge definition:web.more-handlers/a -produces_key-> key::status static_proven src/web/more_handlers.clj:10 {"via":"map-literal"}
+edge definition:web.more-handlers/b -produces_key-> key::status static_proven src/web/more_handlers.clj:11 {"via":"map-literal"}
+edge definition:web.more-handlers/db -produces_key-> key::conn static_proven src/web/more_handlers.clj:3 {"via":"map-literal"}
+edge definition:web.more-handlers/list-users -produces_key-> key::status static_proven src/web/more_handlers.clj:4 {"via":"map-literal"}
+edge definition:web.more-handlers/other -produces_key-> key::status static_proven src/web/more_handlers.clj:7 {"via":"map-literal"}
+edge definition:web.more-handlers/page -produces_key-> key::status static_proven src/web/more_handlers.clj:9 {"via":"map-literal"}
+edge definition:web.more-handlers/profile -produces_key-> key::status static_proven src/web/more_handlers.clj:15 {"via":"map-literal"}
+edge definition:web.more-handlers/real-handler -produces_key-> key::status static_proven src/web/more_handlers.clj:14 {"via":"map-literal"}
+edge definition:web.more-handlers/root -produces_key-> key::status static_proven src/web/more_handlers.clj:5 {"via":"map-literal"}
+edge definition:web.more-handlers/show -produces_key-> key::status static_proven src/web/more_handlers.clj:6 {"via":"map-literal"}
+edge definition:web.mounts/app -passes_callback-> definition:web.more-handlers/show static_proven src/web/mounts.clj:16 {"via":"GET"}
+edge definition:web.mounts/app -references-> definition:web.mounts/pages static_proven src/web/mounts.clj:17
+edge definition:web.mounts/app -references-> definition:web.mounts/user-routes static_proven src/web/mounts.clj:15
+edge definition:web.mounts/outer -references-> definition:web.mounts/app static_proven src/web/mounts.clj:20
+edge definition:web.mounts/pages -calls-> definition:web.more-handlers/a static_proven src/web/mounts.clj:11 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.mounts/pages -calls-> definition:web.more-handlers/b static_proven src/web/mounts.clj:11 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.mounts/pages -calls-> definition:web.more-handlers/layout static_proven src/web/mounts.clj:10 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.mounts/pages -calls-> definition:web.more-handlers/other static_proven src/web/mounts.clj:12 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:web.mounts/pages -calls-> definition:web.more-handlers/page static_proven src/web/mounts.clj:10 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.mounts/user-routes -calls-> definition:web.more-handlers/root static_proven src/web/mounts.clj:6 {"arity":1,"arity_band":"static_proven"}
+edge definition:web.mounts/user-routes -passes_callback-> definition:web.more-handlers/show static_proven src/web/mounts.clj:7 {"via":"GET"}
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
 edge definition:web.pedestal-app/table -references-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
@@ -62,6 +157,15 @@ edge definition:web.reitit-app/routes -references-> definition:web.handlers/wrap
 edge definition:web.reitit-app/routes -references-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:8
 edge namespace:web.compojure-app -defines-> definition:web.compojure-app/app static_proven src/web/compojure_app.clj:5
 edge namespace:web.compojure-app -requires-> namespace:web.handlers static_proven src/web/compojure_app.clj:3
+edge namespace:web.data-more -defines-> definition:web.data-more/api static_proven src/web/data_more.clj:10
+edge namespace:web.data-more -defines-> definition:web.data-more/dup1 static_proven src/web/data_more.clj:16
+edge namespace:web.data-more -defines-> definition:web.data-more/dup2 static_proven src/web/data_more.clj:17
+edge namespace:web.data-more -defines-> definition:web.data-more/r2 static_proven src/web/data_more.clj:12
+edge namespace:web.data-more -defines-> definition:web.data-more/r3 static_proven src/web/data_more.clj:18
+edge namespace:web.data-more -defines-> definition:web.data-more/r4 static_proven src/web/data_more.clj:20
+edge namespace:web.data-more -defines-> definition:web.data-more/table static_proven src/web/data_more.clj:22
+edge namespace:web.data-more -defines-> definition:web.data-more/users static_proven src/web/data_more.clj:7
+edge namespace:web.data-more -requires-> namespace:web.more-handlers static_proven src/web/data_more.clj:5
 edge namespace:web.handlers -defines-> definition:web.handlers/audit static_proven src/web/handlers.clj:9
 edge namespace:web.handlers -defines-> definition:web.handlers/create-item static_proven src/web/handlers.clj:8
 edge namespace:web.handlers -defines-> definition:web.handlers/health static_proven src/web/handlers.clj:2
@@ -70,6 +174,24 @@ edge namespace:web.handlers -defines-> definition:web.handlers/show-user static_
 edge namespace:web.handlers -defines-> definition:web.handlers/upload static_proven src/web/handlers.clj:4
 edge namespace:web.handlers -defines-> definition:web.handlers/wrap-auth static_proven src/web/handlers.clj:5
 edge namespace:web.handlers -defines-> definition:web.handlers/wrap-log static_proven src/web/handlers.clj:6
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/a static_proven src/web/more_handlers.clj:10
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/auth-ic static_proven src/web/more_handlers.clj:12
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/b static_proven src/web/more_handlers.clj:11
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/db static_proven src/web/more_handlers.clj:3
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/layout static_proven src/web/more_handlers.clj:8
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/list-users static_proven src/web/more_handlers.clj:4
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/mw static_proven src/web/more_handlers.clj:13
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/other static_proven src/web/more_handlers.clj:7
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/page static_proven src/web/more_handlers.clj:9
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/profile static_proven src/web/more_handlers.clj:15
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/real-handler static_proven src/web/more_handlers.clj:14
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/root static_proven src/web/more_handlers.clj:5
+edge namespace:web.more-handlers -defines-> definition:web.more-handlers/show static_proven src/web/more_handlers.clj:6
+edge namespace:web.mounts -defines-> definition:web.mounts/app static_proven src/web/mounts.clj:14
+edge namespace:web.mounts -defines-> definition:web.mounts/outer static_proven src/web/mounts.clj:19
+edge namespace:web.mounts -defines-> definition:web.mounts/pages static_proven src/web/mounts.clj:9
+edge namespace:web.mounts -defines-> definition:web.mounts/user-routes static_proven src/web/mounts.clj:5
+edge namespace:web.mounts -requires-> namespace:web.more-handlers static_proven src/web/mounts.clj:3
 edge namespace:web.pedestal-app -defines-> definition:web.pedestal-app/table static_proven src/web/pedestal_app.clj:5
 edge namespace:web.pedestal-app -requires-> namespace:web.handlers static_proven src/web/pedestal_app.clj:3
 edge namespace:web.reitit-app -defines-> definition:web.reitit-app/app static_proven src/web/reitit_app.clj:13
@@ -77,20 +199,41 @@ edge namespace:web.reitit-app -defines-> definition:web.reitit-app/routes static
 edge namespace:web.reitit-app -requires-> namespace:web.handlers static_proven src/web/reitit_app.clj:3
 edge route:ANY /ping @web.reitit-app/app -routes_to-> definition:web.handlers/health static_proven src/web/reitit_app.clj:6
 edge route:GET / @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:10
+edge route:GET / @web.mounts/user-routes/v1/api/users -routes_to-> definition:web.more-handlers/root static_proven src/web/mounts.clj:6
+edge route:GET /a @web.data-more/r2 -guarded_by-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:14 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:GET /a @web.data-more/r2 -routes_to-> definition:web.more-handlers/show static_proven src/web/data_more.clj:12
 edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:9 {"order":1,"level":"route"}
 edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:8 {"order":0,"level":"route","inherited_from":"/api"}
 edge route:GET /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/list-items static_proven src/web/reitit_app.clj:10
+edge route:GET /api/users @web.data-more/api -routes_to-> definition:web.more-handlers/db heuristic src/web/data_more.clj:8
+edge route:GET /api/users @web.data-more/api -routes_to-> definition:web.more-handlers/list-users static_proven src/web/data_more.clj:8
 edge route:GET /health @web.compojure-app/app -routes_to-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6
 edge route:GET /health @web.pedestal-app/table -routes_to-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
 edge route:GET /home @web.reitit-app/app -routes_to-> definition:web.handlers/health static_proven src/web/reitit_app.clj:7
 edge route:GET /items @web.pedestal-app/table -guarded_by-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7 {"order":0,"level":"route"}
 edge route:GET /items @web.pedestal-app/table -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
-edge route:GET /report @web.compojure-app/app -routes_to-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:7
+edge route:GET /m @web.data-more/r4 -guarded_by-> definition:web.more-handlers/mw heuristic src/web/data_more.clj:20 {"order":0,"level":"method"}
+edge route:GET /m @web.data-more/r4 -routes_to-> definition:web.more-handlers/show static_proven src/web/data_more.clj:20
+edge route:GET /me @web.mounts/user-routes/v1/api/users -routes_to-> definition:web.more-handlers/show static_proven src/web/mounts.clj:7
+edge route:GET /p @web.mounts/pages/v1/api -routes_to-> definition:web.more-handlers/layout static_proven src/web/mounts.clj:10
+edge route:GET /p @web.mounts/pages/v1/api -routes_to-> definition:web.more-handlers/page heuristic src/web/mounts.clj:10
+edge route:GET /pu/:id @web.data-more/table -guarded_by-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:24 {"order":0,"level":"route"}
+edge route:GET /pu/:id @web.data-more/table -routes_to-> definition:web.more-handlers/real-handler heuristic src/web/data_more.clj:24
+edge route:GET /pu/:id/profile @web.data-more/table -routes_to-> definition:web.more-handlers/profile static_proven src/web/data_more.clj:25
+edge route:GET /q @web.mounts/pages/v1/api -routes_to-> definition:web.more-handlers/a heuristic src/web/mounts.clj:11
+edge route:GET /q @web.mounts/pages/v1/api -routes_to-> definition:web.more-handlers/b heuristic src/web/mounts.clj:11
+edge route:GET /r @web.mounts/pages/v1/api -routes_to-> definition:web.more-handlers/other heuristic src/web/mounts.clj:12
+edge route:GET /report @web.compojure-app/app -routes_to-> definition:web.handlers/show-user heuristic src/web/compojure_app.clj:7
+edge route:GET /x @web.data-more/r3 -routes_to-> definition:web.more-handlers/other heuristic src/web/data_more.clj:17
+edge route:GET /x @web.data-more/r3 -routes_to-> definition:web.more-handlers/show heuristic src/web/data_more.clj:16
+edge route:GET /z @web.mounts/app/v1/api{?} -routes_to-> definition:web.more-handlers/show static_proven src/web/mounts.clj:16
 edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:9 {"order":1,"level":"route"}
 edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:11 {"order":2,"level":"method"}
 edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:8 {"order":0,"level":"route","inherited_from":"/api"}
 edge route:POST /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/create-item static_proven src/web/reitit_app.clj:11
 edge route:POST /avatar @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:11
-usages resolved=16 unresolved=0 unknown=0 not-vars=0 external=22
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, pedestal, reitit:16 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:13 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
-files sources=4 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
+edge route:POST /b @web.data-more/r2 -guarded_by-> definition:web.more-handlers/auth-ic static_proven src/web/data_more.clj:14 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:POST /b @web.data-more/r2 -routes_to-> definition:web.more-handlers/other static_proven src/web/data_more.clj:13
+usages resolved=42 unresolved=0 unknown=0 not-vars=0 external=67
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, pedestal, reitit:37 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:38 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=7 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

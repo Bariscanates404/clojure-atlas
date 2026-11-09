@@ -173,7 +173,8 @@ edge route:GET /api/orders @shop.routes/app -guarded_by-> definition:shop.auth/w
 edge route:GET /api/orders @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
 edge route:GET /api/orders @shop.routes/app -requires_permission-> permission::admin static_proven src/shop/routes.clj:9 {"check":1,"checks":1,"alternative":2,"alternatives":2,"all_of":1,"tenant":"auth/tenant-of"}
 edge route:GET /api/orders @shop.routes/app -requires_permission-> permission::read-orders static_proven src/shop/routes.clj:9 {"check":1,"checks":1,"alternative":1,"alternatives":2,"all_of":1,"tenant":"auth/tenant-of"}
-edge route:GET /api/orders @shop.routes/app -routes_to-> definition:shop.handlers/list-orders static_proven src/shop/routes.clj:8
+edge route:GET /api/orders @shop.routes/app -routes_to-> definition:shop.handlers/collect static_proven src/shop/routes.clj:8
+edge route:GET /api/orders @shop.routes/app -routes_to-> definition:shop.handlers/list-orders heuristic src/shop/routes.clj:8
 edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-permission static_proven src/shop/routes.clj:14 {"order":2,"level":"route"}
 edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22 {"order":1,"level":"route","inherited_from":"/api"}
 edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
@@ -198,5 +199,5 @@ edge route:POST /catalog/export @shop.catalog/catalog-routes -routes_to-> defini
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::edit-catalog static_proven src/shop/catalog.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
 usages resolved=25 unresolved=0 unknown=0 not-vars=0 external=28
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:35 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:41 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:36 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:41 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=8 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
