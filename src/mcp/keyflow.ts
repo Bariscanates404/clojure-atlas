@@ -4,7 +4,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { BANDS, inEdges, compareText, weakest } from './graph.ts';
 import {
-  ambiguous, call, capabilityNotes, edgeRow, nodeRow, notFound, resolve, type QueryResult, type Row, type Section,
+  ambiguous, call, capabilityNotes, edgeRow, gated, nodeRow, notFound, resolve, type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { isTestFile } from '../shared/testfile.ts';
 
@@ -338,11 +338,11 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     verdict.push(`${a.rows.filter((r) => r.band !== 'unknown').length} caller(s) affected by the change${a.summary.length ? ` (${a.summary.join('; ')})` : ''}`);
   }
   const findings = [...f.arityMissing, ...f.neverPassed, ...f.unread];
-  sections.push(
+  sections.push(...gated(g, ['signatures'], [
     { name: 'findings', rows: findings, ordered: true, searched: 'arity mismatches, destructured keys no caller passes, passed keys the function never reads' },
     { name: 'arities', rows: arityRows, ordered: true },
     { name: 'callers', rows: callerSection, searched: 'calls edges into the definition, plus value uses (apply, partial)' },
-  );
+  ]));
   notes.push(...f.unprovable);
   if (valueRows.length) notes.push(`${valueRows.length} use(s) through apply, partial or as a value: their arity and keys are not provable`);
   const comps = new Set(callerSection.map((r) => r.component ?? '(no component)'));
@@ -465,12 +465,12 @@ export function keyFlow(g: Graph, query: string): QueryResult {
   return {
     name: 'key_flow', query, title, found: true, matches: [key.id],
     verdict: `${prod.length} producer(s), ${cons.length} consumer(s)${rem.length ? `, ${rem.length} remover(s)` : ''} in ${comps.size} component(s); ${tests.length} site(s) in tests${signal ? `; ${signal}` : ''}`,
-    sections: [
+    sections: gated(g, ['key_flow'], [
       { name: 'producers', rows: prod, searched: 'map-literal keys, assoc / assoc-in / update paths, hash-map, [:db/add e k v]' },
       { name: 'consumers', rows: cons, searched: 'keyword as fn, get / get-in / contains? / find / select-keys, destructuring, pull patterns, datalog queries' },
       ...(rem.length ? [{ name: 'removed by', short: 'removed', rows: rem }] : []),
       { name: 'in tests', short: 'tests', rows: tests },
-    ],
+    ]),
     notes,
     next: [
       ...(table?.file ? [call('key_siblings', { target: table.file })] : []),

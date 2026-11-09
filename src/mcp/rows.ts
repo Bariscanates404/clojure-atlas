@@ -40,6 +40,8 @@ export interface Section {
   searched?: string;
   // short name for counts and paging hints
   short?: string;
+  // why the extractor could not see this kind of fact: an empty section then reads "not extracted", never "none"
+  unextracted?: string;
 }
 
 export interface QueryResult {
@@ -117,6 +119,21 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
     ...(unparsed.length ? { unparsed } : {}),
   };
 }
+
+// The reason an empty section is no statement about the code: a capability the graph lacks or lists as absent.
+export function unextractedBy(g: Graph, caps: string[]): string | undefined {
+  const why = caps.flatMap((n) => {
+    const c = capability(g, n);
+    return !c ? [`${n} is not in this graph`] : c.status !== 'available' ? [`${n} is ${c.status}`] : [];
+  });
+  return why.length ? `not extracted (${why.join('; ')})` : undefined;
+}
+
+// The sections, each marked unextracted when the capability that fills it is missing.
+export const gated = (g: Graph, caps: string[], sections: Section[]): Section[] => {
+  const why = unextractedBy(g, caps);
+  return why ? sections.map((s) => ({ ...s, unextracted: s.unextracted ?? why })) : sections;
+};
 
 // A missing capability makes an empty answer meaningless; say so instead of letting it read as "none".
 export function capabilityNotes(g: Graph, names: string[]): string[] {

@@ -4,7 +4,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { BANDS, capability, inEdges, outEdges, weakest, compareText } from './graph.ts';
 import {
-  ambiguous, call, capabilityNotes, countBy, edgeRow, nodeRow, notFound, resolve, unknownNote,
+  ambiguous, call, capabilityNotes, countBy, edgeRow, gated, nodeRow, notFound, resolve, unknownNote,
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
@@ -68,10 +68,10 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
     verdict: `${rows.length} direct caller(s) in ${comps.size} component(s)${entries ? `, ${entries} entry point(s)` : ''}`,
     found: true,
     matches: [target.id],
-    sections: [
+    sections: gated(g, ['definitions'], [
       { name: 'definition', rows: [nodeRow(target)], ordered: true },
       { name: opts.includeReferences ? 'callers and references' : 'callers', rows, searched: 'call edges into this definition' },
-    ],
+    ]),
     counts: countBy(rows, (r) => r.component ?? '(no component)'),
     notes,
     next: [call('blast_radius', { var: target.name, depth: 2 }), call('tests_for', { symbol: target.name })],
@@ -182,7 +182,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
     verdict: `${rows.length} caller(s) over ${deepest} depth(s) in ${byComp.size} component(s)${entryRows.length ? `, ${entryRows.length} entry point(s) reach it` : ''}${capped ? ` (depth capped at ${max}${beyond ? ', more callers exist' : ''})` : ''}`,
     found: true,
     matches: [target.id],
-    sections,
+    sections: gated(g, ['definitions'], sections),
     counts: countBy(rows, (r) => r.component ?? '(no component)'),
     notes,
     next: [
@@ -312,18 +312,24 @@ export type AuthzState = 'permission' | 'exempt' | 'none' | 'unknown';
 const routeAuthzMissing = (g: Graph): boolean => capability(g, 'route_authz')?.status !== 'available';
 const ROUTE_AUTHZ_MISSING = 'not provable: route authz not in this graph';
 
+// The routes adapter sets attrs.middleware to "unknown" on a route whose middleware chain it could not read.
+const middlewareUnread = (route: GraphNode | undefined): boolean => route?.attrs?.middleware === 'unknown';
+const CHAIN_UNREAD_MORE = 'middleware not extracted: further checks UNKNOWN';
+
 export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; text: string } {
   const permE = outEdges(g, routeId, ['requires_permission']);
   const exempt = outEdges(g, routeId, ['exempted_by']);
   if (!permE.length && !exempt.length && routeAuthzMissing(g)) return { state: 'unknown', text: ROUTE_AUTHZ_MISSING };
+  const chainUnread = middlewareUnread(g.byId.get(routeId));
   if (permE.length) {
     const unknown = permE.some((e) => e.band === 'unknown');
     const guessed = !unknown && permE.some((e) => e.band === 'heuristic');
     const caveat = unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : guessed ? ' (HEURISTIC: confirm at the cited line)' : '';
-    const text = `requires ${permissionExpression(g, permE)}${caveat}`;
+    const text = `requires ${permissionExpression(g, permE)}${caveat}${chainUnread ? ` (${CHAIN_UNREAD_MORE})` : ''}`;
     return { state: unknown ? 'unknown' : 'permission', text };
   }
   if (exempt.length) return { state: 'exempt', text: `exempt: ${exempt.map((e) => g.byId.get(e.to)?.name ?? e.to).join('; ')}` };
+  if (chainUnread) return { state: 'unknown', text: `not provable: the route's middleware could not be read, and no check or exemption is recorded on the route itself (${CHAIN_UNREAD_MORE})` };
   return { state: 'none', text: 'NO permission check and NO exemption recorded' };
 }
 
@@ -381,13 +387,17 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
     const exempt = outEdges(g, r.id, ['exempted_by']).map((e) => edgeRow(g, e.to, e, { detail: 'exempt' }));
     const verdict = routeVerdict(g, r.id).text;
     verdicts.push(routes.length > 1 ? `${r.name}: ${verdict}` : verdict);
+    const unread = middlewareUnread(r);
     sections.push(
       { name: `${head}: verdict ${verdict}`, short: 'route', rows: [nodeRow(r)], ordered: true },
-      { name: `${head}: handler`, short: 'handler', rows: handler, ordered: true, searched: 'routes_to edges' },
-      { name: `${head}: middleware (outermost first)`, short: 'middleware', rows: mw, ordered: true, searched: 'guarded_by edges' },
-      { name: `${head}: permissions`, short: 'permissions', rows: perms, ordered: true, searched: 'requires_permission edges' },
-      { name: `${head}: exempt`, short: 'exempt', rows: exempt, ordered: true, searched: 'exempted_by edges' },
+      ...gated(g, ['routes'], [{ name: `${head}: handler`, short: 'handler', rows: handler, ordered: true, searched: 'routes_to edges' }]),
+      { name: `${head}: ${unread ? 'middleware' : 'middleware (outermost first)'}`, short: 'middleware', rows: mw, ordered: true, searched: 'guarded_by edges', ...(unread ? { unextracted: 'not extracted (UNKNOWN)' } : {}) },
+      ...gated(g, ['route_authz'], [
+        { name: `${head}: permissions`, short: 'permissions', rows: perms, ordered: true, searched: 'requires_permission edges' },
+        { name: `${head}: exempt`, short: 'exempt', rows: exempt, ordered: true, searched: 'exempted_by edges' },
+      ]),
     );
+    if (unread && mw.length) notes.push(`${r.name}: middleware not extracted (UNKNOWN); the chain listed is partial`);
     const sib = routeSiblings(g, r);
     if (sib) notes.push(`${r.name}: ${sib.text}`);
     notes.push(...unknownNote([...handler, ...mw, ...perms]));
@@ -419,7 +429,7 @@ export function permissionRoutes(g: Graph, query: string): QueryResult {
     verdict: `guards ${rows.length} route copy(ies): ${alone} require it, ${rows.length - alone} accept it as one of alternatives`,
     found: true,
     matches: [perm.id],
-    sections: [{ name: 'routes', rows, searched: 'requires_permission edges into this permission' }],
+    sections: gated(g, ['route_authz'], [{ name: 'routes', rows, searched: 'requires_permission edges into this permission' }]),
     counts: { required: alone, 'one of alternatives': rows.length - alone },
     notes: [...capabilityNotes(g, ['route_authz']), ...unknownNote(rows)],
     next: rows.slice(0, 1).map((r) => call('route_authz', { route: r.id.replace(/^route:/, '') })),
@@ -507,7 +517,7 @@ export function attributeUsage(g: Graph, query: string): QueryResult {
     verdict: `${writers.length} proven writer(s), ${uncertainW.length} uncertain; ${readers.length} proven reader(s), ${uncertainR.length} uncertain`,
     found: true,
     matches: [attr.id],
-    sections,
+    sections: gated(g, ['data_attributes'], sections),
     counts: { 'proven writers': writers.length, 'uncertain writers': uncertainW.length, 'proven readers': readers.length, 'uncertain readers': uncertainR.length },
     notes,
     next: [call('tests_for', { symbol: attr.name }), ...(firstWriter ? [call('blast_radius', { var: firstWriter.label })] : [])],
@@ -560,7 +570,7 @@ export function eventFlow(g: Graph, query: string): QueryResult {
     verdict: verdicts.join('; '),
     found: true,
     matches: hits.map((n) => n.id),
-    sections,
+    sections: gated(g, ['events'], sections),
     notes: [...capabilityNotes(g, ['events']), ...unknownNote(all)],
     next: [call('tests_for', { symbol: hits[0].name })],
   };
@@ -663,7 +673,7 @@ export function testsCovering(g: Graph, query: string): QueryResult {
     verdict: `${rows.length} browser test(s) in ${new Set(rows.map((r) => r.file)).size} spec file(s)`,
     found: true,
     matches: matches.map((n) => n.id),
-    sections: [{ name: 'tests', rows, searched: 'selector, page-object and request edges' }],
+    sections: gated(g, ['browser_tests'], [{ name: 'tests', rows, searched: 'selector, page-object and request edges' }]),
     counts: countBy(rows, (r) => r.file ?? '(no file)'),
     notes,
     next: [],
@@ -743,7 +753,7 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
     matches: [target.id],
     sections: [
       { name: 'clojure.test', rows: unitRows, searched: `test definitions calling it up to depth ${max}` },
-      { name: 'browser tests', rows: browserRows, searched: 'selectors rendered and routes handled along the same callers' },
+      ...gated(g, ['browser_tests'], [{ name: 'browser tests', rows: browserRows, searched: 'selectors rendered and routes handled along the same callers' }]),
     ],
     counts: { 'unit direct': direct, 'unit transitive': unitRows.length - direct, browser: browserRows.length },
     notes,
@@ -838,7 +848,7 @@ function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>
     authz.push(nodeRow(route, { detail: v.text + (sib ? `; ${sib.text}` : '') }));
     if (v.state === 'none') risk.push(...risks([nodeRow(route, { detail: `route has no permission check and no exemption${sib?.odd ? '; its siblings check one' : ''}` })], true));
     // without the capability nothing was extracted: say so once in the notes, never as a finding about the route
-    if (v.state === 'unknown' && !noAuthz) risk.push(...risks([nodeRow(route, { band: 'unknown', detail: 'permission check decided at runtime; not provable; evidence in the route data' })], true));
+    if (v.state === 'unknown' && !noAuthz) risk.push(...risks([nodeRow(route, { band: 'unknown', detail: middlewareUnread(route) ? v.text : 'permission check decided at runtime; not provable; evidence in the route data' })], true));
   }
   return { routeIds, authz, risk };
 }

@@ -193,6 +193,7 @@ function displayOrder(s: Section, known: Row[], by: GroupBy): Placed[] {
 }
 
 function renderSection(s: Section, o: SectionOpts, lv: Level): string[] {
+  if (!s.rows.length && s.unextracted) return [`${s.name}: ${s.unextracted}`];
   if (!s.rows.length) return [`${s.name}: none${s.searched ? ` (searched: ${s.searched})` : ''}`];
   const known = s.rows.filter((r) => r.band !== 'unknown');
   const unknown = s.rows.filter((r) => r.band === 'unknown');
