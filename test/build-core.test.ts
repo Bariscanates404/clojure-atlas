@@ -50,4 +50,8 @@ describe('core graph corner cases', () => {
   it('a reader conditional around the function leaves it a callback', () => {
     assert.deepEqual([...new Set(edges(def('both'), def('helper')).map((e) => e.kind))], ['passes_callback']);
   });
+
+  it('a function calling itself has a calls edge to itself', () => {
+    assert.deepEqual(edges(def('countdown'), def('countdown')).map((e) => e.kind), ['calls']);
+  });
 });

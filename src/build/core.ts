@@ -110,7 +110,6 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   const link = (from: string, to: string, kind: string, band: Band, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
-    if (from === to) return;
     edges.push({ from, to, kind, band, file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
     if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band, file: u.file, line: u.nameRow });
   };
