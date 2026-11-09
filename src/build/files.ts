@@ -8,8 +8,10 @@ const SOURCE_EXT = /\.(clj|cljs|cljc)$/;
 const EDN_EXT = /\.edn$/;
 const TS_EXT = /(?<!\.d)\.ts$/;
 const MODULE_FILES = new Set(['deps.edn', 'project.clj', 'shadow-cljs.edn', 'bb.edn', 'build.boot']);
-// build output, dependencies and tool state; hidden directories are skipped as well
-const SKIP_DIRS = new Set(['node_modules', 'target', 'out', 'dist', 'classes']);
+// dependencies are skipped at any depth; build output only where a build writes it, the repo root or a module root,
+// because a namespace can be named app.out or app.dist; hidden directories are skipped as well
+const DEPENDENCY_DIR = 'node_modules';
+const BUILD_DIRS = new Set(['target', 'out', 'dist', 'classes']);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 export interface RepoFiles {
@@ -26,10 +28,12 @@ export interface RepoFiles {
 export function listFiles(root: string): RepoFiles {
   const out: RepoFiles = { sources: [], edn: [], typescript: [], packageJsons: [], moduleRoots: [], skippedLarge: [] };
   const visit = (rel: string): void => {
-    for (const e of readdirSync(path.join(root, rel), { withFileTypes: true })) {
+    const entries = readdirSync(path.join(root, rel), { withFileTypes: true });
+    const isModuleRoot = !rel || entries.some((e) => e.isFile() && MODULE_FILES.has(e.name));
+    for (const e of entries) {
       const p = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) {
-        if (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) visit(p);
+        if (!e.name.startsWith('.') && e.name !== DEPENDENCY_DIR && !(isModuleRoot && BUILD_DIRS.has(e.name))) visit(p);
         continue;
       }
       if (!e.isFile() || e.name.startsWith('.')) continue;
@@ -60,7 +64,7 @@ export function componentOf(moduleRoots: readonly string[], file: string): strin
 export function expectedSources(root: string, files: RepoFiles): number {
   try {
     const out = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', '*.clj', '*.cljs', '*.cljc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return out.split('\0').filter((f) => f && !f.endsWith('project.clj')).length;
+    return out.split('\0').filter((f) => f && path.posix.basename(f) !== 'project.clj').length;
   } catch (err) {
     process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message.split('\n')[0]}); expected files = files listed\n`);
     return files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length;
