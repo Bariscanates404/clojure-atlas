@@ -197,8 +197,8 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
 
 const METHOD = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ANY)\s+/i;
 
-// "/article/:id/font", "/article/{article-id}/font/" and "GET /article/{p}/font @x" all canonicalise to
-// "/article/{p}/font"; the method, if any, is returned separately.
+// "/api/articles/:slug", "/api/articles/{article-slug}/" and "GET /api/articles/{p} @x" all canonicalise to
+// "/api/articles/{p}"; the method, if any, is returned separately.
 export function canonicalRoute(input: string): { method: string | null; path: string } {
   let s = input.trim();
   if (s.startsWith('route:')) s = s.slice('route:'.length);
@@ -240,8 +240,8 @@ export function matchRoutes(g: Graph, query: string): RouteMatch {
   const countMethodless = (found: GraphNode[]) => (method ? found.filter((n) => routeMethod(n) === null).length : 0);
   const exact = routes.filter((n) => routePaths(n).includes(path));
   if (exact.length) return { routes: exact, partial: false, methodless: countMethodless(exact) };
-  // otherwise the query's segments must appear as whole consecutive segments of the path: "/font" finds
-  // /article/{p}/font, but "/" or "/fo" finds nothing
+  // otherwise the query's segments must appear as whole consecutive segments of the path: "/comments" finds
+  // /api/articles/{p}/comments, but "/" or "/comm" finds nothing
   const want = path.split('/').filter((x) => x !== '');
   if (!want.length) return { routes: [], partial: false, methodless: 0 };
   const has = (p: string) => {

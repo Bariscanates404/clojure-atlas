@@ -390,6 +390,12 @@ describe('MCP server', () => {
 
   it('ping', () => assert.deepEqual(handleMessage(g, { jsonrpc: '2.0', id: 'p', method: 'ping' }), { jsonrpc: '2.0', id: 'p', result: {} }));
 
+  it('tool texts use generic wording and examples that exist in public repositories', () => {
+    const texts = JSON.stringify(toolList());
+    for (const private_ of ['qa-class', '/article/:id/font', ':edit-article', ':articles/save']) assert.ok(!texts.includes(private_), `${private_} is still in a tool description`);
+    assert.match(texts, /\/api\/articles\/:slug/);
+  });
+
   it('tools/list names every tool with an object schema and required args', () => {
     const r = handleMessage(g, { jsonrpc: '2.0', id: 2, method: 'tools/list' }) as { result: { tools: { name: string; inputSchema: { type: string; required?: string[]; properties: Record<string, unknown> } }[] } };
     assert.deepEqual(r.result.tools.map((t) => t.name), ['callers', 'blast_radius', 'route_authz', 'permission_routes', 'attribute_usage', 'event_flow', 'tests_covering', 'tests_for', 'signature_impact', 'key_flow', 'key_siblings', 'context_for_change', 'graph_info']);
