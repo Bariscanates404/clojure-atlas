@@ -4,12 +4,10 @@
 import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../mcp/keyflow.ts';
 import type { NsUse, VarDef, VarUse } from './analysis.ts';
-import { defId, nsId, type Context, type Owner, type Rows } from './model.ts';
+import { defId, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids, textOf } from './reader.ts';
 import { classify } from './relations.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
-
-const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
 // in it, not resolved by kondo at all, or pointing into a library.
@@ -26,8 +24,6 @@ export interface UsageStats {
   topUnknown: [string, number][];
 }
 
-const SPECIAL_FORMS = new Set(['def', 'if', 'do', 'let*', 'letfn*', 'loop*', 'recur', 'fn*', 'quote', 'var', 'throw', 'try', 'catch',
-  'finally', 'monitor-enter', 'monitor-exit', 'new', 'set!', '.', 'case*', 'deftype*', 'reify*', 'import*', '&']);
 const TEST_NS = /^(clojure|cljs)\.test$/;
 
 // Places where a list is the assertion of an `is`: its head symbol is an assert-expr dispatch value.
@@ -121,7 +117,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const isAssertion = assertionHeads(ctx);
   const usage = (u: VarUse) => {
     if (u.defmethod) return;
-    if (u.to === UNKNOWN_NS && (SPECIAL_FORMS.has(u.name) || u.name.endsWith('#') || isAssertion(u))) {
+    if (u.to === UNKNOWN_NS && (isSpecialForm(u) || u.name.endsWith('#') || isAssertion(u))) {
       stats.notVars++;
       return;
     }

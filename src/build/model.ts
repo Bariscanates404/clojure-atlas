@@ -62,7 +62,16 @@ export type Owner = (site: Site) => string;
 
 const LANGUAGE_NS = /^(clojure|cljs)\.(core|string|set|walk|test|edn|zip|data|pprint|repl|template|spec\.alpha|core\.async)$/;
 
+// the namespace kondo gives a symbol it cannot resolve: special forms, macros it does not know, unbound names
+export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
+
 export const CORE_NS = /^(clojure|cljs)\.core$/;
+
+const SPECIAL_FORMS = new Set(['def', 'if', 'do', 'let*', 'letfn*', 'loop*', 'recur', 'fn*', 'quote', 'var', 'throw', 'try', 'catch',
+  'finally', 'monitor-enter', 'monitor-exit', 'new', 'set!', '.', 'case*', 'deftype*', 'reify*', 'import*', '&']);
+
+// kondo names a special form after clojure.core where it analyzes both platforms, and leaves it unresolved elsewhere
+export const isSpecialForm = (u: VarUse): boolean => SPECIAL_FORMS.has(u.name) && (u.to === UNKNOWN_NS || CORE_NS.test(u.to));
 
 export function groupBy<T>(xs: Iterable<T>, key: (x: T) => string): Map<string, T[]> {
   const out = new Map<string, T[]>();

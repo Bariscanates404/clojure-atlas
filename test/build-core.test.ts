@@ -40,4 +40,14 @@ describe('core graph corner cases', () => {
     const calls = edges(def('twice'), def('helper'), 'calls');
     assert.deepEqual(calls.map((e) => e.attrs?.arity), [1, 2]);
   });
+
+  it('a special form around a function is not a callback', () => {
+    for (const from of ['pick', 'hold', 'safe']) {
+      assert.deepEqual([...new Set(edges(def(from), def('helper')).map((e) => e.kind))], ['references'], from);
+    }
+  });
+
+  it('a reader conditional around the function leaves it a callback', () => {
+    assert.deepEqual([...new Set(edges(def('both'), def('helper')).map((e) => e.kind))], ['passes_callback']);
+  });
 });

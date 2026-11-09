@@ -5,7 +5,7 @@
 import type { Band } from '../mcp/graph.ts';
 import type { VarUse } from './analysis.ts';
 import { textOf, type Form } from './reader.ts';
-import type { Context } from './model.ts';
+import { isSpecialForm, UNKNOWN_NS, type Context } from './model.ts';
 
 export type Relation = 'calls' | 'references' | 'passes_callback' | 'registers_handler' | 'expands_via' | 'rebinds';
 
@@ -26,9 +26,16 @@ const REGISTRARS = new Set([
 
 const headOf = (f: Form | undefined) => (f && f.t === 'list' ? textOf(f.children[0])?.replace(/^.*\//, '') : undefined);
 
+// The collection holding the form at this place, seen through reader conditionals: #?(:clj f :cljs f) sits where f would.
+function placeOf(ctx: Context, file: string, row: number, col: number) {
+  let at = ctx.parentOf(file, row, col);
+  while (at?.parent.t === 'cond') at = ctx.parentOf(file, at.parent.row, at.parent.col);
+  return at;
+}
+
 export function classify(ctx: Context, u: VarUse): Classified {
   if (u.macro) return { kind: 'expands_via', band: 'static_proven' };
-  const at = ctx.parentOf(u.file, u.nameRow, u.nameCol);
+  const at = placeOf(ctx, u.file, u.nameRow, u.nameCol);
   const parent = at?.parent;
   const head = headOf(parent);
   if (parent?.t === 'list' && at?.index === 0) return { kind: 'calls', band: 'static_proven' };
@@ -38,7 +45,8 @@ export function classify(ctx: Context, u: VarUse): Classified {
   if (u.arity !== undefined) return { kind: 'calls', band: 'static_proven' };
   if (parent?.t === 'list' && head && DEFINING.has(head)) return { kind: 'references', band: 'static_proven', via: 'alias' };
   // a function passed to a function is a callback the callee may or may not run; in a macro or special form
-  // (defn, let, reify, extend-type ...), or when it is not a function (data, a record class), it is a value
+  // (defn, let, if, try, new, reify, extend-type ...), in a call kondo cannot resolve, or when it is not a
+  // function (data, a record class), it is a value
   if (parent?.t === 'list' && parent.children[0]?.t === 'symbol' && ctx.defs.get(`${u.to}/${u.name}`)?.fn) {
     const callee = ctx.useAt(u.file, parent.children[0].row, parent.children[0].col);
     if (callee && REGISTRARS.has(`${callee.to}/${callee.name}`)) {
@@ -46,10 +54,10 @@ export function classify(ctx: Context, u: VarUse): Classified {
         ? { kind: 'registers_handler', band: 'static_proven', via: head }
         : { kind: 'references', band: 'static_proven' };
     }
-    if (callee && !callee.macro) return { kind: 'passes_callback', band: 'static_proven', via: head };
+    if (callee && callee.to !== UNKNOWN_NS && !callee.macro && !isSpecialForm(callee)) return { kind: 'passes_callback', band: 'static_proven', via: head };
   }
   if (parent?.t === 'vector') {
-    const owner = ctx.parentOf(u.file, parent.row, parent.col)?.parent;
+    const owner = placeOf(ctx, u.file, parent.row, parent.col)?.parent;
     const binder = headOf(owner);
     if (binder && REBINDINGS.has(binder) && (at?.index ?? 0) % 2 === 0) return { kind: 'rebinds', band: 'unknown', via: binder };
     if (binder && BINDINGS.has(binder) && (at?.index ?? 0) % 2 === 1) return { kind: 'references', band: 'static_proven', via: 'alias' };
