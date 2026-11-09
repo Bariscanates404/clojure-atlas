@@ -3,7 +3,7 @@
 // clj-kondo on PATH is used; with neither, the build stops and says why.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { inflateRawSync } from 'node:zlib';
@@ -57,6 +57,18 @@ export interface KondoHost {
   warn: (message: string) => void;
 }
 
+// The size and sha256 of the extracted binary are written beside it, so a later run can tell a binary that was cut
+// short or changed on disk from the one that was fetched. It guards against damage; whoever can write the cache
+// directory can rewrite both files, so it is not a defence against that.
+const sidecar = (target: string) => `${target}.sha256`;
+const fingerprint = (bytes: Buffer) => `${bytes.length} ${createHash('sha256').update(bytes).digest('hex')}\n`;
+
+function intact(target: string): boolean {
+  if (!existsSync(sidecar(target))) return false;
+  const recorded = readFileSync(sidecar(target), 'utf8');
+  return statSync(target).size === Number(recorded.split(' ')[0]) && fingerprint(readFileSync(target)) === recorded;
+}
+
 export async function locateKondo(host: KondoHost): Promise<Kondo> {
   const exe = host.platform === 'win32' ? 'clj-kondo.exe' : 'clj-kondo';
   const fromPath = (why: string): Kondo => {
@@ -69,7 +81,10 @@ export async function locateKondo(host: KondoHost): Promise<Kondo> {
   if (!asset) return fromPath(`clj-kondo ${KONDO_VERSION} has no native release for ${host.platform}-${host.arch}`);
   const [suffix, sha] = asset;
   const target = path.join(host.cacheDir, `clj-kondo-${KONDO_VERSION}-${suffix}`, exe);
-  if (!existsSync(target)) {
+  const present = existsSync(target);
+  const usable = present && intact(target);
+  if (present && !usable) host.warn(`the cached ${target} does not match the checksum recorded when it was fetched (or none was recorded); fetching it again`);
+  if (!usable) {
     const url = `https://github.com/clj-kondo/clj-kondo/releases/download/v${KONDO_VERSION}/clj-kondo-${KONDO_VERSION}-${suffix}.zip`;
     let zip: Buffer;
     host.warn(`downloading clj-kondo ${KONDO_VERSION} (${suffix}) once, to ${target}`);
@@ -83,9 +98,12 @@ export async function locateKondo(host: KondoHost): Promise<Kondo> {
     mkdirSync(path.dirname(target), { recursive: true });
     // renamed into place, so a concurrent build never runs a half-written binary
     const partial = `${target}.${process.pid}.partial`;
-    writeFileSync(partial, unzipEntry(zip, exe));
+    const binary = unzipEntry(zip, exe);
+    writeFileSync(partial, binary);
     chmodSync(partial, 0o755);
+    writeFileSync(`${sidecar(target)}.${process.pid}.partial`, fingerprint(binary));
     renameSync(partial, target);
+    renameSync(`${sidecar(target)}.${process.pid}.partial`, sidecar(target));
     host.warn(`fetched clj-kondo ${KONDO_VERSION} (${suffix}) to ${target}`);
   }
   const version = host.version(target);

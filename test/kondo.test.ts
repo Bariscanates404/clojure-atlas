@@ -95,6 +95,53 @@ describe('kondo binary', () => {
     assert.equal(log.downloads.length, 1);
   });
 
+  describe('the cached binary is checked before it is run', () => {
+    const targetOf = (dir: string) => path.join(cache, dir, `clj-kondo-${KONDO_VERSION}-testos-x1`, 'clj-kondo');
+    const binary = Buffer.from('#!/bin/sh\n');
+
+    it('records the size and sha256 of the extracted binary beside it', async () => {
+      await locateKondo(host({ dir: 'rec', runs: ['clj-kondo'] }).h);
+      assert.equal(readFileSync(`${targetOf('rec')}.sha256`, 'utf8'), `${binary.length} ${sha(binary)}\n`);
+    });
+
+    it('an intact cache is used with no download and no warning', async () => {
+      const { h, log } = host({ dir: 'intact', runs: ['clj-kondo'] });
+      await locateKondo(h);
+      log.warnings.length = 0;
+      await locateKondo(h);
+      assert.deepEqual([log.downloads.length, log.warnings], [1, []]);
+    });
+
+    for (const [name, damage] of [
+      ['changed bytes of the same size', (t: string) => writeFileSync(t, Buffer.from('#!/bin/xx\n'))],
+      ['a truncated binary', (t: string) => writeFileSync(t, Buffer.from('#!'))],
+      ['a binary with no recorded checksum (an older cache)', (t: string) => rmSync(`${t}.sha256`)],
+    ] as const) {
+      it(`${name}: fetched again, verified against the pinned zip, and warned about`, async () => {
+        const dir = `damaged-${name.slice(0, 6).replace(/\W/g, '')}`;
+        const { h, log } = host({ dir, runs: ['clj-kondo'] });
+        await locateKondo(h);
+        damage(targetOf(dir));
+        log.warnings.length = 0;
+        await locateKondo(h);
+        assert.equal(log.downloads.length, 2);
+        assert.match(log.warnings[0], /does not match the checksum recorded when it was fetched/);
+        assert.deepEqual(readFileSync(targetOf(dir)), binary);
+        assert.equal(readFileSync(`${targetOf(dir)}.sha256`, 'utf8'), `${binary.length} ${sha(binary)}\n`);
+      });
+    }
+
+    it('a damaged binary is never run: when it cannot be fetched again, clj-kondo on PATH is used', async () => {
+      const { h, log } = host({ dir: 'nofetch', runs: ['clj-kondo'] });
+      await locateKondo(h);
+      writeFileSync(targetOf('nofetch'), Buffer.from('tampered'));
+      const offline: KondoHost = { ...h, download: async () => { throw new Error('offline'); } };
+      const k = await locateKondo(offline);
+      assert.equal(k.command, 'clj-kondo');
+      assert.match(log.warnings.join('\n'), /does not match the checksum[\s\S]*cannot download .*\(offline\); using clj-kondo on PATH/);
+    });
+  });
+
   it('refuses a download whose sha256 is not the pinned one, writes nothing, and uses clj-kondo on PATH', async () => {
     const { h, log } = host({ dir: 'bad', runs: ['clj-kondo'], assets: { 'testos-x1': ['testos-x1', '0'.repeat(64)] } });
     assert.equal((await locateKondo(h)).command, 'clj-kondo');
