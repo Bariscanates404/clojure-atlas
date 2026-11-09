@@ -252,6 +252,19 @@ describe('blast radius', () => {
 
   it('every row is cited', () => everyRowCited(blastRadius(g, 'core/t', 3)));
 
+  it('a node reached by a heuristic and a proven path at one depth gets the proven band, in any edge order', () => {
+    for (const heuristicFirst of [true, false]) {
+      const x = new GraphBuilder();
+      const [t, viaH, viaP, z] = ['n/t', 'n/x', 'n/y', 'n/z'].map((n) => x.def(n));
+      x.edge(viaH, 'calls', t, { band: 'heuristic' }).edge(viaP, 'calls', t);
+      if (heuristicFirst) x.edge(z, 'calls', viaH).edge(z, 'calls', viaP);
+      else x.edge(z, 'calls', viaP).edge(z, 'calls', viaH);
+      const hit = rows(blastRadius(x.build(), 'n/t')).find((y) => y.label === 'n/z');
+      assert.equal(hit?.band, 'static_proven', `heuristic path first: ${heuristicFirst}`);
+      assert.equal(hit?.depth, 2);
+    }
+  });
+
   it('a node at the shallowest depth wins when two paths reach it', () => {
     const x = new GraphBuilder();
     const tt = x.def('t/t');

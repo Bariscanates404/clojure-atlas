@@ -74,23 +74,34 @@ interface Reach {
   edge: GraphEdge;
 }
 
-// Reverse breadth-first walk over calls and references, each node once at its shallowest depth.
+// Of two ways to reach one node at one depth, the stronger band wins; on a tie the smaller parent id and then the
+// earlier site, so the answer never depends on the order edges were read in.
+const strongerReach = (a: Reach, b: Reach): boolean =>
+  BANDS.indexOf(a.band) !== BANDS.indexOf(b.band) ? BANDS.indexOf(a.band) < BANDS.indexOf(b.band)
+    : a.via !== b.via ? a.via < b.via
+      : compareText(a.edge.file, b.edge.file) < 0 || (a.edge.file === b.edge.file && (a.edge.line ?? 0) < (b.edge.line ?? 0));
+
+// Reverse breadth-first walk over calls and references, each node once at its shallowest depth and, at that depth,
+// by its strongest path.
 function reverseReach(g: Graph, start: string, max: number): { reached: Reach[]; beyond: boolean } {
   const seen = new Set<string>([start]);
   const reached: Reach[] = [];
   let frontier: { id: string; band: Band }[] = [{ id: start, band: 'static_proven' }];
   for (let d = 1; d <= max && frontier.length; d++) {
-    const next: { id: string; band: Band }[] = [];
+    const level = new Map<string, Reach>();
     for (const f of frontier) {
       for (const e of inEdges(g, f.id, DEPENDENCY_KINDS)) {
         if (seen.has(e.from)) continue;
-        seen.add(e.from);
-        const band = weakest(f.band, e.band);
-        reached.push({ id: e.from, band, depth: d, via: f.id, edge: e });
-        next.push({ id: e.from, band });
+        const candidate: Reach = { id: e.from, band: weakest(f.band, e.band), depth: d, via: f.id, edge: e };
+        const prev = level.get(e.from);
+        if (!prev || strongerReach(candidate, prev)) level.set(e.from, candidate);
       }
     }
-    frontier = next;
+    for (const r of level.values()) {
+      seen.add(r.id);
+      reached.push(r);
+    }
+    frontier = [...level.values()].map((r) => ({ id: r.id, band: r.band }));
   }
   const beyond = frontier.some((f) => inEdges(g, f.id, DEPENDENCY_KINDS).some((e) => !seen.has(e.from)));
   return { reached, beyond };
