@@ -4,12 +4,17 @@
   "description": "A structural map of any Clojure, ClojureScript or .cljc codebase, served to AI coding agents as MCP tools.",
   "license": "MIT",
   "author": "Barış Can Ateş",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bariscanates404/clojure-atlas.git"
+  },
+  "homepage": "https://github.com/Bariscanates404/clojure-atlas",
   "type": "module",
   "bin": {
     "clojure-atlas": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist/**/*.js"
   ],
   "engines": {
     "node": ">=22"
@@ -19,11 +24,12 @@
     "clojurescript",
     "mcp",
     "code-graph",
-    "clj-kondo",
-    "ai-agents"
+    "ai-agents",
+    "clj-kondo"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "bundle": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/clojure-atlas.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "coverage": "node scripts/coverage.ts",
@@ -34,6 +40,7 @@
   },
   "devDependencies": {
     "@types/node": "22.20.5",
+    "esbuild": "0.25.10",
     "typescript": "7.0.2"
   }
 }

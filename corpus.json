@@ -1,0 +1,158 @@
+[
+  {
+    "name": "babashka",
+    "url": "https://github.com/babashka/babashka",
+    "ref": "master",
+    "sha": "cf66ef3a6e49a9474d747a230815e7df2817d06a"
+  },
+  {
+    "name": "biff",
+    "url": "https://github.com/jacobobryant/biff",
+    "ref": "master",
+    "sha": "9ce0f9775682b2e3b163025ee668a490733004e1"
+  },
+  {
+    "name": "cider-nrepl",
+    "url": "https://github.com/clojure-emacs/cider-nrepl",
+    "ref": "master",
+    "sha": "fd681b0943ffcafb99e751b86c060abf6765e8d3"
+  },
+  {
+    "name": "clj-kondo",
+    "url": "https://github.com/clj-kondo/clj-kondo",
+    "ref": "master",
+    "sha": "a38978c2fe24b3790b2b7a6d3007594c087dd863"
+  },
+  {
+    "name": "compojure",
+    "url": "https://github.com/weavejester/compojure",
+    "ref": "master",
+    "sha": "8a4758d28e8fcd28fa7610dca6e2908d039e6a4f"
+  },
+  {
+    "name": "datascript",
+    "url": "https://github.com/tonsky/datascript",
+    "ref": "master",
+    "sha": "34915cf673c02cbc64779fe56e0288d70fea63f8"
+  },
+  {
+    "name": "day-of-datomic",
+    "url": "https://github.com/Datomic/day-of-datomic",
+    "ref": "master",
+    "sha": "daa457f766e16f55243a95513e759573b8827329"
+  },
+  {
+    "name": "fulcro",
+    "url": "https://github.com/fulcrologic/fulcro",
+    "ref": "main",
+    "sha": "c380254444e83cfadf3eae111484539e4c2d1ec4"
+  },
+  {
+    "name": "honeysql",
+    "url": "https://github.com/seancorfield/honeysql",
+    "ref": "develop",
+    "sha": "1cc6bbed923bacdffe8cf727ef044e924d2a3597"
+  },
+  {
+    "name": "integrant",
+    "url": "https://github.com/weavejester/integrant",
+    "ref": "master",
+    "sha": "bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01"
+  },
+  {
+    "name": "logseq",
+    "url": "https://github.com/logseq/logseq",
+    "ref": "master",
+    "sha": "cdfe1147e41e7176ac4274e1c9a996268e622250"
+  },
+  {
+    "name": "malli",
+    "url": "https://github.com/metosin/malli",
+    "ref": "master",
+    "sha": "cbd057b321c6901e1b1d9f0e013d1dec2b0298d6"
+  },
+  {
+    "name": "metabase",
+    "url": "https://github.com/metabase/metabase",
+    "ref": "master",
+    "sha": "2cbad00772a3ffc4e7cb028f4be7e0fd2ee8e177"
+  },
+  {
+    "name": "mount",
+    "url": "https://github.com/tolitius/mount",
+    "ref": "master",
+    "sha": "ae94e7d85cbf17b17789d2e42df2b39eb2bfc302"
+  },
+  {
+    "name": "next-jdbc",
+    "url": "https://github.com/seancorfield/next-jdbc",
+    "ref": "develop",
+    "sha": "f3ef9c1e839e7e43b57a95eeac08b4888a33c463"
+  },
+  {
+    "name": "pathom3",
+    "url": "https://github.com/wilkerlucio/pathom3",
+    "ref": "main",
+    "sha": "5acbdf7af2e81236909295b43c855b82dccc7c92"
+  },
+  {
+    "name": "pedestal",
+    "url": "https://github.com/pedestal/pedestal",
+    "ref": "master",
+    "sha": "db7a74309a2da6acc138ca4e8c2f85676dc8f650"
+  },
+  {
+    "name": "penpot",
+    "url": "https://github.com/penpot/penpot",
+    "ref": "develop",
+    "sha": "01191051c7daf545bcc52ab02637e56f1d1ccca3"
+  },
+  {
+    "name": "polylith-realworld",
+    "url": "https://github.com/furkan3ayraktar/clojure-polylith-realworld-example-app",
+    "ref": "master",
+    "sha": "492e5eeaa0f0bc3a2dd4a44631287fef72055ee8"
+  },
+  {
+    "name": "re-frame",
+    "url": "https://github.com/day8/re-frame",
+    "ref": "master",
+    "sha": "1a1bf1df6570b17a148ebce70d500ec2da393cdc"
+  },
+  {
+    "name": "reagent",
+    "url": "https://github.com/reagent-project/reagent",
+    "ref": "master",
+    "sha": "fa4dc05456ece18cda91d6ba3d49afad24b8ad73"
+  },
+  {
+    "name": "reitit",
+    "url": "https://github.com/metosin/reitit",
+    "ref": "master",
+    "sha": "1d2fc6735f53e2026fed98e92322a29f7a35c371"
+  },
+  {
+    "name": "ring",
+    "url": "https://github.com/ring-clojure/ring",
+    "ref": "master",
+    "sha": "6238fe0e2e4506e28a0ce6ade9ae514f7b02cbee"
+  },
+  {
+    "name": "shadow-cljs",
+    "url": "https://github.com/thheller/shadow-cljs",
+    "ref": "master",
+    "sha": "fbd7335e8c4f3faab79ae57519f679522c8f1c40"
+  },
+  {
+    "name": "usermanager",
+    "url": "https://github.com/seancorfield/usermanager-example",
+    "ref": "develop",
+    "sha": "3554bd6f4e26c9fef0dfd8835cd52c1f95bc3c48"
+  },
+  {
+    "name": "xtdb-v1",
+    "url": "https://github.com/xtdb/xtdb",
+    "ref": "1.x",
+    "sha": "094e36f2f93d6543c899e2ba96947747125423a2"
+  }
+]

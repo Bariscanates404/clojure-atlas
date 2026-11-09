@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import * as lib from '../src/mcp/index.ts';
-import { parseArgs } from '../src/mcp/main.ts';
+import { parseMcpArgs } from '../src/cli.ts';
+import { DEFAULT_GRAPH } from '../src/build/index.ts';
 import type { QueryResult, Row } from '../src/mcp/queries.ts';
 import {
   bandMix, CHARS_PER_TOKEN, clampLimit, DEFAULT_LIMIT, DEFAULT_MAX_TOKENS, MAX_LIMIT, rankRows, render, where, why,
@@ -330,7 +331,7 @@ describe('MCP server', () => {
     const r = handleMessage(g, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } }) as { result: Record<string, unknown> };
     assert.equal(r.result.protocolVersion, '2025-03-26');
     assert.deepEqual(r.result.capabilities, { tools: {} });
-    assert.deepEqual(r.result.serverInfo, { name: 'code-graph', version: '0.1.0' });
+    assert.deepEqual(r.result.serverInfo, { name: 'clojure-atlas', version: '0.1.0' });
   });
 
   it('initialize without a version uses the default', () => {
@@ -467,17 +468,9 @@ describe('entry point args', () => {
     [['--graph', 'g.json', '--max-distance', '7'], { graph: 'g.json', maxDistance: 7 }],
     [['--max-distance', '0', '--graph', 'x'], { graph: 'x', maxDistance: 0 }],
   ];
-  for (const [argv, expected] of cases) it(argv.join(' '), () => assert.deepEqual(parseArgs(argv), expected));
-  it('no graph is a usage error', () => {
-    const saved = process.env.CODE_GRAPH;
-    delete process.env.CODE_GRAPH;
-    try {
-      assert.throws(() => parseArgs([]), /usage:/);
-    } finally {
-      if (saved !== undefined) process.env.CODE_GRAPH = saved;
-    }
-  });
-  it('a bad max distance is rejected', () => assert.throws(() => parseArgs(['--graph', 'g', '--max-distance', 'x']), /non-negative integer/));
+  for (const [argv, expected] of cases) it(argv.join(' '), () => assert.deepEqual(parseMcpArgs(argv), expected));
+  it('no graph serves the project graph a build writes by default', () => assert.deepEqual(parseMcpArgs([]), { graph: DEFAULT_GRAPH }));
+  it('a bad max distance is rejected', () => assert.throws(() => parseMcpArgs(['--graph', 'g', '--max-distance', 'x']), /non-negative integer/));
 });
 
 describe('library API', () => {

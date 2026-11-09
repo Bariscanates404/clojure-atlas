@@ -11,7 +11,7 @@ import { keyFlow, keySiblings, signatureImpact } from './keyflow.ts';
 import { PAGING_PROPS, render, renderOptionsOf, withSource, type GroupBy } from './render.ts';
 import { staleness, type StalenessOptions } from './staleness.ts';
 
-export const SERVER_NAME = 'code-graph';
+export const SERVER_NAME = 'clojure-atlas';
 export const SERVER_VERSION = '0.1.0';
 
 export interface ServerOptions extends StalenessOptions {
