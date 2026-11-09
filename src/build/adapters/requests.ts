@@ -2,7 +2,7 @@
 // own request effect), cljs-ajax GET/POST/..., cljs-http get/post/... and js/fetch. A literal URI is the path; one
 // built with str gets {p} for each runtime part. Each request is joined to the server routes by method and path.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
-import { formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
+import { flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { groupBy, type Adapter, type Context, type Owner } from '../model.ts';
 import { canonicalPath, entry, keywordOf } from './route-data.ts';
 import { routeId, serverRoutes } from './routes.ts';
@@ -24,36 +24,48 @@ interface Request {
 
 const requestId = (r: Pick<Request, 'file' | 'row' | 'col'>) => `request:${r.file}:${r.row}:${r.col}`;
 
-// "/a" -> /a, literal; (str "/a/" id "/b") -> /a/{p}/b, built at runtime; a project URL helper whose body is
-// (str "/api" ...) or (apply str "/api" args) prefixes what it is given. Anything else is not a path.
-function uriOf(ctx: Context, file: string, f: Form | undefined): { path: string; literal: boolean } | undefined {
+interface Uri {
+  path: string;
+  literal: boolean;
+}
+
+// "/a" -> /a, literal; (str "/a/" id "/b") -> /a/{p}/b, built at runtime; a project URL helper is read through its
+// body with its parameters bound to the call's arguments, so (user-url "5") over (str "/users/" id "/profile") is
+// /users/5/profile. Anything else is not a path.
+function uriOf(ctx: Context, file: string, f: Form | undefined, bound: ReadonlyMap<string, Uri> = new Map(), stack: readonly string[] = []): Uri | undefined {
   const u = f && unwrap(f);
   if (u?.t === 'string') return { path: u.text, literal: true };
+  if (u?.t === 'symbol') return bound.get(u.text);
   if (u?.t !== 'list' || !u.children.length) return undefined;
-  const part = (x: Form) => uriOf(ctx, file, x) ?? { path: '{p}', literal: false };
-  const join = (prefix: string, xs: readonly Form[]) => {
-    const parts = xs.map(part);
-    return { path: prefix + parts.map((p) => p.path).join(''), literal: parts.every((p) => p.literal) };
-  };
+  const part = (x: Form): Uri => uriOf(ctx, file, x, bound, stack) ?? { path: '{p}', literal: false };
+  const join = (xs: readonly Uri[]): Uri => ({ path: xs.map((p) => p.path).join(''), literal: xs.every((p) => p.literal) });
   const head = unwrap(u.children[0]);
   if (textOf(head) === 'str') {
-    const built = join('', u.children.slice(1));
+    const built = join(u.children.slice(1).map(part));
     return built.path.startsWith('/') ? built : undefined;
   }
   const def = head.t === 'symbol' ? ctx.defAt(file, head.row, head.col) : undefined;
-  const prefix = def ? helperPrefix(ctx, def) : undefined;
-  return prefix === undefined ? undefined : join(prefix, u.children.slice(1));
+  return def && !stack.includes(def) ? helperUri(ctx, def, u.children.slice(1).map(part), [...stack, def]) : undefined;
 }
 
-// The literal a URL helper puts first: (defn f [& paths] (apply str "/api" paths)) or (defn f [p] (str "/api" p)).
-function helperPrefix(ctx: Context, def: string): string | undefined {
+// What a URL helper returns for the given arguments: its body (defn f [a b] (str "/x/" a b)), or every argument
+// after a literal for (defn f [& paths] (apply str "/api" paths)).
+function helperUri(ctx: Context, def: string, args: readonly Uri[], stack: readonly string[]): Uri | undefined {
   const d = ctx.defs.get(def);
   const form = d && /\/defn-?$/.test(d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
-  const body = form ? unwrap(kids(form)[kids(form).length - 1]) : undefined;
-  if (body?.t !== 'list') return undefined;
-  const xs = body.children.map(unwrap);
-  const lit = textOf(xs[0]) === 'str' ? xs[1] : textOf(xs[0]) === 'apply' && textOf(xs[1]) === 'str' ? xs[2] : undefined;
-  return lit?.t === 'string' && lit.text.startsWith('/') ? lit.text : undefined;
+  const xs = form ? kids(form).map(unwrap) : [];
+  const body = xs[xs.length - 1];
+  const params = xs.find((x, i) => i >= 2 && x.t === 'vector');
+  if (body?.t !== 'list' || !params || params === body || !d) return undefined;
+  const names = flatChildren(params).map((p) => textOf(unwrap(p)) ?? '');
+  const parts = body.children.map(unwrap);
+  if (textOf(parts[0]) === 'apply' && textOf(parts[1]) === 'str') {
+    const [lit, rest] = [parts[2], parts[3]];
+    const isRest = names.length === 2 && names[0] === '&' && textOf(rest) === names[1] && parts.length === 4;
+    return isRest && lit?.t === 'string' && lit.text.startsWith('/') ? { path: lit.text + args.map((a) => a.path).join(''), literal: args.every((a) => a.literal) } : undefined;
+  }
+  if (names.some((n) => n === '&') || names.length !== args.length) return undefined;
+  return uriOf(ctx, d.file, body, new Map(names.map((n, i) => [n, args[i]])), stack);
 }
 
 // js/fetch is interop clj-kondo does not report as a var usage, so it is read from the forms
@@ -96,7 +108,8 @@ function calls(ctx: Context): Request[] {
   });
 }
 
-const routeKey = (method: string, path: string) => `${method} ${canonicalPath(path).replace(/(.)\/$/, '$1')}`;
+// a query string or fragment is not part of the path a route serves
+const routeKey = (method: string, path: string) => `${method} ${canonicalPath(path.replace(/[?#].*$/, '')).replace(/(.)\/$/, '$1')}`;
 
 export const requests: Adapter = {
   name: 'requests',

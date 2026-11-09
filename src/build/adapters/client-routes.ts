@@ -3,12 +3,12 @@
 // test or a request matches it whichever way the path spells them.
 import type { GraphNode } from '../../mcp/graph.ts';
 import { flatChildren, formAt, kids, textOf, unwrap, type Form } from '../reader.ts';
-import type { Adapter, Context } from '../model.ts';
+import { groupBy, type Adapter, type Context } from '../model.ts';
 import { canonicalPath, entry, isRoute, isRouteGroup, joinPath } from './route-data.ts';
 
 const CLIENT_KEYS = [':name', ':view'];
 
-const usesReitit = (u: { file: string; to: string }) => u.file.endsWith('.cljs') && u.to.startsWith('reitit.');
+const usesReitit = (u: { file: string; to: string }) => /\.clj[cs]$/.test(u.file) && u.to.startsWith('reitit.');
 
 const clientRouteId = (path: string) => `client_route:${canonicalPath(path)}`;
 
@@ -61,11 +61,17 @@ export const clientRoutes: Adapter = {
   run: (ctx) => {
     const files = new Set(ctx.analysis.nsUses.filter(usesReitit).map((u) => u.file));
     const found = [...[...files].flatMap((f) => reititRoutes(ctx, f)), ...secretaryRoutes(ctx)];
-    const nodes: GraphNode[] = found.map((r) => {
-      const component = ctx.componentOf(r.file);
+    // routes whose paths differ only in parameter names (/a/:id, /a/:slug) are one node that lists every spelling and name
+    const nodes: GraphNode[] = [...groupBy(found, (r) => clientRouteId(r.path))].map(([id, routes]) => {
+      const [first] = routes;
+      const component = ctx.componentOf(first.file);
+      const names = [...new Set(routes.flatMap((r) => (r.name ? [r.name] : [])))];
+      const paths = [...new Set(routes.map((r) => r.path))];
+      const several = paths.length > 1 || names.length > 1;
       return {
-        id: clientRouteId(r.path), kind: 'client_route', name: canonicalPath(r.path), file: r.file, line: r.line,
-        ...(component ? { component } : {}), attrs: { path: r.path, ...(r.name ? { name: r.name } : {}) },
+        id, kind: 'client_route', name: canonicalPath(first.path), file: first.file, line: first.line,
+        ...(component ? { component } : {}),
+        attrs: { path: first.path, ...(names.length === 1 ? { name: names[0] } : {}), ...(several ? { paths, ...(names.length > 1 ? { names } : {}) } : {}) },
       };
     });
     return { nodes, edges: [] };

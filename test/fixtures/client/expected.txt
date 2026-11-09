@@ -1,16 +1,28 @@
 node client_route:/ [client_route] src/app/routes.cljs:9 {"path":"/","name":":app.routes/home"}
+node client_route:/a/{p} [client_route] src/app/dupes.cljs:5 {"path":"/a/:id","paths":["/a/:id","/a/:slug"],"names":[":app.dupes/a",":app.dupes/a2"]}
 node client_route:/admin/users/{p} [client_route] src/app/routes.cljs:12 {"path":"/admin/users/:id","name":":app.routes/user"}
 node client_route:/doc/{p}/{p} [client_route] src/app/routes.cljs:10 {"path":"/doc/:locale/*slug","name":":app.routes/doc"}
+node client_route:/items/{p} [client_route] src/app/shared.cljc:5 {"path":"/items/:id","name":":app.shared/item"}
+node client_route:/items/{p}/edit [client_route] src/app/shared.cljc:6 {"path":"/items/:slug/edit","name":":app.shared/edit"}
 node client_route:/legacy/{p} [client_route] src/app/routes.cljs:17 {"path":"/legacy/:id"}
+node definition:app.dupes/dupes [definition] src/app/dupes.cljs:4 {"defined_by":"cljs.core/def"}
+node definition:app.dupes/dupes-router [definition] src/app/dupes.cljs:8 {"defined_by":"cljs.core/def"}
 node definition:app.routes/doc-page [definition] src/app/routes.cljs:6 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.routes/home-page [definition] src/app/routes.cljs:5 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.routes/router [definition] src/app/routes.cljs:15 {"defined_by":"cljs.core/def"}
 node definition:app.routes/routes [definition] src/app/routes.cljs:8 {"defined_by":"cljs.core/def"}
+node definition:app.shared/shared-router [definition] src/app/shared.cljc:8 {"defined_by":"clojure.core/def","platforms":["clj","cljs"]}
+node definition:app.shared/shared-routes [definition] src/app/shared.cljc:4 {"defined_by":"clojure.core/def","platforms":["clj","cljs"]}
 node key::conflicting [key] undefined:undefined
 node key::name [key] undefined:undefined
 node key::other [key] undefined:undefined
 node key::view [key] undefined:undefined
+node namespace:app.dupes [namespace] src/app/dupes.cljs:1
 node namespace:app.routes [namespace] src/app/routes.cljs:1
+node namespace:app.shared [namespace] src/app/shared.cljc:1
+edge definition:app.dupes/dupes -produces_key-> key::name static_proven src/app/dupes.cljs:5 {"via":"map-literal"}
+edge definition:app.dupes/dupes -produces_key-> key::name static_proven src/app/dupes.cljs:6 {"via":"map-literal"}
+edge definition:app.dupes/dupes-router -references-> definition:app.dupes/dupes static_proven src/app/dupes.cljs:8
 edge definition:app.routes/router -references-> definition:app.routes/routes static_proven src/app/routes.cljs:15
 edge definition:app.routes/routes -produces_key-> key::conflicting static_proven src/app/routes.cljs:11 {"via":"map-literal"}
 edge definition:app.routes/routes -produces_key-> key::name static_proven src/app/routes.cljs:10 {"via":"map-literal"}
@@ -21,10 +33,18 @@ edge definition:app.routes/routes -produces_key-> key::view static_proven src/ap
 edge definition:app.routes/routes -produces_key-> key::view static_proven src/app/routes.cljs:9 {"via":"map-literal"}
 edge definition:app.routes/routes -references-> definition:app.routes/doc-page static_proven src/app/routes.cljs:10
 edge definition:app.routes/routes -references-> definition:app.routes/home-page static_proven src/app/routes.cljs:9
+edge definition:app.shared/shared-router -references-> definition:app.shared/shared-routes static_proven src/app/shared.cljc:8
+edge definition:app.shared/shared-routes -produces_key-> key::name static_proven src/app/shared.cljc:5 {"via":"map-literal"}
+edge definition:app.shared/shared-routes -produces_key-> key::name static_proven src/app/shared.cljc:6 {"via":"map-literal"}
+edge definition:app.shared/shared-routes -produces_key-> key::view static_proven src/app/shared.cljc:5 {"via":"map-literal"}
+edge namespace:app.dupes -defines-> definition:app.dupes/dupes static_proven src/app/dupes.cljs:4
+edge namespace:app.dupes -defines-> definition:app.dupes/dupes-router static_proven src/app/dupes.cljs:8
 edge namespace:app.routes -defines-> definition:app.routes/doc-page static_proven src/app/routes.cljs:6
 edge namespace:app.routes -defines-> definition:app.routes/home-page static_proven src/app/routes.cljs:5
 edge namespace:app.routes -defines-> definition:app.routes/router static_proven src/app/routes.cljs:15
 edge namespace:app.routes -defines-> definition:app.routes/routes static_proven src/app/routes.cljs:8
-usages resolved=3 unresolved=0 unknown=2 not-vars=0 external=7
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=reitit:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:7 key_tables=map literals in code:0 client_routes=reitit in ClojureScript or secretary:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
-files sources=1 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
+edge namespace:app.shared -defines-> definition:app.shared/shared-router static_proven src/app/shared.cljc:8
+edge namespace:app.shared -defines-> definition:app.shared/shared-routes static_proven src/app/shared.cljc:4
+usages resolved=5 unresolved=0 unknown=2 not-vars=0 external=15
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=reitit:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:12 key_tables=map literals in code:0 client_routes=reitit in ClojureScript or secretary:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
+files sources=3 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

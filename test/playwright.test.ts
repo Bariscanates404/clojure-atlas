@@ -16,6 +16,12 @@ describe('playwright', () => {
     ]);
   });
 
+  it('reads no class from a dot inside quotes, an attribute test or another selector engine', () => {
+    assert.deepEqual(selectorsIn('a[href="/files/report.pdf"].qa-link'), [{ kind: 'class', value: 'qa-link' }]);
+    assert.deepEqual(selectorsIn('text=Save.pdf'), []);
+    assert.deepEqual(selectorsIn('.qa-row >> text=Save.pdf'), [{ kind: 'class', value: 'qa-row' }]);
+  });
+
   it('page objects, exact selectors, tests and renders, every row', async () => {
     const doc = await buildWithTypeScript5('browser');
     assert.equal(rowsText(doc), readFileSync(path.join(fixtureDir('browser'), 'expected.txt'), 'utf8'));
