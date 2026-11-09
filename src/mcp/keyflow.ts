@@ -288,7 +288,7 @@ export function siteCalls(g: Graph, id: string): GraphEdge[] {
 export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; change?: SignatureChange } = {}): QueryResult {
   const title = `signature impact of ${query}`;
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('signature_impact', query, title, 'definition', 'use a fully qualified name (ns/name)');
+  if (!hits.length) return notFound(g, 'signature_impact', query, title, 'definition', ['signatures'], 'use a fully qualified name (ns/name)');
   if (hits.length > 1) return ambiguous('signature_impact', query, title, hits, 'fn');
   const fn = hits[0];
   const notes = capabilityNotes(g, ['signatures']);
@@ -626,7 +626,7 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
   const notes = capabilityNotes(g, ['key_tables']);
   const tables = resolveTables(g, target).sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
   if (!tables.length) {
-    const nf = notFound('key_siblings', target, title, 'literal table (3+ map rows)', 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
+    const nf = notFound(g, 'key_siblings', target, title, 'literal table (3+ map rows)', ['key_tables'], 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
     return { ...nf, notes: [...notes, ...nf.notes] };
   }
   const files = [...new Set(tables.map((t) => t.file ?? ''))];

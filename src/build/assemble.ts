@@ -3,6 +3,7 @@
 // counts, and the coverage statistics `clojure-atlas coverage` prints.
 import { BANDS, FORMAT, VERSION, compareText, type Capability, type GraphDocument, type GraphEdge, type GraphNode, type GraphSource } from '../mcp/graph.ts';
 import { declaresAuthz } from './config.ts';
+import { NOT_USED } from '../shared/capability.ts';
 import { core, type UsageStats } from './core.ts';
 import { makeOwner, type Adapter, type Context, type Rows } from './model.ts';
 
@@ -88,7 +89,7 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
       if (missing) return { name, status: 'absent', edge_kinds: [...kinds], note: missing };
       return {
         name, status: 'available', edge_kinds: [...kinds], edges: rows?.edges.length ?? 0, bands: bandCounts(rows?.edges ?? []),
-        ...(name === 'definitions' ? {} : { note: why ? `switched on by ${why}` : 'not used: nothing in this codebase switches it on' }),
+        ...(name === 'definitions' ? {} : { note: why ? `switched on by ${why}` : NOT_USED }),
       };
     }),
     routeAuthz(ctx, [...edges.values()]),

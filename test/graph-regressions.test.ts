@@ -1,7 +1,10 @@
 // Regressions from the review: sibling routes, the risk level of an attribute write, paging and JSON output.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { contextForChange, routeSiblings } from '../src/mcp/queries.ts';
+import type { Graph } from '../src/mcp/graph.ts';
+import {
+  attributeUsage, blastRadius, contextForChange, eventFlow, permissionRoutes, routeAuthz, routeSiblings, testsCovering, testsFor,
+} from '../src/mcp/queries.ts';
 import { render } from '../src/mcp/render.ts';
 import type { QueryResult } from '../src/mcp/rows.ts';
 import { GraphBuilder } from './helpers/code-graph-fixture.ts';
@@ -66,5 +69,63 @@ describe('response_format json honours limit, offset, section and max_tokens', (
     const out = render(keysResult(300), { format: 'json', maxTokens: 500 });
     assert.ok(out.length <= 500 * 4, `json is ${out.length} chars`);
     assert.match(out, /"truncated"/);
+  });
+});
+
+// A graph built the way a reviewer met it: routes found, but the capability that would answer is absent or unused.
+function authzOff(status: 'absent' | 'unused') {
+  const b = new GraphBuilder();
+  const f = 'components/api/src/routes.clj';
+  for (const p of ['/x', '/y', '/z']) {
+    const id = b.route('GET', p);
+    Object.assign(b.nodes.find((n) => n.id === id) ?? {}, { file: f });
+  }
+  const note = status === 'absent' ? 'not declared: no authz key' : 'not used: nothing in this codebase switches it on';
+  b.caps = b.caps.map((c) => (['route_authz', 'events', 'data_attributes', 'browser_tests'].includes(c.name) ? { ...c, status: status === 'absent' ? 'absent' : 'available', note } : c));
+  return b.build();
+}
+
+describe('route siblings do not count an unknown check as a permission check', () => {
+  it('with route authz absent, siblings are reported unknown, never as checking a permission', () => {
+    const out = render(routeAuthz(authzOff('absent'), '/x'));
+    assert.match(out, /capability route_authz is absent/);
+    assert.match(out, /0 check a permission, 0 exempt, 0 neither, 2 unknown/);
+    assert.doesNotMatch(out, /lacks the check/);
+  });
+});
+
+describe('every not-found answer names the capability state that bounds it', () => {
+  const cases: [string, (g: Graph) => QueryResult, string][] = [
+    ['route_authz', (g) => routeAuthz(g, '/nope'), 'route_authz'],
+    ['permission_routes', (g) => permissionRoutes(g, ':admin'), 'route_authz'],
+    ['attribute_usage', (g) => attributeUsage(g, ':a/b'), 'data_attributes'],
+    ['event_flow', (g) => eventFlow(g, ':e/f'), 'events'],
+    ['tests_covering', (g) => testsCovering(g, 'nope'), 'browser_tests'],
+  ];
+  for (const [name, run, cap] of cases) {
+    it(`${name} with the capability absent`, () => {
+      const out = render(run(authzOff('absent')));
+      assert.match(out, new RegExp(`capability ${cap} is absent`));
+    });
+  }
+  it('a capability that is available but not used warns like an absent one', () => {
+    assert.match(render(eventFlow(authzOff('unused'), ':e/f')), /capability events is available but not used.*not proof of absence/);
+    assert.match(render(attributeUsage(authzOff('unused'), ':a/b')), /capability data_attributes is available but not used/);
+  });
+  it('tests_for and callers say which capability bounds them', () => {
+    assert.match(render(testsFor(authzOff('absent'), 'nope')), /capability (definitions|selectors|browser_tests|data_attributes|events) /);
+  });
+});
+
+describe('a bad argument does not end with the spelling hint', () => {
+  it('blast_radius with depth -3 says the depth is wrong and does not blame the spelling', () => {
+    const b = new GraphBuilder();
+    b.def('core/f');
+    const out = render(blastRadius(b.build(), 'core/f', -3));
+    assert.match(out, /depth -3 is not valid/);
+    assert.doesNotMatch(out, /check the spelling/);
+  });
+  it('a name that matches nothing still gets the spelling hint', () => {
+    assert.match(render(blastRadius(new GraphBuilder().build(), 'core/zzz')), /check the spelling/);
   });
 });

@@ -19,7 +19,7 @@ const FQN_HINT = 'use a fully qualified name (ns/name)';
 // A depth below 1 asks for no walk at all: that is stated, never silently raised to 1.
 function invalidDepth(name: string, query: string, title: string, depth: number): QueryResult {
   const verdict = `depth ${depth} is not valid: pass 1 or more${name === 'blast_radius' ? ', or omit it to walk to the end' : ''}`;
-  return { name, query, title, found: false, verdict, matches: [], sections: [], notes: [verdict], next: [] };
+  return { name, query, title, found: false, verdict, matches: [], sections: [], notes: [verdict], next: [], badArgument: true };
 }
 
 const fractionNote = (depth: number, used: number): string[] =>
@@ -45,7 +45,7 @@ function callerRows(g: Graph, edges: GraphEdge[]): Row[] {
 export function callers(g: Graph, query: string, opts: { includeReferences?: boolean } = {}): QueryResult {
   const title = `callers of ${query}`;
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('callers', query, title, 'definition', FQN_HINT);
+  if (!hits.length) return notFound(g, 'callers', query, title, 'definition', ['definitions'], FQN_HINT);
   if (hits.length > 1) return ambiguous('callers', query, title, hits, 'var');
   const target = hits[0];
   const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
@@ -135,7 +135,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   const title = `blast radius of ${query}`;
   if (depth !== undefined && depth < 1) return invalidDepth('blast_radius', query, title, depth);
   const hits = resolve(g, ['definition'], query);
-  if (!hits.length) return notFound('blast_radius', query, title, 'definition', FQN_HINT);
+  if (!hits.length) return notFound(g, 'blast_radius', query, title, 'definition', ['definitions'], FQN_HINT);
   if (hits.length > 1) return ambiguous('blast_radius', query, title, hits, 'var');
   const target = hits[0];
   const capped = depth !== undefined && Number.isFinite(depth);
@@ -336,13 +336,14 @@ export function routeSiblings(g: Graph, route: GraphNode): { text: string; odd: 
   const sibs = (g.byKind.get('route') ?? []).filter((n) => n.file === route.file && n.id !== route.id && mount(n) === mount(route) && !samePath(n));
   if (!sibs.length) return null;
   const states = sibs.map((s) => routeVerdict(g, s.id).state);
-  const perm = states.filter((s) => s === 'permission' || s === 'unknown').length;
+  const perm = states.filter((s) => s === 'permission').length;
+  const unknown = states.filter((s) => s === 'unknown').length;
   const exempt = states.filter((s) => s === 'exempt').length;
   const none = states.filter((s) => s === 'none').length;
   const mine = routeVerdict(g, route.id).state;
   const odd = mine === 'none' && perm > sibs.length / 2;
   return {
-    text: `${sibs.length} sibling route(s) in ${route.file}: ${perm} check a permission, ${exempt} exempt, ${none} neither${odd ? '; this route lacks the check its siblings have' : ''}`,
+    text: `${sibs.length} sibling route(s) in ${route.file}: ${perm} check a permission, ${exempt} exempt, ${none} neither${unknown ? `, ${unknown} unknown (not provable from this graph)` : ''}${odd ? '; this route lacks the check its siblings have' : ''}`,
     odd,
   };
 }
@@ -351,7 +352,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
   const title = `route authz of ${query}`;
   const match = matchRoutes(g, query);
   const found = match.routes;
-  if (!found.length) return notFound('route_authz', query, title, 'route', 'paths match with :param and {param} segments treated alike');
+  if (!found.length) return notFound(g, 'route_authz', query, title, 'route', ['routes', 'route_authz'], 'paths match with :param and {param} segments treated alike');
   const routes = found.slice(0, MAX_ROUTE_ANSWERS);
   const sections: Section[] = [];
   const notes: string[] = [...capabilityNotes(g, ['route_authz'])];
@@ -399,7 +400,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
 export function permissionRoutes(g: Graph, query: string): QueryResult {
   const title = `routes requiring ${query}`;
   const hits = resolve(g, ['permission'], query);
-  if (!hits.length) return notFound('permission_routes', query, title, 'permission', 'use the exact permission name, with its namespace if it has one');
+  if (!hits.length) return notFound(g, 'permission_routes', query, title, 'permission', ['route_authz'], 'use the exact permission name, with its namespace if it has one');
   if (hits.length > 1) return ambiguous('permission_routes', query, title, hits, 'permission');
   const perm = hits[0];
   const perms = permEdges(inEdges(g, perm.id, ['requires_permission']));
@@ -466,7 +467,7 @@ export function readLikeness(context: string, caller: string, file: string | nul
 export function attributeUsage(g: Graph, query: string): QueryResult {
   const title = `usage of ${query}`;
   const hits = resolve(g, ['data_attribute', 'data_value'], query);
-  if (!hits.length) return notFound('attribute_usage', query, title, 'data attribute');
+  if (!hits.length) return notFound(g, 'attribute_usage', query, title, 'data attribute', ['data_attributes']);
   if (hits.length > 1) return ambiguous('attribute_usage', query, title, hits, 'attr');
   const attr = hits[0];
   const rowsOf = (kind: string) => inEdges(g, attr.id, [kind]).map((e) => edgeRow(g, e.from, e));
@@ -518,7 +519,7 @@ export function attributeUsage(g: Graph, query: string): QueryResult {
 export function eventFlow(g: Graph, query: string): QueryResult {
   const title = `event flow of ${query}`;
   const hits = resolve(g, ['event', 'subscription'], query);
-  if (!hits.length) return notFound('event_flow', query, title, 'event or subscription');
+  if (!hits.length) return notFound(g, 'event_flow', query, title, 'event or subscription', ['events']);
   const sections: Section[] = [];
   const all: Row[] = [];
   const verdicts: string[] = [];
@@ -651,7 +652,7 @@ export function testsCovering(g: Graph, query: string): QueryResult {
       else if (n.kind === 'page_object_member') testsOfMember(g, n.id, 'static_proven', n.name, acc);
     }
   }
-  if (!matches.length) return notFound('tests_covering', q, title, 'file, definition, selector or route');
+  if (!matches.length) return notFound(g, 'tests_covering', q, title, 'file, definition, selector or route', ['definitions', 'routes', 'selectors', 'browser_tests']);
   const rows = hitRows(g, acc, 'test');
   const notes = [...capabilityNotes(g, ['selectors', 'browser_tests']), ...unknownNote(rows)];
   if (!rows.length) notes.push('no browser test reaches this target through selectors, page objects or requests');
@@ -688,7 +689,7 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
   if (!hits.length) {
     const viaBrowser = testsCovering(g, query);
-    if (!viaBrowser.found) return notFound('tests_for', query, title, 'definition, attribute, event, selector or route', FQN_HINT);
+    if (!viaBrowser.found) return notFound(g, 'tests_for', query, title, 'definition, attribute, event, selector or route', ['definitions', 'data_attributes', 'events', 'selectors', 'browser_tests'], FQN_HINT);
     return { ...viaBrowser, name: 'tests_for', title };
   }
   if (hits.length > 1) return ambiguous('tests_for', query, title, hits, 'symbol');

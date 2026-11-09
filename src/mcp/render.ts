@@ -268,7 +268,7 @@ function frame(res: QueryResult, o: RenderOptions, sections: Section[]): { head:
   for (const n of res.notes) head.push(`note: ${quoted(n)}`);
   if (o.section && !sections.length) head.push(`no section matches ${JSON.stringify(o.section)}; sections: ${res.sections.map(shortName).join(', ')}`);
   const tail: string[] = [];
-  if (!res.found && !res.sections.length) tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
+  if (!res.found && !res.sections.length && !res.badArgument) tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
   if (res.next.length) tail.push(`next: ${res.next.slice(0, 3).join('  ')}`);
   return { head, tail };
 }

@@ -1,6 +1,7 @@
 // Shared row model and helpers of the graph queries: the QueryResult shape the renderer prints, row
 // builders that cite file:line and band, name resolution, and the not-found / ambiguous answers.
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
+import { NOT_USED } from '../shared/capability.ts';
 import { capability, inEdges, compareText } from './graph.ts';
 
 export interface Row {
@@ -51,6 +52,8 @@ export interface QueryResult {
   counts?: Record<string, number>;
   notes: string[];
   next: string[];
+  // the arguments were rejected before any search: there is no name to spell-check
+  badArgument?: boolean;
 }
 
 
@@ -98,11 +101,12 @@ export function nodeRow(n: GraphNode, extra: Partial<Row> = {}): Row {
 export const call = (tool: string, args: Record<string, string | number>) =>
   `${tool}(${Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`;
 
-export function notFound(name: string, query: string, title: string, what: string, note?: string): QueryResult {
+// Not found is only as strong as the capabilities that could have produced a match: their state is always named.
+export function notFound(g: Graph, name: string, query: string, title: string, what: string, caps: string[], note?: string): QueryResult {
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
     verdict: `no ${what} matches ${JSON.stringify(query)}`,
-    notes: note ? [note] : [],
+    notes: [...capabilityNotes(g, caps), ...(note ? [note] : [])],
   };
 }
 
@@ -113,6 +117,7 @@ export function capabilityNotes(g: Graph, names: string[]): string[] {
     const c = capability(g, name);
     if (!c) notes.push(`capability ${name} is not listed in this graph: an empty answer is not proof of absence`);
     else if (c.status !== 'available') notes.push(`capability ${name} is ${c.status}: an empty answer is not proof of absence`);
+    else if (c.note === NOT_USED) notes.push(`capability ${name} is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence`);
     else if (c.note) notes.push(`${name}: ${c.note}`);
   }
   return notes;
