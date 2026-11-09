@@ -61,7 +61,33 @@ describe('signature_impact', () => {
   const rv = signatureImpact(sigGraph(valueUse('apply')), 'core/f');
   it('verdict first with counts', () => {
     assert.match(r.verdict, /^4 caller\(s\) in 2 component\(s\); arities 2, 1\+; /);
-    assert.match(rv.verdict, /1 UNKNOWN \(apply\/partial\/value\)/);
+    assert.match(rv.verdict, /^5 caller\(s\) in 2 component\(s\), 1 UNKNOWN \(1 via apply\/partial\/value\); arities /);
+  });
+  it('header, counts line and listed rows come from one set', () => {
+    const g = sigGraph((b, f) => {
+      for (const line of [50, 51, 52]) valueUse('apply', line)(b, f);
+      b.edge(b.def('x/blind'), 'calls', f, { file: 'components/x/src/b.clj', line: 5, attrs: undefined });
+    });
+    const res = signatureImpact(g, 'core/f');
+    const all = rows(res, 'callers');
+    const unknown = all.filter((x) => x.band === 'unknown').length;
+    assert.equal(unknown, 4, '3 value uses and the call without recorded arguments');
+    assert.match(res.verdict, new RegExp(`^${all.length} caller\\(s\\) in \\d+ component\\(s\\), ${unknown} UNKNOWN \\(3 via apply/partial/value, 1 with arguments not recorded\\)`));
+    const text = render(res, { limit: 50 });
+    assert.match(text, new RegExp(`counts: .*callers=${all.length} \\[[^\\]]*\\?${unknown}[^\\]]*\\]`));
+    assert.equal(text.split('\n').filter((l) => l.startsWith('  UNKNOWN:')).length, unknown, 'every UNKNOWN row is listed');
+  });
+  it('says a map parameter is passed on only for a real map parameter that escapes', () => {
+    const detail = (param: object) => {
+      const b = new GraphBuilder();
+      const f = b.def('core/h', 'components/core', { attrs: { signature: { arities: [{ params: [param], variadic: false }] } } });
+      b.edge(b.def('ui/u'), 'calls', f, { attrs: { arity: 1, arity_band: 'static_proven' } });
+      return rows(signatureImpact(v2(b), 'core/h'), 'arities')[0].detail ?? '';
+    };
+    assert.doesNotMatch(detail({ kind: 'symbol', name: 'a', reads_complete: false, escapes: ['passed to +'] }), /map parameter/);
+    assert.doesNotMatch(detail({ kind: 'map', keys: [':a'], reads_complete: false }), /map parameter/, 'incomplete reads without an escape is not "passed on"');
+    assert.match(detail({ kind: 'map', keys: [':a'], as: 'm', reads_complete: false, escapes: ['passed to h'] }), /1 caller\(s\); passes a map parameter on/);
+    assert.match(detail({ kind: 'kwargs', keys: [':a'], as: 'o', reads_complete: false, escapes: ['passed to h'] }), /passes a map parameter on/);
   });
   it('flags an arity no definition has', () => {
     assert.ok(labels(r, 'findings').some((l) => /api\/two calls f with 0 argument/.test(l)));
@@ -470,5 +496,14 @@ describe('key_flow and key_siblings answers stay honest', () => {
     assert.match(r.verdict, /matches 2 files/);
     assert.deepEqual(r.next, ['key_siblings(target="src/app/core.clj")', 'key_siblings(target="src/web/core.clj")']);
     assert.equal(keySiblings(g, 'src/app/core.clj').found, true);
+  });
+});
+
+describe('signature_impact on a built graph', () => {
+  it('(defn target [a b] (+ a b)) does not "pass a map parameter on"', async () => {
+    const { graphOf } = await import('./helpers/inline-graph.ts');
+    const doc = await graphOf({ 'src/demo/core.clj': '(ns demo.core)\n(defn target [a b] (+ a b))\n(defn user [] (target 1 2))\n' });
+    const res = signatureImpact(indexGraph(doc), 'demo.core/target');
+    assert.match(rows(res, 'arities')[0].detail ?? '', /^1 caller\(s\)$/);
   });
 });

@@ -222,6 +222,10 @@ function keysOf(as: ArityDesc[]): Set<string> {
   return new Set(as.flatMap((a) => a.params.flatMap((p) => [...(p.keys ?? []), ...(p.reads ?? [])])));
 }
 
+// Only a destructured map or keyword-args parameter that is handed on; a plain symbol's type is unknown, and incomplete
+// reads alone (a :strs entry) are not a hand-on.
+const passesMapOn = (p: ParamDesc): boolean => (p.kind === 'map' || p.kind === 'kwargs') && !!p.escapes?.length;
+
 function requiredKeys(as: ArityDesc[]): Set<string> {
   return new Set(as.flatMap((a) => a.params.flatMap((p) => (p.keys ?? []).filter((k) => !p.defaults?.includes(k)))));
 }
@@ -317,10 +321,11 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     label: `${g.byId.get(e.from)?.name ?? e.from} uses ${shortName(fn)} via ${typeof e.attrs?.via === 'string' ? e.attrs.via : 'a value'}`,
     reason: 'arity and arguments decided at runtime',
   }));
+  const callerSection = [...callerRows, ...valueRows];
   const arityRows: Row[] = arities.map((a, i) => nodeRow(fn, {
     id: `${fn.id}@${i}`,
     label: arityText(a),
-    detail: `${calls.filter((c) => c.arity === a).length} caller(s)${a.params.some((p) => p.reads_complete === false) ? '; passes a map parameter on' : ''}`,
+    detail: `${calls.filter((c) => c.arity === a).length} caller(s)${a.params.some(passesMapOn) ? '; passes a map parameter on' : ''}`,
   }));
   const sections: Section[] = [];
   const verdict: string[] = [];
@@ -336,16 +341,18 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
   sections.push(
     { name: 'findings', rows: findings, ordered: true, searched: 'arity mismatches, destructured keys no caller passes, passed keys the function never reads' },
     { name: 'arities', rows: arityRows, ordered: true },
-    { name: 'callers', rows: [...callerRows, ...valueRows], searched: 'calls edges into the definition, plus value uses (apply, partial)' },
+    { name: 'callers', rows: callerSection, searched: 'calls edges into the definition, plus value uses (apply, partial)' },
   );
   notes.push(...f.unprovable);
   if (valueRows.length) notes.push(`${valueRows.length} use(s) through apply, partial or as a value: their arity and keys are not provable`);
-  const comps = new Set(callerRows.map((r) => r.component ?? '(no component)'));
+  const comps = new Set(callerSection.map((r) => r.component ?? '(no component)'));
+  const blind = callerRows.filter((r) => r.band === 'unknown').length;
+  const unknownTotal = callerSection.filter((r) => r.band === 'unknown').length;
+  const unknownParts = [...(valueRows.length ? [`${valueRows.length} via apply/partial/value`] : []), ...(blind ? [`${blind} with arguments not recorded`] : [])];
   verdict.push(
-    `${calls.length} caller(s) in ${comps.size} component(s)`,
+    `${callerSection.length} caller(s) in ${comps.size} component(s)${unknownTotal ? `, ${unknownTotal} UNKNOWN (${unknownParts.join(', ')})` : ''}`,
     `arities ${arities.map((a) => (a.variadic ? `${fixedCount(a)}+` : String(fixedCount(a)))).join(', ')}`,
     findings.length ? `${findings.length} finding(s): ${f.arityMissing.length} arity not defined, ${f.neverPassed.length} key never passed, ${f.unread.length} unread key passed` : 'no finding',
-    ...(valueRows.length ? [`${valueRows.length} UNKNOWN (apply/partial/value)`] : []),
   );
   const neverKey = f.neverPassed[0]?.key;
   const crossCaller = calls.find((c) => g.byId.get(c.edge.from)?.component !== fn.component);
