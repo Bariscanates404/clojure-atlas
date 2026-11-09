@@ -22,7 +22,7 @@ export interface Context {
   config: ProjectConfig;
   playwright: Playwright;
   projectNs: ReadonlySet<string>;
-  // "ns/name" to its first definition
+  // "ns/name" to its definition (the first one, see merged)
   defs: ReadonlyMap<string, VarDef>;
   edn: readonly string[];
   forms: (file: string) => Form[];
@@ -78,9 +78,23 @@ export function groupBy<T>(xs: Iterable<T>, key: (x: T) => string): Map<string, 
 export const defId = (fullName: string) => `definition:${fullName}`;
 export const nsId = (ns: string) => `namespace:${ns}`;
 
+const isDeclare = (d: VarDef) => /(^|\/)declare$/.test(d.definedBy ?? '');
+
+// The definitions of one name: the first one stands, unless it is a (declare ...) and a later one is the real
+// definition; the platforms they are defined for add up (the same namespace in a .clj and a .cljs file).
+function merged(prev: VarDef, d: VarDef): VarDef {
+  const winner = isDeclare(prev) && !isDeclare(d) ? d : prev;
+  return { ...winner, langs: [...new Set([...prev.langs, ...d.langs])].sort() };
+}
+
 export function createContext(analysis: Analysis, config: ProjectConfig, playwright: Playwright, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
   const defs = new Map<string, VarDef>();
-  for (const d of analysis.varDefs) if (d.name && !LANGUAGE_NS.test(d.ns) && !defs.has(`${d.ns}/${d.name}`)) defs.set(`${d.ns}/${d.name}`, d);
+  for (const d of analysis.varDefs) {
+    if (!d.name || LANGUAGE_NS.test(d.ns)) continue;
+    const full = `${d.ns}/${d.name}`;
+    const prev = defs.get(full);
+    defs.set(full, prev ? merged(prev, d) : d);
+  }
   const cache = new Map<string, Form[]>();
   const parents = new Map<string, Map<string, { parent: Form; index: number }>>();
   const at = (file: string, row: number, col: number) => `${file}:${row}:${col}`;
