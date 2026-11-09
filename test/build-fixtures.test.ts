@@ -14,7 +14,7 @@ const FIXTURES: [string, string][] = [
   ['project-config', "the project's .clj-kondo lint-as honored: a def-like macro and a defrecord-like macro; record constructors ->R, map->R, R. and the class; a usage of a var its namespace never defines is unresolved"],
   ['relations', 'calls vs references vs passed callbacks (vector, partial, comp, apply, alias, closure, empty map), a handler registered with add-watch, macro expansion, binding/with-redefs as UNKNOWN, dispatch candidates for defmulti, extend-type, extend-protocol, reify'],
   ['multimethods', 'defmethod nodes, resolved keyword dispatch, heuristic dispatch edges, a library multimethod'],
-  ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event'],
+  ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event, the re-frame.alpha re-exports'],
   ['routes', 'compojure context mounts, reitit route data with middleware, pedestal table routes and interceptors'],
   ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],

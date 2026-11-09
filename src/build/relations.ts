@@ -20,7 +20,7 @@ const REBINDINGS = new Set(['binding', 'with-redefs', 'with-bindings']);
 const DEFINING = new Set(['def', 'defonce']);
 // functions that store their last argument as a handler; the arguments before it (ids, interceptors, keys) are values
 const REGISTRARS = new Set([
-  ...['reg-event-db', 'reg-event-fx', 'reg-event-ctx', 'reg-sub', 'reg-sub-raw', 'reg-fx', 'reg-cofx'].map((n) => `re-frame.core/${n}`),
+  ...['core', 'alpha'].flatMap((ns) => ['reg-event-db', 'reg-event-fx', 'reg-event-ctx', 'reg-sub', 'reg-sub-raw', 'reg-fx', 'reg-cofx'].map((n) => `re-frame.${ns}/${n}`)),
   'clojure.core/add-watch', 'clojure.core/add-tap',
 ]);
 

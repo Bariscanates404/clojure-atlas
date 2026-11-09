@@ -121,7 +121,7 @@ function dedupe<T>(xs: T[], k: (x: T) => string, merge: (a: T, b: T) => T = (a) 
 
 function reFrame(r: Raw): ReFrameContext | undefined {
   const ctx = r.context as Raw | undefined;
-  const rf = ctx && (ctx['re-frame.core'] as Raw | undefined);
+  const rf = ctx && ((ctx['re-frame.core'] ?? ctx['re-frame.alpha']) as Raw | undefined);
   if (!rf || typeof rf !== 'object') return undefined;
   return {
     ...(s(rf['in-id']) ? { inId: s(rf['in-id']) } : {}),

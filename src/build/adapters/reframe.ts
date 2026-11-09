@@ -6,9 +6,10 @@ import { keywordName, type Keyword, type VarUse } from '../analysis.ts';
 import { contains, formAt, kids, unwrap } from '../reader.ts';
 import { defId, groupBy, type Adapter, type Container, type Context, type Owner } from '../model.ts';
 
-const RF = 're-frame.core';
-const EVENT_REG = /^re-frame\.core\/reg-event-(db|fx|ctx)$/;
-const SUB_REG = /^re-frame\.core\/reg-sub(-raw)?$/;
+// re-frame.alpha re-exports re-frame.core's registration and dispatch fns
+const RF = new Set(['re-frame.core', 're-frame.alpha']);
+const EVENT_REG = /^re-frame\.(core|alpha)\/reg-event-(db|fx|ctx)$/;
+const SUB_REG = /^re-frame\.(core|alpha)\/reg-sub(-raw)?$/;
 
 interface Registration {
   kw: Keyword;
@@ -24,12 +25,12 @@ const nodeId = (kind: string, name: string) => `${kind}:${name}`;
 const handlerId = (r: Pick<Registration, 'kind' | 'name' | 'form'>) => `handler:${r.kind} ${r.name} ${r.form.file}:${r.form.row}`;
 
 function registrations(ctx: Context): Registration[] {
-  const regCalls = groupBy(ctx.analysis.varUses.filter((u) => u.to === RF && u.name.startsWith('reg-')), (u) => u.file);
+  const regCalls = groupBy(ctx.analysis.varUses.filter((u) => RF.has(u.to) && u.name.startsWith('reg-')), (u) => u.file);
   const out: Registration[] = [];
   for (const kw of ctx.analysis.keywords) {
     const kind = EVENT_REG.test(kw.reg ?? '') ? 'event' : SUB_REG.test(kw.reg ?? '') ? 'subscription' : null;
     if (!kind) continue;
-    const form = (regCalls.get(kw.file) ?? []).find((u) => `${RF}/${u.name}` === kw.reg && contains(u, kw.row, kw.col));
+    const form = (regCalls.get(kw.file) ?? []).find((u) => `${u.to}/${u.name}` === kw.reg && contains(u, kw.row, kw.col));
     if (!form) continue;
     const list = formAt(ctx.forms(kw.file), form.row, form.col);
     // the handler is the last argument; interceptors and signal inputs come before it
@@ -43,7 +44,7 @@ function registrations(ctx: Context): Registration[] {
 export const reFrame: Adapter = {
   name: 'events',
   edgeKinds: ['registers', 'dispatches', 'subscribes'],
-  detect: (ctx) => (ctx.analysis.nsUses.some((u) => u.to === RF) ? RF : null),
+  detect: (ctx) => ctx.analysis.nsUses.find((u) => RF.has(u.to))?.to ?? null,
   containers: (ctx): Container[] => registrations(ctx).filter((r) => !r.handlerDef).map((r) => ({ id: handlerId(r), span: r.form })),
   run: (ctx: Context, owner: Owner) => {
     const nodes: GraphNode[] = [];

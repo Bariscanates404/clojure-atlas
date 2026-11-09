@@ -6,8 +6,14 @@ import { spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { concat, normalize, type Analysis } from './analysis.ts';
 
-// Library macros that define a var but that clj-kondo does not know without the library's exported config.
-export const BUILT_IN_LINT_AS: Record<string, string> = { 'mount.core/defstate': 'clojure.core/def', 'mount.lite/defstate': 'clojure.core/def' };
+// Library macros that define a var but that clj-kondo does not know without the library's exported config, and
+// re-frame.alpha's re-exports of re-frame.core, which clj-kondo's re-frame analysis knows only under re-frame.core.
+export const BUILT_IN_LINT_AS: Record<string, string> = {
+  'mount.core/defstate': 'clojure.core/def',
+  'mount.lite/defstate': 'clojure.core/def',
+  ...Object.fromEntries(['reg-event-db', 'reg-event-fx', 'reg-event-ctx', 'reg-sub', 'reg-sub-raw', 'dispatch', 'dispatch-sync', 'subscribe']
+    .map((n) => [`re-frame.alpha/${n}`, `re-frame.core/${n}`])),
+};
 
 // The lint-as atlas adds: its built-ins only where the project's own clj-kondo config says nothing about the symbol
 // (its lint-as or hooks win), then what .clojure-atlas.edn declares.
