@@ -72,7 +72,7 @@ export function signatureOf(n: GraphNode | undefined): ArityDesc[] | null {
   }));
 }
 
-export function callAttrs(e: GraphEdge): CallAttrs | null {
+function callAttrs(e: GraphEdge): CallAttrs | null {
   const a = e.attrs;
   if (!a || typeof a.arity !== 'number') return null;
   const args: CallArg[] | undefined = Array.isArray(a.args)
@@ -95,7 +95,7 @@ export function callAttrs(e: GraphEdge): CallAttrs | null {
 }
 
 const REST = new Set(['rest', 'kwargs']);
-export const fixedCount = (a: ArityDesc) => a.params.filter((p) => !REST.has(p.kind)).length;
+const fixedCount = (a: ArityDesc) => a.params.filter((p) => !REST.has(p.kind)).length;
 
 export function arityFor(arities: ArityDesc[], n: number): ArityDesc | undefined {
   return arities.find((a) => !a.variadic && fixedCount(a) === n) ?? arities.find((a) => a.variadic && n >= fixedCount(a));
@@ -113,7 +113,7 @@ function paramText(p: ParamDesc): string {
   return p.name ?? '_';
 }
 
-export const arityText = (a: ArityDesc) => `[${a.params.map(paramText).join(' ')}]${a.platform ? ` (${a.platform} only)` : ''}`;
+const arityText = (a: ArityDesc) => `[${a.params.map(paramText).join(' ')}]${a.platform ? ` (${a.platform} only)` : ''}`;
 
 const keyList = (ks: string[]) => `{${ks.join(' ')}}`;
 export const isTestFile = (f: string | null | undefined) => !!f && /(^|\/)test\/|_test\.clj[sc]?$/.test(f);
@@ -520,8 +520,8 @@ export interface SiblingAnalysis {
   explained: { row: TableRow; key: string; why: string }[];
 }
 
-export const MAJORITY = 0.6;
-export const SAME_KIND_MAX = 0.25;
+const MAJORITY = 0.6;
+const SAME_KIND_MAX = 0.25;
 // context_for_change: a key absent in this share of sibling rows or more is no sibling pattern, the row is not shown
 export const WEAK_PATTERN_ABSENT = 0.3;
 

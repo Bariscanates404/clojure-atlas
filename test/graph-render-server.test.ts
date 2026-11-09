@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import * as lib from '../src/mcp/index.ts';
+import { BANDS } from '../src/mcp/graph.ts';
 import { parseMcpArgs } from '../src/cli.ts';
 import { DEFAULT_GRAPH } from '../src/build/index.ts';
-import type { QueryResult, Row } from '../src/mcp/queries.ts';
+import { callers, type QueryResult, type Row } from '../src/mcp/queries.ts';
 import {
   bandMix, CHARS_PER_TOKEN, clampLimit, DEFAULT_LIMIT, DEFAULT_MAX_TOKENS, MAX_LIMIT, rankRows, render, where, why,
 } from '../src/mcp/render.ts';
@@ -251,9 +248,9 @@ describe('render: every row line of a real query is cited', () => {
   it('callers with mixed bands', () => {
     const g = new GraphBuilder();
     const t = g.def('t/t');
-    for (let i = 0; i < 30; i++) g.edge(g.def(`c/f${i}`, `components/c${i % 3}`), 'calls', t, { band: lib.BANDS[i % 3] });
+    for (let i = 0; i < 30; i++) g.edge(g.def(`c/f${i}`, `components/c${i % 3}`), 'calls', t, { band: BANDS[i % 3] });
     g.edge(g.def('c/unk'), 'calls', t, { band: 'unknown' });
-    const text = render(lib.callers(g.build(), 't/t'), { limit: 500, maxTokens: 100000 });
+    const text = render(callers(g.build(), 't/t'), { limit: 500, maxTokens: 100000 });
     const lines = rowLines(text);
     assert.equal(lines.length, 31, '30 callers and the definition row');
     for (const l of lines) assert.match(l, /\S+(:\d+)? \[(S|D|H|\?)\]/);
@@ -473,22 +470,3 @@ describe('entry point args', () => {
   it('a bad max distance is rejected', () => assert.throws(() => parseMcpArgs(['--graph', 'g', '--max-distance', 'x']), /non-negative integer/));
 });
 
-describe('library API', () => {
-  it('exports the same queries the server serves, on a loaded file', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'code-graph-lib-'));
-    const p = join(dir, 'g.json');
-    writeFileSync(p, JSON.stringify(serverGraph().doc));
-    const g = lib.loadGraph(p);
-    assert.equal(lib.callers(g, 'core/save').found, true);
-    assert.equal(lib.routeAuthz(g, '/font').found, true);
-    assert.equal(lib.permissionRoutes(g, ':edit-article').found, true);
-    assert.equal(lib.attributeUsage(g, ':article/n').found, true);
-    assert.equal(lib.eventFlow(g, ':article/save').found, true);
-    assert.equal(lib.testsCovering(g, 'qa-x').found, true);
-    assert.equal(lib.blastRadius(g, 'core/save').found, true);
-    assert.equal(lib.FORMAT, 'code-graph');
-    assert.equal(lib.VERSION, 2);
-    assert.equal(lib.MAX_DEPTH, 3);
-    assert.equal(typeof lib.render(lib.callers(g, 'core/save')), 'string');
-  });
-});

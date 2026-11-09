@@ -12,7 +12,7 @@ import { readPlaywright } from './typescript.ts';
 import { createContext } from './model.ts';
 
 export const DEFAULT_GRAPH = '.clojure-atlas/graph.json.gz';
-export const CONFIG_FILE = '.clojure-atlas.edn';
+const CONFIG_FILE = '.clojure-atlas.edn';
 
 // readTs reads the Playwright side; tests hand in one bound to a TypeScript of their choosing.
 export async function buildGraph(dir: string, readTs: typeof readPlaywright = readPlaywright): Promise<AtlasDocument> {

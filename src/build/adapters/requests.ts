@@ -22,7 +22,7 @@ interface Request {
   from: string;
 }
 
-export const requestId = (r: Pick<Request, 'file' | 'row' | 'col'>) => `request:${r.file}:${r.row}:${r.col}`;
+const requestId = (r: Pick<Request, 'file' | 'row' | 'col'>) => `request:${r.file}:${r.row}:${r.col}`;
 
 // "/a" -> /a, literal; (str "/a/" id "/b") -> /a/{p}/b, built at runtime; a project URL helper whose body is
 // (str "/api" ...) or (apply str "/api" args) prefixes what it is given. Anything else is not a path.

@@ -5,7 +5,7 @@ import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import type { ProtocolImpl } from '../analysis.ts';
 import { defId, nsId, type Adapter, type Container } from '../model.ts';
 
-export const implementationId = (p: ProtocolImpl) => `implementation:${p.file}:${p.row}:${p.col}`;
+const implementationId = (p: ProtocolImpl) => `implementation:${p.file}:${p.row}:${p.col}`;
 
 export const implementations: Adapter = {
   name: 'implementations',

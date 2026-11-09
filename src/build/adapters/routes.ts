@@ -60,8 +60,8 @@ export interface Route {
 const NO_AUTHZ: Authz = { permissions: [] };
 
 export const routeId = (r: Pick<Route, 'method' | 'path' | 'base' | 'mount'>) => `route:${r.method} ${r.path} @${r.base}${r.mount}`;
-export const permissionId = (name: string) => `permission:${name}`;
-export const exemptionId = (reason: string) => `authz_exemption:${reason}`;
+const permissionId = (name: string) => `permission:${name}`;
+const exemptionId = (reason: string) => `authz_exemption:${reason}`;
 
 
 function literalPath(f: Form | undefined): string | undefined {

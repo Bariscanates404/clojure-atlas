@@ -3,7 +3,7 @@
 // get, get-in, select-keys, contains?, find and destructuring consume it; dissoc removes it. Threaded slots are HEURISTIC.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { keywordName, type Keyword } from '../analysis.ts';
-import { flatChildren, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
+import { flatChildren, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { CORE_NS, type Adapter, type Context, type Owner } from '../model.ts';
 
 type Role = 'produces_key' | 'consumes_key' | 'removes_key';
@@ -19,7 +19,7 @@ const BINDING_FORMS = new Set(['let', 'loop', 'binding', 'when-let', 'if-let', '
 const FN_FORMS = new Set(['fn', 'defn', 'defn-', 'defmacro', 'defmethod', 'bound-fn']);
 const DESTRUCTURE_KEYS = new Set([':keys', ':strs', ':syms', ':as', ':or']);
 
-export const keyId = (name: string) => `key:${name}`;
+const keyId = (name: string) => `key:${name}`;
 
 // The clojure.core function a list calls, by name.
 function coreHead(ctx: Context, file: string, list: Form): string | undefined {

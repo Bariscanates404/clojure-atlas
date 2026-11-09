@@ -44,7 +44,7 @@ function assertionHeads(ctx: Context): (u: VarUse) => boolean {
 
 const isTestDef = (d: VarDef) => d.test || /(^|\/)(deftest|defspec)$/.test(d.definedBy ?? '');
 
-export function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): GraphNode {
+function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): GraphNode {
   const component = ctx.componentOf(d.file);
   const test = isTestDef(d) || isTestFile(d.file);
   return {

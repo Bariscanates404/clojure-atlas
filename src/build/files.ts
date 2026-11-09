@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-export const SOURCE_EXT = /\.(clj|cljs|cljc)$/;
+const SOURCE_EXT = /\.(clj|cljs|cljc)$/;
 const EDN_EXT = /\.edn$/;
 const TS_EXT = /(?<!\.d)\.ts$/;
 const MODULE_FILES = new Set(['deps.edn', 'project.clj', 'shadow-cljs.edn', 'bb.edn', 'build.boot']);

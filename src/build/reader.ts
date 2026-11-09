@@ -198,9 +198,6 @@ export function readForms(src: string): ReadResult {
 // The text of an atom (symbol, keyword, string, ...); collections and wrappers have none.
 export const textOf = (f: Form | undefined): string | undefined => (f && 'text' in f ? f.text : undefined);
 
-export const isColl = (f: Form): f is Pos & { t: Coll; children: Form[]; ns?: string } =>
-  f.t === 'list' || f.t === 'vector' || f.t === 'map' || f.t === 'set' || f.t === 'fn';
-
 // Children of any form that has them (collections and wrappers alike).
 export const kids = (f: Form): Form[] => ('children' in f ? f.children : []);
 

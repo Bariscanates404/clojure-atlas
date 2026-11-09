@@ -14,12 +14,7 @@ const READS = new Set(['q', 'query', 'qseq', 'pull', 'pull-many', 'entity', 'ent
 const RESERVED = /^:(db|db\.[a-z]+|xt|xtdb\.api|crux\.db|crux\.tx|fressian)\//;
 const TX_OPS = /^:(db\/(add|retract|cas)|db\.fn\/[a-z]+|xtdb\.api\/(put|delete|match)|xt\/(put|delete|match))$/;
 
-export const attributeId = (kind: string, name: string) => `${kind}:${name}`;
-
-interface Site {
-  name: string;
-  form: Form;
-}
+const attributeId = (kind: string, name: string) => `${kind}:${name}`;
 
 const isKeyword = (f: Form) => unwrap(f).t === 'keyword';
 

@@ -21,9 +21,9 @@ interface Registration {
 
 const nodeId = (kind: string, name: string) => `${kind}:${name}`;
 // an inline handler, keyed by what it registers and where: an event and a subscription may share a keyword
-export const handlerId = (r: Pick<Registration, 'kind' | 'name' | 'form'>) => `handler:${r.kind} ${r.name} ${r.form.file}:${r.form.row}`;
+const handlerId = (r: Pick<Registration, 'kind' | 'name' | 'form'>) => `handler:${r.kind} ${r.name} ${r.form.file}:${r.form.row}`;
 
-export function registrations(ctx: Context): Registration[] {
+function registrations(ctx: Context): Registration[] {
   const regCalls = groupBy(ctx.analysis.varUses.filter((u) => u.to === RF && u.name.startsWith('reg-')), (u) => u.file);
   const out: Registration[] = [];
   for (const kw of ctx.analysis.keywords) {

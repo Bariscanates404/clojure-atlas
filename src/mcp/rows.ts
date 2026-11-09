@@ -67,7 +67,7 @@ export function entryOf(g: Graph, id: string): string | undefined {
   return undefined;
 }
 
-export const fanInOf = (g: Graph, id: string) => inEdges(g, id, ['calls']).length;
+const fanInOf = (g: Graph, id: string) => inEdges(g, id, ['calls']).length;
 
 export function edgeRow(g: Graph, nodeId: string, e: GraphEdge, extra: Partial<Row> = {}): Row {
   const n = g.byId.get(nodeId);
@@ -88,7 +88,7 @@ export function edgeRow(g: Graph, nodeId: string, e: GraphEdge, extra: Partial<R
   };
 }
 
-export const nodeSite = (n: GraphNode): { file: string | null; line: number | null } => ({ file: n.file ?? null, line: n.line ?? null });
+const nodeSite = (n: GraphNode): { file: string | null; line: number | null } => ({ file: n.file ?? null, line: n.line ?? null });
 
 export function nodeRow(n: GraphNode, extra: Partial<Row> = {}): Row {
   return { label: n.name, id: n.id, ...nodeSite(n), band: 'static_proven', kind: n.kind, ...(n.component ? { component: n.component } : {}), ...extra };
@@ -124,7 +124,7 @@ export function unknownNote(rows: Row[]): string[] {
 
 // ---------- resolution ----------
 
-export function stripKw(q: string): string {
+function stripKw(q: string): string {
   return q.trim().replace(/^:/, '');
 }
 

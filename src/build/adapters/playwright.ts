@@ -8,9 +8,9 @@ import { entries, keywordOf } from './route-data.ts';
 import type { Selector } from '../typescript.ts';
 
 const selectorKey = (s: Selector) => (s.kind === 'class' ? s.value : `testid=${s.value}`);
-export const selectorId = (s: Selector) => `selector:${selectorKey(s)}`;
-export const memberId = (member: string) => `page_object_member:${member}`;
-export const testId = (file: string, line: number) => `test:${file}:${line}`;
+const selectorId = (s: Selector) => `selector:${selectorKey(s)}`;
+const memberId = (member: string) => `page_object_member:${member}`;
+const testId = (file: string, line: number) => `test:${file}:${line}`;
 
 // Classes and test ids a hiccup form names: :div.a.b#id, {:class "a b"}, {:class ["a" "b"]}, {:data-testid "x"}.
 function rendered(f: Form): Selector[] {

@@ -14,7 +14,7 @@ const MALLI_TYPES = new Set([
   ':cat', ':catn', ':alt', ':altn', ':=>', ':function', ':schema', ':ref', ':merge', ':union', ':select-keys',
 ]);
 
-export const schemaId = (name: string) => `schema:${name}`;
+const schemaId = (name: string) => `schema:${name}`;
 
 // Whether a place lies inside a call to one of the selected vars.
 function inCallOf(ctx: Context, select: (u: VarUse) => boolean): (file: string, row: number, col: number) => boolean {

@@ -74,7 +74,7 @@ export function selectorsIn(css: string): Selector[] {
   return out;
 }
 
-export function readProject(ts: Ts, root: string, dir: string, files: readonly string[]): PlaywrightProject {
+function readProject(ts: Ts, root: string, dir: string, files: readonly string[]): PlaywrightProject {
   const abs = (f: string) => path.join(root, f);
   const configPath = ts.findConfigFile(abs(dir), ts.sys.fileExists);
   const options = configPath

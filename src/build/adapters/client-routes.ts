@@ -10,7 +10,7 @@ const CLIENT_KEYS = [':name', ':view'];
 
 const usesReitit = (u: { file: string; to: string }) => u.file.endsWith('.cljs') && u.to.startsWith('reitit.');
 
-export const clientRouteId = (path: string) => `client_route:${canonicalPath(path)}`;
+const clientRouteId = (path: string) => `client_route:${canonicalPath(path)}`;
 
 interface ClientRoute {
   path: string;

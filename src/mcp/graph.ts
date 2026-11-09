@@ -6,7 +6,7 @@ import { gunzipSync } from 'node:zlib';
 
 export const FORMAT = 'code-graph';
 export const VERSION = 2;
-export const SUPPORTED_VERSIONS: readonly number[] = [1, 2];
+const SUPPORTED_VERSIONS: readonly number[] = [1, 2];
 
 // Upper bounds for one graph file on disk and inflated: a bigger file is refused before it is read or gunzipped.
 const MAX_GRAPH_BYTES = 256 * 1024 * 1024;

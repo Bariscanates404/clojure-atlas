@@ -11,7 +11,7 @@ const IG_METHODS = /^integrant\.core\/(init-key|halt-key!|suspend-key!|resume-ke
 const MOUNT = /^mount\.(core|lite)\/defstate$/;
 const COMPONENT = 'com.stuartsierra.component';
 
-export const systemKeyId = (name: string) => `system_key:${name}`;
+const systemKeyId = (name: string) => `system_key:${name}`;
 
 interface Key {
   name: string;

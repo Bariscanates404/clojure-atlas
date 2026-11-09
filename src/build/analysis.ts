@@ -87,7 +87,7 @@ export interface Analysis {
   syntaxErrors: SyntaxError[];
 }
 
-export const emptyAnalysis = (): Analysis => ({
+const emptyAnalysis = (): Analysis => ({
   nsDefs: [], nsUses: [], varDefs: [], varUses: [], keywords: [], protocolImpls: [], syntaxErrors: [],
 });
 

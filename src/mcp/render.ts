@@ -55,7 +55,7 @@ export const DEFAULT_MAX_TOKENS = { concise: 1500, detailed: 4000 } as const;
 export const CHARS_PER_TOKEN = 4;
 const DETAIL_TOP = 5;
 
-export const BAND_CODE: Record<string, string> = { static_proven: 'S', declared: 'D', heuristic: 'H', unknown: '?' };
+const BAND_CODE: Record<string, string> = { static_proven: 'S', declared: 'D', heuristic: 'H', unknown: '?' };
 const LEGEND = 'legend: [S] static_proven  [D] declared  [H] heuristic (name or pattern match; the cited line is the evidence)  [?] unknown, not provable';
 
 export function clampLimit(limit: number | undefined, format: ResponseFormat = 'concise'): number {
@@ -79,7 +79,7 @@ export function why(r: Row, crossShownInGroup = false): string {
   return parts.slice(0, 2).join(', ');
 }
 
-export function rankKey(r: Row): (number | string)[] {
+function rankKey(r: Row): (number | string)[] {
   return [BANDS.indexOf(r.band), r.depth ?? 0, r.entry ? 0 : 1, -(r.fanIn ?? 0), r.cross ? 0 : 1, r.label];
 }
 

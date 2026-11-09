@@ -4,14 +4,14 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { BANDS, capability, inEdges, outEdges, weakest, compareText } from './graph.ts';
 import {
-  ambiguous, call, capabilityNotes, countBy, edgeRow, entryOf, fanInOf, nodeRow, notFound, resolve, site, unknownNote,
+  ambiguous, call, capabilityNotes, countBy, edgeRow, nodeRow, notFound, resolve, unknownNote,
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
 
 export { entryOf, resolve, type QueryResult, type Row, type Section } from './rows.ts';
 
-export const MAX_DEPTH = 3;
+const MAX_DEPTH = 3;
 
 // ---------- callers / blast radius ----------
 
@@ -253,8 +253,8 @@ function permDetail(p: PermEdge): string {
 export type AuthzState = 'permission' | 'exempt' | 'none' | 'unknown';
 
 // Without an available route_authz capability no route's check was extracted: a route with no edge is unknown, not unguarded.
-export const routeAuthzMissing = (g: Graph): boolean => capability(g, 'route_authz')?.status !== 'available';
-export const ROUTE_AUTHZ_MISSING = 'not provable: route authz not in this graph';
+const routeAuthzMissing = (g: Graph): boolean => capability(g, 'route_authz')?.status !== 'available';
+const ROUTE_AUTHZ_MISSING = 'not provable: route authz not in this graph';
 
 export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; text: string } {
   const permE = outEdges(g, routeId, ['requires_permission']);
