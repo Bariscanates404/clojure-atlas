@@ -1,0 +1,198 @@
+// Persisted attributes of Datomic, datascript and XTDB: schema maps define them, transaction and query calls
+// prove writes and reads; a query literal outside a call reads them HEURISTICALLY, and any other use of a known
+// attribute keyword is a reference of UNKNOWN role whose context the attribute_usage tool ranks.
+import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
+import { flatChildren, formAt, kids, unwrap, walk, type Form } from '../reader.ts';
+import type { Adapter, Context, Owner } from '../model.ts';
+
+const DB_LIBS: Record<string, string> = {
+  'datomic.api': 'datomic', 'datomic.client.api': 'datomic', 'datascript.core': 'datascript', 'xtdb.api': 'xtdb', 'crux.api': 'xtdb',
+};
+const WRITES = new Set(['transact', 'transact!', 'transact-async', 'with', 'db-with', 'submit-tx', 'submit-tx-async', 'reset-conn!']);
+const READS = new Set(['q', 'query', 'qseq', 'pull', 'pull-many', 'entity', 'entity-history', 'datoms', 'seek-datoms', 'index-range']);
+const RESERVED = /^:(db|db\.[a-z]+|xt|xtdb\.api|crux\.db|crux\.tx|fressian)\//;
+const TX_OPS = /^:(db\/(add|retract|cas)|db\.fn\/[a-z]+|xtdb\.api\/(put|delete|match)|xt\/(put|delete|match))$/;
+
+export const attributeId = (kind: string, name: string) => `${kind}:${name}`;
+
+interface Site {
+  name: string;
+  form: Form;
+}
+
+const isKeyword = (f: Form) => unwrap(f).t === 'keyword';
+
+// Keyword forms that name attributes in transaction data: map keys (nested maps included) and the attribute slot of
+// an operation vector such as [:db/add e :attr v].
+function txAttributes(name: (f: Form) => string, f: Form): Form[] {
+  const u = unwrap(f);
+  if (u.t === 'map') {
+    const xs = flatChildren(u);
+    return xs.flatMap((x, k) => (k % 2 === 0 ? (isKeyword(x) ? [unwrap(x)] : []) : txAttributes(name, x)));
+  }
+  if (u.t === 'vector' || u.t === 'list') {
+    const xs = flatChildren(u);
+    if (xs[0] && isKeyword(xs[0]) && TX_OPS.test(name(unwrap(xs[0])))) {
+      return [...(xs[2] && isKeyword(xs[2]) ? [unwrap(xs[2])] : []), ...xs.slice(1).flatMap((x) => (unwrap(x).t === 'map' ? txAttributes(name, x) : []))];
+    }
+    return xs.flatMap((x) => txAttributes(name, x));
+  }
+  return [];
+}
+
+// Keyword forms a query or pull reads: the attribute slot of a data pattern [?e :attr ?v] and every key of a pull
+// pattern; :find, :in and value positions are not attributes.
+function readAttributes(f: Form): Form[] {
+  const u = unwrap(f);
+  if (u.t !== 'vector' && u.t !== 'list' && u.t !== 'map') return [];
+  const xs = flatChildren(u);
+  if (u.t === 'vector' && xs[0] && unwrap(xs[0]).t === 'symbol') {
+    const first = (unwrap(xs[0]) as { text: string }).text;
+    const slot = first.startsWith('$') ? 2 : 1;
+    if (/^[?_$]/.test(first)) return xs[slot] && isKeyword(xs[slot]) ? [unwrap(xs[slot])] : [];
+  }
+  if (u.t === 'vector' && xs.length && xs.every((x) => ['keyword', 'map', 'symbol', 'list', 'vector'].includes(unwrap(x).t)) && xs.some(isKeyword) && !xs.some((x) => /^:(find|where|in|keys)$/.test((unwrap(x) as { text?: string }).text ?? ''))) {
+    return xs.flatMap((x) => (isKeyword(x) ? [unwrap(x)] : unwrap(x).t === 'map' ? flatChildren(unwrap(x)).flatMap((y, k) => (k % 2 === 0 && isKeyword(y) ? [unwrap(y)] : readAttributes(y))) : readAttributes(x)));
+  }
+  return xs.flatMap(readAttributes);
+}
+
+const isQueryLiteral = (f: Form): boolean => {
+  const xs = flatChildren(f);
+  if (f.t === 'vector') return !!xs[0] && (unwrap(xs[0]) as { text?: string }).text === ':find';
+  if (f.t === 'map') return xs.some((x, k) => k % 2 === 0 && (unwrap(x) as { text?: string }).text === ':find');
+  return false;
+};
+
+interface Definition {
+  name: string;
+  kind: 'data_attribute' | 'data_value';
+  file: string;
+  line: number;
+  col: number;
+}
+
+// {:db/ident :a ...} defines an attribute (with :db/valueType) or an enum value; a datascript schema map
+// {:a {:db/unique ...}} defines its keys.
+function schemaDefinitions(name: (f: Form) => string, file: string, forms: readonly Form[]): Definition[] {
+  const out: Definition[] = [];
+  for (const f of walk(forms)) {
+    if (f.t !== 'map') continue;
+    const xs = flatChildren(f);
+    const keys = xs.filter((_, k) => k % 2 === 0).map((x) => (isKeyword(x) ? name(unwrap(x)) : ''));
+    const ident = keys.indexOf(':db/ident');
+    if (ident >= 0 && xs[ident * 2 + 1] && isKeyword(xs[ident * 2 + 1])) {
+      const target = unwrap(xs[ident * 2 + 1]);
+      out.push({ name: name(target), kind: keys.includes(':db/valueType') ? 'data_attribute' : 'data_value', file, line: target.row, col: target.col });
+      continue;
+    }
+    const vals = xs.filter((_, k) => k % 2 === 1).map(unwrap);
+    const isSchema = vals.length > 0 && vals.every((v) => v.t === 'map' && flatChildren(v).length > 0
+      && flatChildren(v).every((y, k) => k % 2 === 1 || (isKeyword(y) && /^:db\//.test(name(unwrap(y))))));
+    if (isSchema && keys.every((k) => k && !RESERVED.test(k))) {
+      xs.forEach((x, k) => { if (k % 2 === 0) out.push({ name: name(unwrap(x)), kind: 'data_attribute', file, line: x.row, col: x.col }); });
+    }
+  }
+  return out;
+}
+
+interface Use {
+  name: string;
+  kind: 'writes' | 'reads' | 'references';
+  band: 'static_proven' | 'heuristic' | 'unknown';
+  file: string;
+  row: number;
+  col: number;
+  from: string;
+  fromVar?: string;
+  context: string;
+}
+
+export const dataAttributes: Adapter = {
+  name: 'data_attributes',
+  edgeKinds: ['writes', 'reads', 'references'],
+  detect: (ctx) => {
+    const libs = new Set(ctx.analysis.nsUses.flatMap((u) => (DB_LIBS[u.to] ? [DB_LIBS[u.to]] : [])));
+    return libs.size ? [...libs].sort().join(', ') : null;
+  },
+  run: (ctx: Context, owner: Owner) => {
+    const nsOf = new Map(ctx.analysis.nsDefs.map((d) => [d.file, d.name]));
+    const nameIn = (file: string) => (f: Form) => ctx.keywordAt(file, f.row, f.col) ?? ('text' in f ? f.text : '');
+    const defs: Definition[] = [];
+    const uses: Use[] = [];
+    const seen = new Set<string>();
+    const add = (u: Use) => {
+      const k = `${u.file}:${u.row}:${u.col}`;
+      if (seen.has(k) || RESERVED.test(u.name)) return;
+      seen.add(k);
+      uses.push(u);
+    };
+    for (const file of [...ctx.edn, ...nsOf.keys()]) defs.push(...schemaDefinitions(nameIn(file), file, ctx.forms(file)));
+    // a definition site is neither a read nor a write nor a reference
+    for (const d of defs) seen.add(`${d.file}:${d.line}:${d.col}`);
+
+    const calls = ctx.analysis.varUses.filter((u) => DB_LIBS[u.to] && (WRITES.has(u.name) || READS.has(u.name)));
+    for (const call of calls) {
+      const form = formAt(ctx.forms(call.file), call.row, call.col);
+      if (!form) continue;
+      const name = nameIn(call.file);
+      const write = WRITES.has(call.name);
+      const found = kids(form).slice(1).flatMap((a) => (write ? txAttributes(name, a) : readAttributes(a)));
+      for (const f of found) {
+        add({ name: name(f), kind: write ? 'writes' : 'reads', band: 'static_proven', file: call.file, row: f.row, col: f.col, from: call.from, ...(call.fromVar ? { fromVar: call.fromVar } : {}), context: `@${call.to}/${call.name}` });
+      }
+    }
+    const kwAt = new Map(ctx.analysis.keywords.map((k) => [`${k.file}:${k.row}:${k.col}`, k]));
+    for (const [file, ns] of nsOf) {
+      const name = nameIn(file);
+      for (const f of walk(ctx.forms(file))) {
+        if (!isQueryLiteral(f)) continue;
+        for (const k of readAttributes(f)) {
+          const fromVar = kwAt.get(`${file}:${k.row}:${k.col}`)?.fromVar;
+          add({ name: name(k), kind: 'reads', band: 'heuristic', file, row: k.row, col: k.col, from: ns, ...(fromVar ? { fromVar } : {}), context: 'query literal' });
+        }
+      }
+    }
+
+    const known = new Set([...defs.map((d) => d.name), ...uses.map((u) => u.name)]);
+    const parents = new Map<string, Form>();
+    for (const file of nsOf.keys()) {
+      for (const f of walk(ctx.forms(file))) for (const c of kids(f)) parents.set(`${file}:${c.row}:${c.col}`, f);
+    }
+    const contextOf = (file: string, row: number, col: number): string => {
+      const p = parents.get(`${file}:${row}:${col}`);
+      if (!p) return 'reference';
+      const xs = flatChildren(p);
+      const name = nameIn(file);
+      if (p.t === 'list' && xs[0] && xs[0].row === row && xs[0].col === col) return 'non-write-position (keyword as function)';
+      if ((p.t === 'vector' || p.t === 'list') && xs[0] && isKeyword(xs[0]) && TX_OPS.test(name(unwrap(xs[0])))) return name(unwrap(xs[0]));
+      if (p.t === 'map' && xs.some((x, k) => k % 2 === 0 && isKeyword(x) && /^:(db\/id|xt\/id|xtdb\.api\/id|crux\.db\/id)$/.test(name(unwrap(x))))) return ':db/id-map';
+      return 'reference';
+    };
+    for (const k of ctx.analysis.keywords) {
+      const name = `:${k.ns ? `${k.ns}/` : ''}${k.name}`;
+      if (!k.ns || !known.has(name)) continue;
+      add({ name, kind: 'references', band: 'unknown', file: k.file, row: k.row, col: k.col, from: k.from, ...(k.fromVar ? { fromVar: k.fromVar } : {}), context: contextOf(k.file, k.row, k.col) });
+    }
+
+    const nodes: GraphNode[] = [];
+    const firstUse = new Map<string, Use>();
+    for (const u of uses) if (!firstUse.has(u.name) || u.kind !== 'references' && firstUse.get(u.name)?.kind === 'references') firstUse.set(u.name, u);
+    const defined = new Map<string, Definition>();
+    for (const d of defs) if (!defined.has(d.name)) defined.set(d.name, d);
+    for (const name of [...known].sort()) {
+      const d = defined.get(name);
+      const at = d ?? firstUse.get(name);
+      if (!at) continue;
+      const kind = d?.kind ?? 'data_attribute';
+      const component = ctx.componentOf(d ? d.file : (at as Use).file);
+      nodes.push({ id: attributeId(kind, name), kind, name, file: d ? d.file : (at as Use).file, line: d ? d.line : (at as Use).row, ...(component ? { component } : {}), attrs: { schema: !!d } });
+    }
+    const kindOf = new Map(nodes.map((n) => [n.name, n.kind]));
+    const edges: GraphEdge[] = uses.map((u) => ({
+      from: owner(u), to: attributeId(kindOf.get(u.name) ?? 'data_attribute', u.name), kind: u.kind, band: u.band, file: u.file, line: u.row, attrs: { context: u.context },
+    }));
+    return { nodes, edges };
+  },
+};
+

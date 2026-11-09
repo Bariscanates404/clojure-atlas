@@ -1,0 +1,3 @@
+{:app/db {:url "jdbc:x"}
+ :app/handler {:db #ig/ref :app/db}
+ [:app/server :app/http] {:handler #ig/ref :app/handler}}

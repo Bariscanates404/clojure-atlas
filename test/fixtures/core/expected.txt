@@ -1,0 +1,51 @@
+node definition:demo.core-test/f-test [definition] test/demo/core_test.clj:7 roles=test {"defined_by":"clojure.test/deftest"}
+node definition:demo.core-test/fixture-map [definition] test/demo/core_test.clj:5 roles=test {"defined_by":"clojure.core/defn"}
+node definition:demo.core/->Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
+node definition:demo.core/Shape [definition] src/demo/core.clj:4 {"defined_by":"clojure.core/defprotocol"}
+node definition:demo.core/Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
+node definition:demo.core/area [definition] src/demo/core.clj:4 {"defined_by":"clojure.core/defprotocol"}
+node definition:demo.core/area impl src/demo/core.clj:5 [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord","protocol":"demo.core/Shape","impl_ns":"demo.core"}
+node definition:demo.core/f [definition] src/demo/core.clj:9 {"defined_by":"clojure.core/defn"}
+node definition:demo.core/m [definition] src/demo/core.clj:15 {"defined_by":"clojure.core/defmacro","macro":true}
+node definition:demo.core/map->Square [definition] src/demo/core.clj:5 {"defined_by":"clojure.core/defrecord"}
+node definition:demo.core/secret [definition] src/demo/core.clj:17 {"defined_by":"clojure.core/defn-","private":true}
+node definition:demo.core/table [definition] src/demo/core.clj:7 {"defined_by":"clojure.core/def"}
+node definition:demo.util/helper [definition] src/demo/util.clj:2 {"defined_by":"clojure.core/defn"}
+node definition:demo.util/twice [definition] src/demo/util.clj:3 {"defined_by":"clojure.core/defn"}
+node namespace:clojure.core [namespace] test-resources/clojure/core.clj:1
+node namespace:demo.core [namespace] src/demo/core.clj:1
+node namespace:demo.core-test [namespace] test/demo/core_test.clj:1
+node namespace:demo.util [namespace] src/demo/util.clj:1
+edge definition:demo.core-test/f-test -calls-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8
+edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:8
+edge definition:demo.core-test/f-test -calls-> definition:demo.core/f static_proven test/demo/core_test.clj:9
+edge definition:demo.core-test/f-test -tests-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:8
+edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_proven test/demo/core_test.clj:8
+edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_proven test/demo/core_test.clj:9
+edge definition:demo.core/area -calls-> definition:demo.core/area impl src/demo/core.clj:5 heuristic src/demo/core.clj:5 {"via":"protocol dispatch"}
+edge definition:demo.core/area impl src/demo/core.clj:5 -calls-> definition:demo.util/twice static_proven src/demo/core.clj:5
+edge definition:demo.core/f -calls-> definition:demo.util/helper static_proven src/demo/core.clj:10
+edge definition:demo.core/f -references-> definition:demo.util/helper static_proven src/demo/core.clj:11
+edge definition:demo.core/m -references-> definition:demo.core/f static_proven src/demo/core.clj:15
+edge definition:demo.core/m -references-> definition:demo.core/table static_proven src/demo/core.clj:15
+edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17
+edge definition:demo.util/twice -calls-> definition:demo.util/helper static_proven src/demo/util.clj:3
+edge namespace:demo.core -defines-> definition:demo.core/->Square static_proven src/demo/core.clj:5
+edge namespace:demo.core -defines-> definition:demo.core/Shape static_proven src/demo/core.clj:4
+edge namespace:demo.core -defines-> definition:demo.core/Square static_proven src/demo/core.clj:5
+edge namespace:demo.core -defines-> definition:demo.core/area static_proven src/demo/core.clj:4
+edge namespace:demo.core -defines-> definition:demo.core/area impl src/demo/core.clj:5 static_proven src/demo/core.clj:5
+edge namespace:demo.core -defines-> definition:demo.core/f static_proven src/demo/core.clj:9
+edge namespace:demo.core -defines-> definition:demo.core/m static_proven src/demo/core.clj:15
+edge namespace:demo.core -defines-> definition:demo.core/map->Square static_proven src/demo/core.clj:5
+edge namespace:demo.core -defines-> definition:demo.core/secret static_proven src/demo/core.clj:17
+edge namespace:demo.core -defines-> definition:demo.core/table static_proven src/demo/core.clj:7
+edge namespace:demo.core -references-> definition:demo.core/Shape static_proven src/demo/core.clj:5
+edge namespace:demo.core -requires-> namespace:demo.util static_proven src/demo/core.clj:2
+edge namespace:demo.core-test -defines-> definition:demo.core-test/f-test static_proven test/demo/core_test.clj:7
+edge namespace:demo.core-test -defines-> definition:demo.core-test/fixture-map static_proven test/demo/core_test.clj:5
+edge namespace:demo.core-test -requires-> namespace:demo.core static_proven test/demo/core_test.clj:3
+edge namespace:demo.util -defines-> definition:demo.util/helper static_proven src/demo/util.clj:2
+edge namespace:demo.util -defines-> definition:demo.util/twice static_proven src/demo/util.clj:3
+usages resolved=12 unresolved=0 unknown=1 not-vars=5 external=19
+adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0

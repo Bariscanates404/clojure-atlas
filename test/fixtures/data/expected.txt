@@ -1,0 +1,39 @@
+node data_attribute::todo/owner [data_attribute] src/store/local.cljs:5 {"schema":true}
+node data_attribute::todo/tags [data_attribute] src/store/local.cljs:4 {"schema":true}
+node data_attribute::user/email [data_attribute] resources/schema.edn:1 {"schema":true}
+node data_attribute::user/friends [data_attribute] src/store/users.clj:12 {"schema":false}
+node data_attribute::user/name [data_attribute] resources/schema.edn:2 {"schema":true}
+node data_attribute::user/status [data_attribute] src/store/users.clj:5 {"schema":false}
+node data_value::user.status/active [data_value] resources/schema.edn:3 {"schema":true}
+node definition:store.local/add-todo [definition] src/store/local.cljs:7 {"defined_by":"cljs.core/defn"}
+node definition:store.local/schema [definition] src/store/local.cljs:4 {"defined_by":"cljs.core/def"}
+node definition:store.users/by-email [definition] src/store/users.clj:8 {"defined_by":"clojure.core/defn"}
+node definition:store.users/create-user! [definition] src/store/users.clj:4 {"defined_by":"clojure.core/defn"}
+node definition:store.users/display [definition] src/store/users.clj:16 {"defined_by":"clojure.core/defn"}
+node definition:store.users/name-query [definition] src/store/users.clj:14 {"defined_by":"clojure.core/def"}
+node definition:store.users/names [definition] src/store/users.clj:11 {"defined_by":"clojure.core/defn"}
+node definition:store.users/rename-tx [definition] src/store/users.clj:18 {"defined_by":"clojure.core/defn"}
+node namespace:store.local [namespace] src/store/local.cljs:1
+node namespace:store.users [namespace] src/store/users.clj:1
+edge definition:store.local/add-todo -writes-> data_attribute::todo/tags static_proven src/store/local.cljs:7 {"context":"@datascript.core/transact!"}
+edge definition:store.users/by-email -reads-> data_attribute::user/email static_proven src/store/users.clj:9 {"context":"@datomic.api/q"}
+edge definition:store.users/create-user! -references-> data_value::user.status/active unknown src/store/users.clj:5 {"context":":db/id-map"}
+edge definition:store.users/create-user! -writes-> data_attribute::user/email static_proven src/store/users.clj:5 {"context":"@datomic.api/transact"}
+edge definition:store.users/create-user! -writes-> data_attribute::user/name static_proven src/store/users.clj:6 {"context":"@datomic.api/transact"}
+edge definition:store.users/create-user! -writes-> data_attribute::user/status static_proven src/store/users.clj:5 {"context":"@datomic.api/transact"}
+edge definition:store.users/display -references-> data_attribute::user/name unknown src/store/users.clj:16 {"context":"non-write-position (keyword as function)"}
+edge definition:store.users/name-query -reads-> data_attribute::user/name heuristic src/store/users.clj:14 {"context":"query literal"}
+edge definition:store.users/names -reads-> data_attribute::user/email static_proven src/store/users.clj:12 {"context":"@datomic.api/pull"}
+edge definition:store.users/names -reads-> data_attribute::user/friends static_proven src/store/users.clj:12 {"context":"@datomic.api/pull"}
+edge definition:store.users/names -reads-> data_attribute::user/name static_proven src/store/users.clj:12 {"context":"@datomic.api/pull"}
+edge definition:store.users/rename-tx -references-> data_attribute::user/name unknown src/store/users.clj:18 {"context":":db/id-map"}
+edge namespace:store.local -defines-> definition:store.local/add-todo static_proven src/store/local.cljs:7
+edge namespace:store.local -defines-> definition:store.local/schema static_proven src/store/local.cljs:4
+edge namespace:store.users -defines-> definition:store.users/by-email static_proven src/store/users.clj:8
+edge namespace:store.users -defines-> definition:store.users/create-user! static_proven src/store/users.clj:4
+edge namespace:store.users -defines-> definition:store.users/display static_proven src/store/users.clj:16
+edge namespace:store.users -defines-> definition:store.users/name-query static_proven src/store/users.clj:14
+edge namespace:store.users -defines-> definition:store.users/names static_proven src/store/users.clj:11
+edge namespace:store.users -defines-> definition:store.users/rename-tx static_proven src/store/users.clj:18
+usages resolved=0 unresolved=0 unknown=0 not-vars=0 external=12
+adapters multimethods=off:0 events=off:0 routes=off:0 data_attributes=datascript, datomic:12 system=off:0 schemas=off:0

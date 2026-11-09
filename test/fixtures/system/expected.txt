@@ -1,0 +1,52 @@
+node definition:integrant.core/halt-key! :app/db [definition] src/sys/ig.clj:8 {"defined_by":"clojure.core/defmethod","multi":"integrant.core/halt-key!","dispatch":":app/db"}
+node definition:integrant.core/init-key :app/db [definition] src/sys/ig.clj:6 {"defined_by":"clojure.core/defmethod","multi":"integrant.core/init-key","dispatch":":app/db"}
+node definition:integrant.core/init-key :sys.ig/worker [definition] src/sys/ig.clj:10 {"defined_by":"clojure.core/defmethod","multi":"integrant.core/init-key","dispatch":":sys.ig/worker"}
+node definition:sys.comp/new-app [definition] src/sys/comp.clj:5 {"defined_by":"clojure.core/defn"}
+node definition:sys.comp/new-db [definition] src/sys/comp.clj:4 {"defined_by":"clojure.core/defn"}
+node definition:sys.comp/system [definition] src/sys/comp.clj:7 {"defined_by":"clojure.core/defn"}
+node definition:sys.ig/config [definition] src/sys/ig.clj:12 {"defined_by":"clojure.core/def"}
+node definition:sys.ig/connect [definition] src/sys/ig.clj:4 {"defined_by":"clojure.core/defn"}
+node definition:sys.states/cache [definition] src/sys/states.clj:8 {"defined_by":"mount.core/defstate"}
+node definition:sys.states/conn [definition] src/sys/states.clj:6 {"defined_by":"mount.core/defstate"}
+node definition:sys.states/connect [definition] src/sys/states.clj:4 {"defined_by":"clojure.core/defn"}
+node namespace:sys.comp [namespace] src/sys/comp.clj:1
+node namespace:sys.ig [namespace] src/sys/ig.clj:1
+node namespace:sys.states [namespace] src/sys/states.clj:1
+node system_key::app [system_key] src/sys/comp.clj:10 {"library":"component"}
+node system_key::app/db [system_key] src/sys/ig.clj:6 {"library":"integrant"}
+node system_key::app/handler [system_key] resources/config.edn:2 {"library":"integrant"}
+node system_key::db [system_key] src/sys/comp.clj:9 {"library":"component"}
+node system_key::sys.ig/worker [system_key] src/sys/ig.clj:10 {"library":"integrant"}
+node system_key:[:app/server :app/http] [system_key] resources/config.edn:3 {"library":"integrant"}
+node system_key:sys.states/cache [system_key] src/sys/states.clj:8 {"library":"mount"}
+node system_key:sys.states/conn [system_key] src/sys/states.clj:6 {"library":"mount"}
+edge definition:integrant.core/init-key :app/db -calls-> definition:sys.ig/connect static_proven src/sys/ig.clj:6
+edge definition:sys.comp/system -calls-> definition:sys.comp/new-app static_proven src/sys/comp.clj:10
+edge definition:sys.comp/system -calls-> definition:sys.comp/new-db static_proven src/sys/comp.clj:9
+edge definition:sys.states/cache -references-> definition:sys.states/conn static_proven src/sys/states.clj:8
+edge definition:sys.states/conn -calls-> definition:sys.states/connect static_proven src/sys/states.clj:6
+edge namespace:sys.comp -defines-> definition:sys.comp/new-app static_proven src/sys/comp.clj:5
+edge namespace:sys.comp -defines-> definition:sys.comp/new-db static_proven src/sys/comp.clj:4
+edge namespace:sys.comp -defines-> definition:sys.comp/system static_proven src/sys/comp.clj:7
+edge namespace:sys.ig -defines-> definition:integrant.core/halt-key! :app/db static_proven src/sys/ig.clj:8
+edge namespace:sys.ig -defines-> definition:integrant.core/init-key :app/db static_proven src/sys/ig.clj:6
+edge namespace:sys.ig -defines-> definition:integrant.core/init-key :sys.ig/worker static_proven src/sys/ig.clj:10
+edge namespace:sys.ig -defines-> definition:sys.ig/config static_proven src/sys/ig.clj:12
+edge namespace:sys.ig -defines-> definition:sys.ig/connect static_proven src/sys/ig.clj:4
+edge namespace:sys.states -defines-> definition:sys.states/cache static_proven src/sys/states.clj:8
+edge namespace:sys.states -defines-> definition:sys.states/conn static_proven src/sys/states.clj:6
+edge namespace:sys.states -defines-> definition:sys.states/connect static_proven src/sys/states.clj:4
+edge system_key::app -depends_on-> system_key::db static_proven src/sys/comp.clj:10
+edge system_key::app -registers-> definition:sys.comp/new-app static_proven src/sys/comp.clj:10 {"via":"system-map"}
+edge system_key::app/db -registers-> definition:integrant.core/halt-key! :app/db static_proven src/sys/ig.clj:8 {"via":"halt-key!"}
+edge system_key::app/db -registers-> definition:integrant.core/init-key :app/db static_proven src/sys/ig.clj:6 {"via":"init-key"}
+edge system_key::app/handler -depends_on-> system_key::app/db static_proven resources/config.edn:2
+edge system_key::db -registers-> definition:sys.comp/new-db static_proven src/sys/comp.clj:9 {"via":"system-map"}
+edge system_key::sys.ig/worker -depends_on-> system_key::app/db static_proven src/sys/ig.clj:12
+edge system_key::sys.ig/worker -registers-> definition:integrant.core/init-key :sys.ig/worker static_proven src/sys/ig.clj:10 {"via":"init-key"}
+edge system_key:[:app/server :app/http] -depends_on-> system_key::app/handler static_proven resources/config.edn:3
+edge system_key:sys.states/cache -depends_on-> system_key:sys.states/conn static_proven src/sys/states.clj:8
+edge system_key:sys.states/cache -registers-> definition:sys.states/cache static_proven src/sys/states.clj:8 {"via":"defstate"}
+edge system_key:sys.states/conn -registers-> definition:sys.states/conn static_proven src/sys/states.clj:6 {"via":"defstate"}
+usages resolved=5 unresolved=0 unknown=0 not-vars=0 external=14
+adapters multimethods=defmethod:3 events=off:0 routes=off:0 data_attributes=off:0 system=component, integrant, mount:12 schemas=off:0
