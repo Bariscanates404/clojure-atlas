@@ -27,6 +27,9 @@ describe('.clojure-atlas.edn', () => {
       ['{:lint-as {a/b c}}', /qualified symbol/],
       ['[1]', /one map/],
       ['{:a', /line 1/],
+      ['{:lint-as {a/b c/d} :lint-as {x/y z/w}}', /duplicate key :lint-as/],
+      ['{:lint-as {a/b c/d, a/b e/f}}', /duplicate key a\/b/],
+      ['#:foo{:lint-as {a/b c/d}}', /unknown key :foo\/lint-as/],
     ] as const) assert.throws(() => parseConfig(src), (e: unknown) => e instanceof ConfigError && msg.test((e as Error).message), src);
   });
 });

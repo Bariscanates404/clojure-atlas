@@ -3,13 +3,11 @@
 // names (calls, references, passes_callback, registers_handler, expands_via, rebinds) and tests (a deftest -> what it uses).
 import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../mcp/keyflow.ts';
-import type { VarDef, VarUse } from './analysis.ts';
-import { defId, nsId, type Context, type Owner, type Rows } from './model.ts';
-import { formAt, kids } from './reader.ts';
+import type { NsUse, VarDef, VarUse } from './analysis.ts';
+import { defId, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
+import { formAt, kids, textOf } from './reader.ts';
 import { classify } from './relations.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
-
-const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
 // in it, not resolved by kondo at all, or pointing into a library.
@@ -26,8 +24,6 @@ export interface UsageStats {
   topUnknown: [string, number][];
 }
 
-const SPECIAL_FORMS = new Set(['def', 'if', 'do', 'let*', 'letfn*', 'loop*', 'recur', 'fn*', 'quote', 'var', 'throw', 'try', 'catch',
-  'finally', 'monitor-enter', 'monitor-exit', 'new', 'set!', '.', 'case*', 'deftype*', 'reify*', 'import*', '&']);
 const TEST_NS = /^(clojure|cljs)\.test$/;
 
 // Places where a list is the assertion of an `is`: its head symbol is an assert-expr dispatch value.
@@ -41,6 +37,14 @@ function assertionHeads(ctx: Context): (u: VarUse) => boolean {
     if (head) byFile.set(u.file, (byFile.get(u.file) ?? new Set()).add(`${head.row}:${head.col}`));
   }
   return (u) => byFile.get(u.file)?.has(`${u.nameRow}:${u.nameCol}`) ?? false;
+}
+
+// `[lib :as-alias x]` only names a namespace for ::x/kw keywords; nothing is loaded, unless the same vector also
+// says :as or :refer.
+function loadsNamespace(ctx: Context, u: NsUse): boolean {
+  const spec = ctx.parentOf(u.file, u.row, u.col)?.parent;
+  const words = spec?.t === 'vector' ? kids(spec).map(textOf) : [];
+  return !words.includes(':as-alias') || words.includes(':as') || words.includes(':refer');
 }
 
 const isTestDef = (d: VarDef) => d.test || /(^|\/)(deftest|defspec)$/.test(d.definedBy ?? '');
@@ -98,7 +102,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     edges.push({ from: nsId(d.ns), to: node.id, kind: 'defines', band: 'static_proven', file: d.file, line: d.row });
   }
   for (const u of ctx.analysis.nsUses) {
-    if (ctx.projectNs.has(u.to) && u.to !== u.from) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
+    if (ctx.projectNs.has(u.to) && u.to !== u.from && loadsNamespace(ctx, u)) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
   }
 
   const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [] };
@@ -106,14 +110,13 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   const link = (from: string, to: string, kind: string, band: Band, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
-    if (from === to) return;
     edges.push({ from, to, kind, band, file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
     if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band, file: u.file, line: u.nameRow });
   };
   const isAssertion = assertionHeads(ctx);
   const usage = (u: VarUse) => {
     if (u.defmethod) return;
-    if (u.to === UNKNOWN_NS && (SPECIAL_FORMS.has(u.name) || u.name.endsWith('#') || isAssertion(u))) {
+    if (u.to === UNKNOWN_NS && (isSpecialForm(u) || u.name.endsWith('#') || isAssertion(u))) {
       stats.notVars++;
       return;
     }

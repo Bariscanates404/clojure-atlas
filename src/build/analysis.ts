@@ -106,6 +106,9 @@ function span(r: Raw): Span {
   return { file: s(r.filename) ?? '', row, col, endRow: n(r['end-row']) ?? row, endCol: n(r['end-col']) ?? col };
 }
 
+// kondo names the platform of a definition in a .cljc file only; any other file has the one its extension says.
+const languageOf = (file: string): string => (file.endsWith('.cljs') ? 'cljs' : 'clj');
+
 const key = (...xs: unknown[]) => xs.map(String).join('\0');
 
 // Keeps the first entry per key and folds later duplicates into it (a .cljc file is analyzed once per platform).
@@ -149,7 +152,7 @@ export function normalize(raw: Raw): Analysis {
       macro: r.macro === true,
       fn: r.macro !== true && (Array.isArray(r['fixed-arities']) || n(r['varargs-min-arity']) !== undefined || r['defined-by'] === 'clojure.core/defmulti'),
       private: r.private === true,
-      langs: s(r.lang) ? [s(r.lang) as string] : [],
+      langs: [s(r.lang) ?? languageOf(span(r).file)],
     })),
     (x) => key(x.file, x.ns, x.name, x.row, x.col),
     (p, q) => ({ ...p, langs: [...new Set([...p.langs, ...q.langs])].sort() }),

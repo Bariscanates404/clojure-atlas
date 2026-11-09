@@ -50,7 +50,8 @@ function signaturesOf(edges: readonly GraphEdge[]): Capability {
   return { name: 'signatures', status: 'available', edge_kinds: ['calls'], edges: mine.length, bands: bandCounts(mine) };
 }
 
-const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}`;
+// An edge has a line, not a column: two call sites on one line are told apart by what they carry (arity, arguments).
+const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}\0${JSON.stringify(e.attrs ?? {})}`;
 
 export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: BuildStats['files']): AtlasDocument {
   const detected = new Map(adapters.map((a) => [a.name, a.detect(ctx)]));

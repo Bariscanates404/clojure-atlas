@@ -29,24 +29,33 @@ export const EMPTY_CONFIG: ProjectConfig = { lintAs: {}, permissionMiddleware: [
 
 export class ConfigError extends Error {}
 
+const fail = (msg: string): never => {
+  throw new ConfigError(`.clojure-atlas.edn: ${msg}`);
+};
+
 type Edn = string | Edn[] | { [k: string]: Edn };
 
-// Keywords keep their colon, symbols and strings become plain strings, sequences arrays, maps objects.
+// the key a #:ns{} map gives an unqualified keyword or symbol: :k becomes :ns/k, s becomes ns/s
+const qualified = (ns: string, key: string) => (key.startsWith(':') ? `:${ns}/${key.slice(1)}` : `${ns}/${key}`);
+
+// Keywords keep their colon, symbols and strings become plain strings, sequences arrays, maps objects. A map key
+// given twice is an error (Clojure's reader refuses it too), and #:ns{...} qualifies the keys it holds.
 export function ednValue(f: Form): Edn {
   const u = unwrap(f);
   if (u.t === 'map') {
     const xs = u.children;
     const out: Record<string, Edn> = {};
-    for (let k = 0; k + 1 < xs.length; k += 2) out[String(ednValue(xs[k]))] = ednValue(xs[k + 1]);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const bare = String(ednValue(xs[k]));
+      const key = u.ns && (xs[k].t === 'keyword' || xs[k].t === 'symbol') && !bare.includes('/') ? qualified(u.ns, bare) : bare;
+      if (Object.hasOwn(out, key)) fail(`duplicate key ${key}`);
+      out[key] = ednValue(xs[k + 1]);
+    }
     return out;
   }
   if ('children' in u) return u.children.map(ednValue);
   return u.text;
 }
-
-const fail = (msg: string): never => {
-  throw new ConfigError(`.clojure-atlas.edn: ${msg}`);
-};
 
 const symbolMap = (v: Edn, key: string): Record<string, string> => {
   if (typeof v !== 'object' || Array.isArray(v)) return fail(`${key} must be a map of symbol to symbol`);
