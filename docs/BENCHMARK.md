@@ -9,7 +9,7 @@ comes from that run, and the run refuses a graph built by another clojure-atlas 
 **Positive questions: 12 of 12 pass.** A question passes when the answer names every
 expected definition and nothing else. Expected items found: 28 of 28; items answered: 28.
 
-**Absence questions: 4 of 6 pass.** The correct answer is that there is none. One passes only
+**Absence questions: 6 of 6 pass.** The correct answer is that there is none. One passes only
 when the answer states that kind of absence and names nothing: *none* (the thing exists, nothing relates to it, the
 answer says zero), *not-found* (the codebase has no such thing, the answer says so), *capability-off* (the graph
 cannot answer, because the extractor for this kind of fact found nothing to extract from, and the answer says that
@@ -42,7 +42,7 @@ The builder was fixed, with a fixture; the question was kept as it was.
 |---|---|---|---|---|---|---|---|
 | a01 | mount | callers | Which definitions call mount.core/unpound? | none | yes | yes | yes |
 | a02 | integrant | callers | Which definitions call integrant.core/stop? | not-found | yes | yes | yes |
-| a03 | mount | event_flow | Which handlers does the re-frame event :app/start run? | capability-off (events) | no | yes | no |
-| a04 | mount | permission_routes | Which routes require the :admin permission? | capability-off (route_authz) | no | yes | no |
+| a03 | mount | event_flow | Which handlers does the re-frame event :app/start run? | capability-off (events) | yes | yes | yes |
+| a04 | mount | permission_routes | Which routes require the :admin permission? | capability-off (route_authz) | yes | yes | yes |
 | a05 | usermanager | tests_for | Which tests reach usermanager.main/-main? | none | yes | yes | yes |
 | a06 | usermanager | route_authz | Which handler serves the route GET /admin? | not-found | yes | yes | yes |
