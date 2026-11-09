@@ -355,11 +355,11 @@ function serverGraph() {
   const b = new GraphBuilder();
   const t = b.def('core/save');
   b.edge(b.def('ui/a', 'components/ui'), 'calls', t);
-  const r = b.route('POST', '/article/{p}/font', 'editor', '/api');
-  b.edge(r, 'requires_permission', b.node('permission', ':edit-article'), { attrs: { check: 1, checks: 1 } });
+  const r = b.route('POST', '/articles/{p}/comments', 'editor', '/api');
+  b.edge(r, 'requires_permission', b.node('permission', ':comment-write'), { attrs: { check: 1, checks: 1 } });
   b.edge(b.def('db/w'), 'writes', b.node('data_attribute', ':article/n'));
   b.edge(b.def('ui/v'), 'dispatches', b.node('event', ':article/save'));
-  b.node('selector', 'qa-x');
+  b.node('selector', 'sel-x');
   return b.build();
 }
 
@@ -390,9 +390,8 @@ describe('MCP server', () => {
 
   it('ping', () => assert.deepEqual(handleMessage(g, { jsonrpc: '2.0', id: 'p', method: 'ping' }), { jsonrpc: '2.0', id: 'p', result: {} }));
 
-  it('tool texts use generic wording and examples that exist in public repositories', () => {
+  it('tool texts use examples that exist in public repositories', () => {
     const texts = JSON.stringify(toolList());
-    for (const private_ of ['qa-class', '/article/:id/font', ':edit-article', ':articles/save']) assert.ok(!texts.includes(private_), `${private_} is still in a tool description`);
     assert.match(texts, /\/api\/articles\/:slug/);
   });
 
@@ -409,11 +408,11 @@ describe('MCP server', () => {
   const happy: [string, Record<string, unknown>, RegExp][] = [
     ['callers', { var: 'core/save' }, /^CALLERS core\/save — 1 direct caller\(s\) in 1 component\(s\)/],
     ['blast_radius', { var: 'core/save', depth: 3 }, /depth capped at 3/],
-    ['route_authz', { route: '/article/:id/font' }, /verdict requires :edit-article/],
-    ['permission_routes', { permission: ':edit-article' }, /POST \/api\/article\/\{p\}\/font/],
+    ['route_authz', { route: '/articles/:slug/comments' }, /verdict requires :comment-write/],
+    ['permission_routes', { permission: ':comment-write' }, /POST \/api\/articles\/\{p\}\/comments/],
     ['attribute_usage', { attr: ':article/n' }, /1 proven writer\(s\), 0 uncertain; 0 proven reader\(s\), 0 uncertain/],
     ['event_flow', { name: ':article/save' }, /ui\/v/],
-    ['tests_covering', { target: 'qa-x' }, /no browser test reaches/],
+    ['tests_covering', { target: 'sel-x' }, /no browser test reaches/],
     ['tests_for', { symbol: 'core/save' }, /static links only/],
     ['context_for_change', { changes: ['components/core/src/core_save.clj'] }, /1 changed symbol\(s\)/],
     ['graph_info', {}, /graph demo @ main sha a{40}/],

@@ -372,14 +372,14 @@ describe('blast radius on a deep graph', () => {
 
 describe('canonicalRoute', () => {
   const cases: [string, string | null, string][] = [
-    ['/article/:id/font', null, '/article/{p}/font'],
-    ['/article/{article-id}/font', null, '/article/{p}/font'],
-    ['/article/{p}/font/', null, '/article/{p}/font'],
-    ['GET /article/:id', 'GET', '/article/{p}'],
+    ['/articles/:slug/comments', null, '/articles/{p}/comments'],
+    ['/articles/{article-slug}/comments', null, '/articles/{p}/comments'],
+    ['/articles/{p}/comments/', null, '/articles/{p}/comments'],
+    ['GET /articles/:slug', 'GET', '/articles/{p}'],
     ['post /x', 'POST', '/x'],
     ['DELETE /a/:b/c/:d', 'DELETE', '/a/{p}/c/{p}'],
-    ['POST /article/{p}/font @editor/api', 'POST', '/article/{p}/font'],
-    ['route:POST /article/{p}/font @editor/api', 'POST', '/article/{p}/font'],
+    ['POST /articles/{p}/comments @editor/api', 'POST', '/articles/{p}/comments'],
+    ['route:POST /articles/{p}/comments @editor/api', 'POST', '/articles/{p}/comments'],
     ['/x?y=1', null, '/x'],
     ['x/y', null, '/x/y'],
     ['/', null, '/'],
@@ -392,33 +392,33 @@ describe('canonicalRoute', () => {
 
 function authzGraph() {
   const b = new GraphBuilder();
-  const font = b.route('POST', '/article/{p}/font', 'editor', '/api');
-  const fontPublic = b.route('GET', '/article/{p}/font', 'public', '');
+  const comments = b.route('POST', '/articles/{p}/comments', 'editor', '/api');
+  const commentsPublic = b.route('GET', '/articles/{p}/comments', 'public', '');
   const usage = b.route('POST', '/billing/usage', 'editor', '/api');
   const copy = b.route('POST', '/copy', 'editor', '/api');
   const pub = b.route('GET', '/docs', 'editor', '');
   const open = b.route('GET', '/open', 'editor', '');
   const dyn = b.route('GET', '/dyn', 'editor', '');
-  const handler = b.def('routes.articles/upload-font', 'bases/editor');
+  const handler = b.def('routes.articles/add-comment', 'bases/editor');
   const csp = b.def('mw/csp');
   const authn = b.def('mw/authn');
   const authz = b.def('mw/authz');
   const lib = b.node('external', 'var/lib/coerce');
-  const edit = b.node('permission', ':edit-article');
-  const view = b.node('permission', ':view-article');
+  const edit = b.node('permission', ':comment-write');
+  const view = b.node('permission', ':comment-read');
   const bill = b.node('permission', ':billing');
   const admin = b.node('permission', ':admin');
   const readA = b.node('permission', ':read-a');
   const readT = b.node('permission', ':read-t');
   const create = b.node('permission', ':create');
   const ex = b.node('authz_exemption', 'public documentation');
-  b.edge(font, 'routes_to', handler)
-    .edge(font, 'guarded_by', authz, { attrs: { order: 4, level: 'path' } })
-    .edge(font, 'guarded_by', csp, { attrs: { order: 1, level: 'router-data', inherited_from: 'bases/d/h.clj:10' } })
-    .edge(font, 'guarded_by', lib, { attrs: { order: 2, level: 'router-data', inherited_from: 'bases/d/h.clj:10' } })
-    .edge(font, 'guarded_by', authn, { attrs: { order: 3, level: 'path', inherited_from: 'bases/d/h.clj:20' } })
-    .edge(font, 'requires_permission', edit, { attrs: { check: 1, checks: 1 } })
-    .edge(fontPublic, 'requires_permission', view, { attrs: { check: 1, checks: 1 } })
+  b.edge(comments, 'routes_to', handler)
+    .edge(comments, 'guarded_by', authz, { attrs: { order: 4, level: 'path' } })
+    .edge(comments, 'guarded_by', csp, { attrs: { order: 1, level: 'router-data', inherited_from: 'bases/d/h.clj:10' } })
+    .edge(comments, 'guarded_by', lib, { attrs: { order: 2, level: 'router-data', inherited_from: 'bases/d/h.clj:10' } })
+    .edge(comments, 'guarded_by', authn, { attrs: { order: 3, level: 'path', inherited_from: 'bases/d/h.clj:20' } })
+    .edge(comments, 'requires_permission', edit, { attrs: { check: 1, checks: 1 } })
+    .edge(commentsPublic, 'requires_permission', view, { attrs: { check: 1, checks: 1 } })
     .edge(usage, 'requires_permission', bill, { attrs: { check: 1, checks: 1, alternative: 1, alternatives: 2 } })
     .edge(usage, 'requires_permission', admin, { attrs: { check: 1, checks: 1, alternative: 2, alternatives: 2 } })
     .edge(copy, 'requires_permission', create, { attrs: { check: 1, checks: 2, all_checks: true } })
@@ -435,12 +435,12 @@ describe('route authz', () => {
   const g = authzGraph();
 
   const findCases: [string, string[]][] = [
-    ['/article/:id/font', ['route:GET /article/{p}/font @public', 'route:POST /article/{p}/font @editor/api']],
-    ['/article/{article-id}/font', ['route:GET /article/{p}/font @public', 'route:POST /article/{p}/font @editor/api']],
-    ['POST /article/:id/font', ['route:POST /article/{p}/font @editor/api']],
-    ['GET /article/:id/font', ['route:GET /article/{p}/font @public']],
-    ['/api/article/:id/font', ['route:POST /article/{p}/font @editor/api']],
-    ['/font', ['route:GET /article/{p}/font @public', 'route:POST /article/{p}/font @editor/api']],
+    ['/articles/:slug/comments', ['route:GET /articles/{p}/comments @public', 'route:POST /articles/{p}/comments @editor/api']],
+    ['/articles/{article-slug}/comments', ['route:GET /articles/{p}/comments @public', 'route:POST /articles/{p}/comments @editor/api']],
+    ['POST /articles/:slug/comments', ['route:POST /articles/{p}/comments @editor/api']],
+    ['GET /articles/:slug/comments', ['route:GET /articles/{p}/comments @public']],
+    ['/api/articles/:slug/comments', ['route:POST /articles/{p}/comments @editor/api']],
+    ['/comments', ['route:GET /articles/{p}/comments @public', 'route:POST /articles/{p}/comments @editor/api']],
     ['route:POST /copy @editor/api', ['route:POST /copy @editor/api']],
     ['POST /copy @editor/api', ['route:POST /copy @editor/api']],
     ['/nothing', []],
@@ -450,7 +450,7 @@ describe('route authz', () => {
   }
 
   it('the same path in two bases is two answers, each with base and mount', () => {
-    const r = routeAuthz(g, '/article/:id/font');
+    const r = routeAuthz(g, '/articles/:slug/comments');
     assert.equal(r.matches.length, 2);
     assert.match(r.notes.join(' '), /2 routes match/);
     assert.ok(r.sections.some((s) => /base editor, mount \/api/.test(s.name)));
@@ -458,15 +458,15 @@ describe('route authz', () => {
   });
 
   it('single permission: verdict, handler, permission row with check', () => {
-    const r = routeAuthz(g, 'POST /article/:id/font');
-    assert.ok(r.sections.some((s) => /verdict requires :edit-article$/.test(s.name)));
-    assert.deepEqual(labels(r, 'handler'), ['routes.articles/upload-font']);
+    const r = routeAuthz(g, 'POST /articles/:slug/comments');
+    assert.ok(r.sections.some((s) => /verdict requires :comment-write$/.test(s.name)));
+    assert.deepEqual(labels(r, 'handler'), ['routes.articles/add-comment']);
     assert.deepEqual(rows(r, 'permissions').map((x) => x.detail), ['check 1/1']);
     everyRowCited(r);
   });
 
   it('middleware in chain order, outermost first, with inheritance', () => {
-    const r = routeAuthz(g, 'POST /article/:id/font');
+    const r = routeAuthz(g, 'POST /articles/:slug/comments');
     assert.deepEqual(labels(r, 'middleware (outermost first)'), ['mw/csp', 'var/lib/coerce', 'mw/authn', 'mw/authz']);
     const details = rows(r, 'middleware (outermost first)').map((x) => x.detail);
     assert.match(details[0] ?? '', /#1 router-data inherited from bases\/d\/h.clj:10/);
@@ -517,11 +517,11 @@ describe('permission routes', () => {
   const g = authzGraph();
 
   const cases: [string, string[]][] = [
-    [':edit-article', ['POST /api/article/{p}/font @editor']],
-    ['edit-article', ['POST /api/article/{p}/font @editor']],
-    ['permission::edit-article', ['POST /api/article/{p}/font @editor']],
+    [':comment-write', ['POST /api/articles/{p}/comments @editor']],
+    ['comment-write', ['POST /api/articles/{p}/comments @editor']],
+    ['permission::comment-write', ['POST /api/articles/{p}/comments @editor']],
     [':admin', ['POST /api/billing/usage @editor', 'POST /api/copy @editor']],
-    [':view-article', ['GET /article/{p}/font @public']],
+    [':comment-read', ['GET /articles/{p}/comments @public']],
   ];
   for (const [q, expected] of cases) {
     it(`routes for ${q}`, () => assert.deepEqual(labels(permissionRoutes(g, q)).sort(), expected));
@@ -529,7 +529,7 @@ describe('permission routes', () => {
 
   it('says whether the permission is required alone or one of alternatives', () => {
     assert.deepEqual(permissionRoutes(g, ':admin').counts, { required: 0, 'one of alternatives': 2 });
-    assert.deepEqual(permissionRoutes(g, ':edit-article').counts, { required: 1, 'one of alternatives': 0 });
+    assert.deepEqual(permissionRoutes(g, ':comment-write').counts, { required: 1, 'one of alternatives': 0 });
   });
 
   it('a permission no route checks is found and empty; an unknown one is not found', () => {
@@ -680,9 +680,9 @@ describe('event flow', () => {
   const sub = b.node('subscription', ':article/current');
   const base = b.node('subscription', ':article/all');
   const sh = b.node('handler', 'handler of :article/current', { id: 'handler:src/subs.cljs:4' });
-  const req = b.node('request', 'POST /article', { id: 'request:src/events.cljs:12' });
+  const req = b.node('request', 'POST /articles', { id: 'request:src/events.cljs:12' });
   b.edge(view, 'dispatches', save).edge(h, 'dispatches', ok, { band: 'heuristic' }).edge(save, 'registers', h)
-    .edge(h, 'issues_request', req, { attrs: { method: 'post', path: '/article' } })
+    .edge(h, 'issues_request', req, { attrs: { method: 'post', path: '/articles' } })
     .edge(sub, 'registers', sh).edge(sh, 'subscribes', base).edge(view, 'subscribes', sub);
   void orphan;
   const g = b.build();
@@ -693,7 +693,7 @@ describe('event flow', () => {
     assert.deepEqual(labels(r, 'handler'), ['handler of :article/save']);
     assert.deepEqual(labels(r, 'handler dispatches'), [':article/save-ok']);
     assert.equal(rows(r, 'handler dispatches')[0].band, 'heuristic');
-    assert.deepEqual(rows(r, 'handler requests').map((x) => x.detail), ['post /article']);
+    assert.deepEqual(rows(r, 'handler requests').map((x) => x.detail), ['post /articles']);
     everyRowCited(r);
   });
 
@@ -721,18 +721,18 @@ function coverageGraph() {
   const b = new GraphBuilder();
   const view = b.def('ui.article/list', 'components/ui', { file: 'components/ui/src/article.cljs' });
   const other = b.def('ui.article/helper', 'components/ui', { file: 'components/ui/src/article.cljs' });
-  const sel = b.node('selector', 'qa-article-list');
-  const pat = b.node('selector_pattern', 'qa-article-row-*');
+  const sel = b.node('selector', 'item-list');
+  const pat = b.node('selector_pattern', 'item-row-*');
   const m1 = b.node('page_object_member', 'ArticlePage.list');
   const m2 = b.node('page_object_member', 'ArticlePage.openFirst');
   const m3 = b.node('page_object_member', 'ArticlePage.row');
   const t1 = b.node('test', 'articles > lists articles', { id: 'test:tests/articles.spec.ts:10', file: 'tests/articles.spec.ts', line: 10 });
   const t2 = b.node('test', 'articles > opens one', { id: 'test:tests/articles.spec.ts:40', file: 'tests/articles.spec.ts', line: 40 });
-  const t3 = b.node('test', 'api > font upload', { id: 'test:tests/api.spec.ts:5', file: 'tests/api.spec.ts', line: 5 });
+  const t3 = b.node('test', 'api > comment add', { id: 'test:tests/api.spec.ts:5', file: 'tests/api.spec.ts', line: 5 });
   const t4 = b.node('test', 'rows > row', { id: 'test:tests/rows.spec.ts:1', file: 'tests/rows.spec.ts', line: 1 });
-  const route = b.route('POST', '/article/{p}/font', 'editor', '/api');
+  const route = b.route('POST', '/articles/{p}/comments', 'editor', '/api');
   const h = b.def('routes.articles/upload', 'bases/api', { file: 'bases/api/src/articles.clj' });
-  const req = b.node('request', 'glob **/font', { id: 'request:tests/api.spec.ts:7' });
+  const req = b.node('request', 'glob **/comments', { id: 'request:tests/api.spec.ts:7' });
   b.edge(view, 'renders', sel).edge(m1, 'uses_selector', sel).edge(t1, 'asserts_on', m1).edge(m2, 'calls', m1).edge(t2, 'calls', m2, { band: 'heuristic' })
     .edge(route, 'routes_to', h).edge(req, 'requests_route', route, { band: 'unknown' }).edge(t3, 'awaits_request', req)
     .edge(m3, 'uses_selector', pat).edge(t4, 'calls', m3).edge(t1, 'calls', m1, { band: 'heuristic' });
@@ -744,14 +744,14 @@ describe('tests covering', () => {
   const g = coverageGraph();
 
   const cases: [string, string[]][] = [
-    ['qa-article-list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
-    ['selector:qa-article-list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
-    ['qa-article-row-*', ['tests/rows.spec.ts:1']],
+    ['item-list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
+    ['selector:item-list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
+    ['item-row-*', ['tests/rows.spec.ts:1']],
     ['ui.article/list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
     ['components/ui/src/article.cljs', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
     ['routes.articles/upload', ['tests/api.spec.ts:5']],
     ['bases/api/src/articles.clj', ['tests/api.spec.ts:5']],
-    ['/article/:id/font', ['tests/api.spec.ts:5']],
+    ['/articles/:slug/comments', ['tests/api.spec.ts:5']],
     ['ArticlePage.list', ['tests/articles.spec.ts:10', 'tests/articles.spec.ts:40']],
     ['tests/rows.spec.ts', ['tests/rows.spec.ts:1']],
   ];
@@ -765,31 +765,31 @@ describe('tests covering', () => {
   }
 
   it('keeps the strongest path per test', () => {
-    const r = testsCovering(g, 'qa-article-list');
+    const r = testsCovering(g, 'item-list');
     assert.equal(rows(r).find((x) => x.line === 10)?.band, 'static_proven');
     assert.equal(rows(r).find((x) => x.line === 40)?.band, 'heuristic', 'only path is heuristic');
   });
 
   it('a path through an UNKNOWN request join stays UNKNOWN and is shown', () => {
-    const r = testsCovering(g, '/article/:id/font');
+    const r = testsCovering(g, '/articles/:slug/comments');
     assert.equal(rows(r)[0].band, 'unknown');
     assert.match(r.notes.join(' '), /UNKNOWN/);
   });
 
   it('says how a test was reached', () => {
-    assert.match(rows(testsCovering(g, 'qa-article-list')).find((x) => x.line === 40)?.detail ?? '', /via ArticlePage.openFirst/);
+    assert.match(rows(testsCovering(g, 'item-list')).find((x) => x.line === 40)?.detail ?? '', /via ArticlePage.openFirst/);
   });
 
-  it('counts tests per spec file', () => assert.deepEqual(testsCovering(g, 'qa-article-list').counts, { 'tests/articles.spec.ts': 2 }));
+  it('counts tests per spec file', () => assert.deepEqual(testsCovering(g, 'item-list').counts, { 'tests/articles.spec.ts': 2 }));
 
   it('a target no test reaches is found and says so', () => {
-    const x = graph((b) => { b.node('selector', 'qa-alone'); });
-    const r = testsCovering(x, 'qa-alone');
+    const x = graph((b) => { b.node('selector', 'alone'); });
+    const r = testsCovering(x, 'alone');
     assert.ok(r.found);
     assert.match(r.notes.join(' '), /no browser test reaches/);
   });
 
-  it('unknown target', () => assert.equal(testsCovering(g, 'qa-nope').found, false));
+  it('unknown target', () => assert.equal(testsCovering(g, 'nope').found, false));
 });
 
 // ---------- every query cites every row, table driven ----------
@@ -799,10 +799,10 @@ describe('every row of every query carries file and band', () => {
   const g2 = coverageGraph();
   const calls: [string, () => QueryResult][] = [
     ['route_authz copy', () => routeAuthz(g1, '/copy')],
-    ['route_authz font', () => routeAuthz(g1, '/font')],
+    ['route_authz comments', () => routeAuthz(g1, '/comments')],
     ['permission_routes admin', () => permissionRoutes(g1, ':admin')],
-    ['tests_covering selector', () => testsCovering(g2, 'qa-article-list')],
-    ['tests_covering route', () => testsCovering(g2, '/article/:id/font')],
+    ['tests_covering selector', () => testsCovering(g2, 'item-list')],
+    ['tests_covering route', () => testsCovering(g2, '/articles/:slug/comments')],
     ['callers ambiguous', () => callers(graph((b) => { b.def('a/x'); b.def('b/x'); }), 'x')],
   ];
   for (const [name, f] of calls) it(name, () => everyRowCited(f()));
@@ -831,9 +831,9 @@ describe('bands survive every query', () => {
     it(`${band} on a selector use`, () => {
       const b = new GraphBuilder();
       const m = b.node('page_object_member', 'P.m');
-      b.edge(m, 'uses_selector', b.node('selector', 'qa-x'), { band });
+      b.edge(m, 'uses_selector', b.node('selector', 'sel-x'), { band });
       b.edge(b.node('test', 't', { file: 't.spec.ts', line: 3 }), 'calls', m);
-      assert.deepEqual(rows(testsCovering(b.build(), 'qa-x')).map((x) => x.band), [band]);
+      assert.deepEqual(rows(testsCovering(b.build(), 'sel-x')).map((x) => x.band), [band]);
     });
     it(`${band} in blast radius`, () => {
       const b = new GraphBuilder();

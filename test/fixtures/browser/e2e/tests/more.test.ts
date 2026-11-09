@@ -4,9 +4,9 @@ import { ChildPage, CtorPage } from '../models/MorePages';
 test.describe.serial('group', () => {
   test('inherited member and soft assertions', async ({ page }) => {
     const p = new ChildPage(page);
-    await expect(p.qaBase).toBeVisible();
-    expect.soft(p.qaChild).toBeVisible();
-    await expect.poll(() => p.qaBase.count()).toBe(1);
+    await expect(p.baseField).toBeVisible();
+    expect.soft(p.childField).toBeVisible();
+    await expect.poll(() => p.baseField.count()).toBe(1);
   });
 
   test('constructor locator', async ({ page }) => {

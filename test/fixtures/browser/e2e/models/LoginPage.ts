@@ -3,11 +3,11 @@ export class BasePage {
 }
 
 export class LoginPage extends BasePage {
-  readonly form = () => this.page.locator('.qa-login-form');
-  readonly username = () => this.form().locator('.qa-username');
-  readonly password = () => this.page.locator('input.qa-password');
+  readonly form = () => this.page.locator('.login-form');
+  readonly username = () => this.form().locator('.username');
+  readonly password = () => this.page.locator('input.password');
   readonly submit = () => this.page.getByTestId('submit');
-  readonly byName = (name: string) => this.page.locator(`.qa-user-${name}`);
+  readonly byName = (name: string) => this.page.locator(`.user-${name}`);
 
   async logIn(user: string, pass: string) {
     await this.username().fill(user);

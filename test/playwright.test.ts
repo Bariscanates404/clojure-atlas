@@ -11,15 +11,15 @@ import { buildFixture, buildWithTypeScript5, fixtureDir, rowsText } from './help
 
 describe('playwright', () => {
   it('reads CSS class tokens and test ids from a selector string', () => {
-    assert.deepEqual(selectorsIn('div.qa-a > input.qa-b[data-testid="x"]'), [
-      { kind: 'class', value: 'qa-a' }, { kind: 'class', value: 'qa-b' }, { kind: 'testid', value: 'x' },
+    assert.deepEqual(selectorsIn('div.item-a > input.item-b[data-testid="x"]'), [
+      { kind: 'class', value: 'item-a' }, { kind: 'class', value: 'item-b' }, { kind: 'testid', value: 'x' },
     ]);
   });
 
   it('reads no class from a dot inside quotes, an attribute test or another selector engine', () => {
-    assert.deepEqual(selectorsIn('a[href="/files/report.pdf"].qa-link'), [{ kind: 'class', value: 'qa-link' }]);
+    assert.deepEqual(selectorsIn('a[href="/files/report.pdf"].report-link'), [{ kind: 'class', value: 'report-link' }]);
     assert.deepEqual(selectorsIn('text=Save.pdf'), []);
-    assert.deepEqual(selectorsIn('.qa-row >> text=Save.pdf'), [{ kind: 'class', value: 'qa-row' }]);
+    assert.deepEqual(selectorsIn('.row >> text=Save.pdf'), [{ kind: 'class', value: 'row' }]);
   });
 
   it('page objects, exact selectors, tests and renders, every row', async () => {
@@ -30,7 +30,7 @@ describe('playwright', () => {
   it('answers tests_for and tests_covering through the MCP', async () => {
     const g = graphFromJson(JSON.stringify(await buildWithTypeScript5('browser')));
     assert.match(testsFor(g, 'app.views/login-form').verdict, /and 4 browser test\(s\) reach it$/);
-    assert.match(testsCovering(g, 'qa-password').verdict, /^3 browser test\(s\) in 1 spec file\(s\)$/);
+    assert.match(testsCovering(g, 'password').verdict, /^3 browser test\(s\) in 1 spec file\(s\)$/);
   });
 
   it('a TypeScript without the compiler API leaves the capabilities absent, with the reason', async () => {

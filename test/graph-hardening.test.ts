@@ -167,15 +167,15 @@ describe('the last-resort cut ends on a whole line', () => {
 
 describe('route matching is by whole segments and the answer is capped', () => {
   const b = new GraphBuilder();
-  for (let i = 0; i < 30; i++) b.route('GET', `/article/${i}/font`);
+  for (let i = 0; i < 30; i++) b.route('GET', `/articles/${i}/comments`);
   const g = b.build();
   it('"/" and a partial segment match nothing', () => {
     assert.equal(findRoutes(g, '/').length, 0);
     assert.equal(findRoutes(g, '/fo').length, 0);
   });
-  it('a whole segment still matches', () => assert.equal(findRoutes(g, '/font').length, 30));
+  it('a whole segment still matches', () => assert.equal(findRoutes(g, '/comments').length, 30));
   it('many matches: ten answered, the rest counted', () => {
-    const r = routeAuthz(g, '/font');
+    const r = routeAuthz(g, '/comments');
     assert.equal(r.matches.length, 10);
     assert.match(r.verdict, /; \+20 more routes$/);
     assert.ok(r.notes.some((n) => n.startsWith('30 routes match; the first 10 are answered')));

@@ -69,7 +69,7 @@ const SKIP_TEST_PROPS = new Set(['describe', 'beforeEach', 'afterEach', 'beforeA
 // Playwright selector engines whose text is not CSS: text=Save.pdf, xpath=..., //div, role=button[name="a.b"]
 const OTHER_ENGINE = /^\s*((text|xpath|id|role|internal:[\w-]+)=|\/\/)/;
 
-// .qa-x class tokens and [data-testid="x"] in a CSS selector string. A dot inside quotes or an attribute test is not
+// .x class tokens and [data-testid="x"] in a CSS selector string. A dot inside quotes or an attribute test is not
 // a class, and a part written for another engine has none.
 export function selectorsIn(css: string): Selector[] {
   const out: Selector[] = [];
@@ -159,7 +159,7 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
   };
   const pageMember = (cls: string | undefined, name: string) => (cls && classes.get(cls)?.has(name) ? `${cls}.${name}` : undefined);
   const memberOf = (access: Node): string | undefined => pageMember(declaringClass(checker.getSymbolAtLocation(access.name)), access.name.text);
-  // const { qaX } = page; qaX(): an identifier bound by destructuring a page object names its member
+  // const { fieldX } = page; fieldX(): an identifier bound by destructuring a page object names its member
   const boundMember = (id: Node): string | undefined => {
     const decl = checker.getSymbolAtLocation(id)?.valueDeclaration;
     if (!decl || !ts.isBindingElement(decl) || !ts.isObjectBindingPattern(decl.parent) || decl.name === id) return undefined;

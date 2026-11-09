@@ -29,7 +29,7 @@ function unitGraph() {
     .edge(view, 'calls', f).edge(other, 'calls', view)
     .edge(a, 'calls', f).edge(bb, 'calls', a).edge(c, 'calls', bb).edge(far, 'calls', c)
     .edge(heur, 'calls', f, { band: 'heuristic' });
-  const sel = b.node('selector', 'qa-view');
+  const sel = b.node('selector', 'view-box');
   const m = b.node('page_object_member', 'Page.view');
   b.edge(view, 'renders', sel).edge(m, 'uses_selector', sel).edge(b.node('test', 'ui > shows view', { file: 'e2e/ui.spec.ts', line: 3 }), 'calls', m);
   const attr = b.node('data_attribute', ':core/n');
@@ -97,7 +97,7 @@ describe('tests_for', () => {
   it('browser tests through a caller that renders a selector', () => {
     const r = testsFor(g, 'core/f');
     assert.deepEqual(labels(r, 'browser tests'), ['ui > shows view']);
-    assert.match(rows(r, 'browser tests')[0].detail ?? '', /ui\/view -> qa-view/);
+    assert.match(rows(r, 'browser tests')[0].detail ?? '', /ui\/view -> view-box/);
   });
 
   it('states its limits and the namespaces to run per component', () => {
@@ -123,7 +123,7 @@ describe('tests_for', () => {
   });
 
   it('a selector or route falls back to browser coverage', () => {
-    const r = testsFor(g, 'qa-view');
+    const r = testsFor(g, 'view-box');
     assert.equal(r.name, 'tests_for');
     assert.equal(r.sections[0].rows.length, 1);
   });
@@ -321,7 +321,7 @@ describe('every query fills verdict, name and next', () => {
     ['permission_routes', () => permissionRoutes(g, ':edit-items')],
     ['attribute_usage', () => attributeUsage(g, ':item/name')],
     ['event_flow', () => eventFlow(graph((b) => { b.node('event', ':e/x'); }), ':e/x')],
-    ['tests_covering', () => testsCovering(u, 'qa-view')],
+    ['tests_covering', () => testsCovering(u, 'view-box')],
     ['tests_for', () => testsFor(u, 'core/f')],
     ['context_for_change', () => contextForChange(g, ['bases/api/src/routes.clj'])],
   ];

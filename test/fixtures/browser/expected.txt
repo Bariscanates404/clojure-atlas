@@ -7,27 +7,27 @@ node page_object:ChildPage [page_object] e2e/models/MorePages.ts:13 {"members":1
 node page_object:CtorPage [page_object] e2e/models/MorePages.ts:1 {"members":1}
 node page_object:Links [page_object] e2e/models/MorePages.ts:17 {"members":4}
 node page_object:LoginPage [page_object] e2e/models/LoginPage.ts:5 {"members":6,"base":"BasePage"}
-node page_object_member:BasePage.qaBase [page_object_member] e2e/models/MorePages.ts:10 {"class":"BasePage","selectors":1}
-node page_object_member:ChildPage.qaChild [page_object_member] e2e/models/MorePages.ts:14 {"class":"ChildPage","selectors":1}
+node page_object_member:BasePage.baseField [page_object_member] e2e/models/MorePages.ts:10 {"class":"BasePage","selectors":1}
+node page_object_member:ChildPage.childField [page_object_member] e2e/models/MorePages.ts:14 {"class":"ChildPage","selectors":1}
 node page_object_member:CtorPage.submit [page_object_member] e2e/models/MorePages.ts:2 {"class":"CtorPage","selectors":1}
 node page_object_member:Links.[Symbol.iterator] [page_object_member] e2e/models/MorePages.ts:19 {"class":"Links","selectors":0}
 node page_object_member:Links.page [page_object_member] e2e/models/MorePages.ts:18 {"class":"Links","selectors":0}
-node page_object_member:Links.qaLink [page_object_member] e2e/models/MorePages.ts:20 {"class":"Links","selectors":0}
-node page_object_member:Links.qaValue [page_object_member] e2e/models/MorePages.ts:21 {"class":"Links","selectors":1}
+node page_object_member:Links.reportLink [page_object_member] e2e/models/MorePages.ts:20 {"class":"Links","selectors":0}
+node page_object_member:Links.valueField [page_object_member] e2e/models/MorePages.ts:21 {"class":"Links","selectors":1}
 node page_object_member:LoginPage.byName [page_object_member] e2e/models/LoginPage.ts:10 {"class":"LoginPage","selectors":0}
 node page_object_member:LoginPage.form [page_object_member] e2e/models/LoginPage.ts:6 {"class":"LoginPage","selectors":1}
 node page_object_member:LoginPage.logIn [page_object_member] e2e/models/LoginPage.ts:12 {"class":"LoginPage","selectors":0}
 node page_object_member:LoginPage.password [page_object_member] e2e/models/LoginPage.ts:8 {"class":"LoginPage","selectors":1}
 node page_object_member:LoginPage.submit [page_object_member] e2e/models/LoginPage.ts:9 {"class":"LoginPage","selectors":1}
 node page_object_member:LoginPage.username [page_object_member] e2e/models/LoginPage.ts:7 {"class":"LoginPage","selectors":1}
-node selector:qa-base [selector] undefined:undefined
-node selector:qa-child [selector] undefined:undefined
-node selector:qa-login-form [selector] undefined:undefined
-node selector:qa-password [selector] undefined:undefined
-node selector:qa-submit [selector] undefined:undefined
-node selector:qa-username [selector] undefined:undefined
-node selector:qa-value [selector] undefined:undefined
+node selector:base-field [selector] undefined:undefined
+node selector:child-field [selector] undefined:undefined
+node selector:login-form [selector] undefined:undefined
+node selector:password [selector] undefined:undefined
+node selector:submit [selector] undefined:undefined
 node selector:testid=submit [selector] undefined:undefined
+node selector:username [selector] undefined:undefined
+node selector:value-field [selector] undefined:undefined
 node test:e2e/tests/login.test.ts:13 [test] e2e/tests/login.test.ts:13 {"describe":["login"],"assertions":1}
 node test:e2e/tests/login.test.ts:20 [test] e2e/tests/login.test.ts:20 {"describe":["login"],"assertions":0}
 node test:e2e/tests/login.test.ts:25 [test] e2e/tests/login.test.ts:25 {"describe":["login"],"assertions":0}
@@ -39,25 +39,25 @@ node test_file:e2e/tests/more.test.ts [test_file] e2e/tests/more.test.ts:1
 edge definition:app.views/login-form -produces_key-> key::class static_proven src/app/views.cljs:5 {"via":"map-literal"}
 edge definition:app.views/login-form -produces_key-> key::class static_proven src/app/views.cljs:6 {"via":"map-literal"}
 edge definition:app.views/login-form -produces_key-> key::data-testid static_proven src/app/views.cljs:7 {"via":"map-literal"}
-edge definition:app.views/login-form -renders-> selector:qa-login-form static_proven src/app/views.cljs:4
-edge definition:app.views/login-form -renders-> selector:qa-password static_proven src/app/views.cljs:6
-edge definition:app.views/login-form -renders-> selector:qa-username static_proven src/app/views.cljs:5
+edge definition:app.views/login-form -renders-> selector:login-form static_proven src/app/views.cljs:4
+edge definition:app.views/login-form -renders-> selector:password static_proven src/app/views.cljs:6
 edge definition:app.views/login-form -renders-> selector:testid=submit static_proven src/app/views.cljs:7
+edge definition:app.views/login-form -renders-> selector:username static_proven src/app/views.cljs:5
 edge namespace:app.views -defines-> definition:app.views/login-form static_proven src/app/views.cljs:3
-edge page_object_member:BasePage.qaBase -uses_selector-> selector:qa-base static_proven e2e/models/MorePages.ts:10
-edge page_object_member:ChildPage.qaChild -uses_selector-> selector:qa-child static_proven e2e/models/MorePages.ts:14
-edge page_object_member:CtorPage.submit -uses_selector-> selector:qa-submit static_proven e2e/models/MorePages.ts:2
-edge page_object_member:Links.qaLink -calls-> page_object_member:Links.page static_proven e2e/models/MorePages.ts:20
-edge page_object_member:Links.qaValue -calls-> page_object_member:Links.page static_proven e2e/models/MorePages.ts:21
-edge page_object_member:Links.qaValue -uses_selector-> selector:qa-value static_proven e2e/models/MorePages.ts:21
-edge page_object_member:LoginPage.form -uses_selector-> selector:qa-login-form static_proven e2e/models/LoginPage.ts:6
+edge page_object_member:BasePage.baseField -uses_selector-> selector:base-field static_proven e2e/models/MorePages.ts:10
+edge page_object_member:ChildPage.childField -uses_selector-> selector:child-field static_proven e2e/models/MorePages.ts:14
+edge page_object_member:CtorPage.submit -uses_selector-> selector:submit static_proven e2e/models/MorePages.ts:2
+edge page_object_member:Links.reportLink -calls-> page_object_member:Links.page static_proven e2e/models/MorePages.ts:20
+edge page_object_member:Links.valueField -calls-> page_object_member:Links.page static_proven e2e/models/MorePages.ts:21
+edge page_object_member:Links.valueField -uses_selector-> selector:value-field static_proven e2e/models/MorePages.ts:21
+edge page_object_member:LoginPage.form -uses_selector-> selector:login-form static_proven e2e/models/LoginPage.ts:6
 edge page_object_member:LoginPage.logIn -calls-> page_object_member:LoginPage.password static_proven e2e/models/LoginPage.ts:12
 edge page_object_member:LoginPage.logIn -calls-> page_object_member:LoginPage.submit static_proven e2e/models/LoginPage.ts:12
 edge page_object_member:LoginPage.logIn -calls-> page_object_member:LoginPage.username static_proven e2e/models/LoginPage.ts:12
-edge page_object_member:LoginPage.password -uses_selector-> selector:qa-password static_proven e2e/models/LoginPage.ts:8
+edge page_object_member:LoginPage.password -uses_selector-> selector:password static_proven e2e/models/LoginPage.ts:8
 edge page_object_member:LoginPage.submit -uses_selector-> selector:testid=submit static_proven e2e/models/LoginPage.ts:9
 edge page_object_member:LoginPage.username -calls-> page_object_member:LoginPage.form static_proven e2e/models/LoginPage.ts:7
-edge page_object_member:LoginPage.username -uses_selector-> selector:qa-username static_proven e2e/models/LoginPage.ts:7
+edge page_object_member:LoginPage.username -uses_selector-> selector:username static_proven e2e/models/LoginPage.ts:7
 edge test:e2e/tests/login.test.ts:13 -asserts_on-> page_object_member:LoginPage.username static_proven e2e/tests/login.test.ts:15 {"matcher":"toBeEditable"}
 edge test:e2e/tests/login.test.ts:13 -calls-> page_object_member:LoginPage.password static_proven e2e/tests/login.test.ts:16
 edge test:e2e/tests/login.test.ts:20 -calls-> page_object_member:LoginPage.logIn static_proven e2e/tests/login.test.ts:21
@@ -65,9 +65,9 @@ edge test:e2e/tests/login.test.ts:25 -calls-> page_object_member:LoginPage.logIn
 edge test:e2e/tests/login.test.ts:7 -asserts_on-> page_object_member:LoginPage.form static_proven e2e/tests/login.test.ts:9 {"matcher":"toBeVisible"}
 edge test:e2e/tests/login.test.ts:7 -asserts_on-> page_object_member:LoginPage.submit static_proven e2e/tests/login.test.ts:10 {"matcher":"toBeDisabled"}
 edge test:e2e/tests/more.test.ts:12 -asserts_on-> page_object_member:CtorPage.submit static_proven e2e/tests/more.test.ts:13 {"matcher":"toBeVisible"}
-edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:BasePage.qaBase static_proven e2e/tests/more.test.ts:7 {"matcher":"toBeVisible"}
-edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:BasePage.qaBase static_proven e2e/tests/more.test.ts:9 {"matcher":"toBe"}
-edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:ChildPage.qaChild static_proven e2e/tests/more.test.ts:8 {"matcher":"toBeVisible"}
+edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:BasePage.baseField static_proven e2e/tests/more.test.ts:7 {"matcher":"toBeVisible"}
+edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:BasePage.baseField static_proven e2e/tests/more.test.ts:9 {"matcher":"toBe"}
+edge test:e2e/tests/more.test.ts:5 -asserts_on-> page_object_member:ChildPage.childField static_proven e2e/tests/more.test.ts:8 {"matcher":"toBeVisible"}
 edge test_file:e2e/tests/login.test.ts -declares_test-> test:e2e/tests/login.test.ts:13 static_proven e2e/tests/login.test.ts:13
 edge test_file:e2e/tests/login.test.ts -declares_test-> test:e2e/tests/login.test.ts:20 static_proven e2e/tests/login.test.ts:20
 edge test_file:e2e/tests/login.test.ts -declares_test-> test:e2e/tests/login.test.ts:25 static_proven e2e/tests/login.test.ts:25

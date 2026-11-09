@@ -15,11 +15,11 @@ describe('sibling routes are the same base and mount, never another copy of the 
   it('a route served under two bases is not the odd one out because the other copy has a check', () => {
     const b = new GraphBuilder();
     const f = 'components/api/src/routes.clj';
-    const app = b.route('GET', '/article', 'app', '/api');
-    const admin = b.route('GET', '/article', 'admin', '/admin');
+    const app = b.route('GET', '/articles', 'app', '/api');
+    const admin = b.route('GET', '/articles', 'admin', '/admin');
     const other = b.route('GET', '/logo', 'app', '/api');
     for (const id of [app, admin, other]) Object.assign(b.nodes.find((n) => n.id === id) ?? {}, { file: f, line: 5 });
-    b.edge(admin, 'requires_permission', b.node('permission', ':edit-article'));
+    b.edge(admin, 'requires_permission', b.node('permission', ':comment-write'));
     const g = b.build();
     const node = g.byId.get(app);
     assert.ok(node);
