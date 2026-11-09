@@ -910,3 +910,36 @@ describe('odd names', () => {
     }
   });
 });
+
+// ---------- route answers that are weaker than they look ----------
+
+describe('route authz states how sure it is', () => {
+  const x = new GraphBuilder();
+  const guessed = x.route('GET', '/admin/users');
+  const proven = x.route('GET', '/users/{id}');
+  const nomethod = x.node('route', '/x', { id: 'route:/x', attrs: { path: '/x' } });
+  const perm = x.node('permission', 'p');
+  x.edge(guessed, 'requires_permission', perm, { band: 'heuristic' }).edge(proven, 'requires_permission', perm);
+  const g = x.build();
+
+  it('a heuristic permission edge is not stated as plain "requires"', () => {
+    const r = routeAuthz(g, 'GET /admin/users');
+    assert.match(r.verdict, /^requires p \(HEURISTIC: confirm at the cited line\)/);
+    assert.doesNotMatch(routeAuthz(g, 'GET /users/{id}').verdict, /HEURISTIC/);
+  });
+
+  it('a route with no recorded method is still found by a method query, and says so', () => {
+    const r = routeAuthz(g, 'GET /x');
+    assert.equal(r.found, true);
+    assert.deepEqual(r.matches, [nomethod]);
+    assert.match(r.notes.join(' '), /1 matched route\(s\) have no recorded method/);
+    assert.doesNotMatch(routeAuthz(g, '/x').notes.join(' '), /no recorded method/);
+  });
+
+  it('a partial path match is said to be partial, an exact one is not', () => {
+    const partial = routeAuthz(g, '/users');
+    assert.deepEqual([...partial.matches].sort(), [guessed, proven].sort());
+    assert.match(partial.notes.join(' '), /matched as part of the path/);
+    assert.doesNotMatch(routeAuthz(g, '/users/{id}').notes.join(' '), /matched as part of the path/);
+  });
+});

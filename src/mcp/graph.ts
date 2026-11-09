@@ -112,12 +112,16 @@ export function parseDocument(raw: unknown, origin = 'graph'): GraphDocument {
     check(!ids.has(node.id as string), `${origin}: nodes[${i}] repeats id ${JSON.stringify(node.id)}`);
     ids.add(node.id as string);
     check(node.file === undefined || typeof node.file === 'string', `${origin}: nodes[${i}] has a non-string file`);
+    check(node.roles === undefined || (Array.isArray(node.roles) && node.roles.every((r) => typeof r === 'string')), `${origin}: nodes[${i}] has roles that are not a list of strings`);
+    check(node.attrs === undefined || isObject(node.attrs), `${origin}: nodes[${i}] has attrs that are not an object`);
     check(isLine(node.line) && isLine(node.end_line), `${origin}: nodes[${i}] has a line or end_line that is not a whole number`);
   });
   edges.forEach((e, i) => {
     check(isObject(e) && typeof e.from === 'string' && typeof e.to === 'string' && typeof e.kind === 'string'
       && typeof e.file === 'string', `${origin}: edges[${i}] needs string from, to, kind and file`);
     check(isLine((e as Record<string, unknown>).line), `${origin}: edges[${i}] has a line that is not a whole number`);
+    const attrs = (e as Record<string, unknown>).attrs;
+    check(attrs === undefined || isObject(attrs), `${origin}: edges[${i}] has attrs that are not an object`);
     check((BANDS as readonly string[]).includes(String((e as Record<string, unknown>).band)),
       `${origin}: edges[${i}] has band ${JSON.stringify((e as Record<string, unknown>).band)}, expected one of ${BANDS.join(', ')}`);
   });

@@ -39,6 +39,10 @@ describe('graph loading: rejects what is not a version-1 code-graph', () => {
     ['node without name', { ...base, nodes: [{ id: 'definition:x', kind: 'definition' }] }, /nodes\[0\]/],
     ['edge without file', { ...base, edges: [{ ...base.edges[0], file: undefined }] }, /edges\[0\] needs string from, to, kind and file/],
     ['edge without band', { ...base, edges: [{ ...base.edges[0], band: undefined }] }, /edges\[0\] has band undefined/],
+    ['node roles that are not a list of strings', { ...base, nodes: [{ ...base.nodes[0], roles: 'test' }] }, /nodes\[0\] has roles that are not a list of strings/],
+    ['node roles with a non-string entry', { ...base, nodes: [{ ...base.nodes[0], roles: ['test', 1] }] }, /nodes\[0\] has roles that are not a list of strings/],
+    ['node attrs that are not an object', { ...base, nodes: [{ ...base.nodes[0], attrs: [] }] }, /nodes\[0\] has attrs that are not an object/],
+    ['edge attrs that are not an object', { ...base, edges: [{ ...base.edges[0], attrs: 'x' }] }, /edges\[0\] has attrs that are not an object/],
     ['edge with an upper-case band', { ...base, edges: [{ ...base.edges[0], band: 'STATIC_PROVEN' }] }, /has band "STATIC_PROVEN"/],
   ];
   for (const [name, doc, re] of cases) {

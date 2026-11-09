@@ -222,24 +222,37 @@ function routeMethod(n: GraphNode): string | null {
   return typeof m === 'string' ? m.replace(/^:/, '').toUpperCase() : null;
 }
 
-export function findRoutes(g: Graph, query: string): GraphNode[] {
+export interface RouteMatch {
+  routes: GraphNode[];
+  // matched as whole segments inside a longer path, not as the path itself
+  partial: boolean;
+  // matched a method query although the route records no method
+  methodless: number;
+}
+
+export function matchRoutes(g: Graph, query: string): RouteMatch {
   const byId = g.byId.get(query.trim()) ?? g.byId.get(`route:${query.trim()}`);
-  if (byId && byId.kind === 'route') return [byId];
+  if (byId && byId.kind === 'route') return { routes: [byId], partial: false, methodless: 0 };
   const { method, path } = canonicalRoute(query);
-  const routes = (g.byKind.get('route') ?? []).filter((n) => !method || routeMethod(n) === method || routeMethod(n) === 'ANY');
+  // a route that records no method may answer any method: it is kept and counted, never dropped as if absent
+  const routes = (g.byKind.get('route') ?? []).filter((n) => !method || routeMethod(n) === method || routeMethod(n) === 'ANY' || routeMethod(n) === null);
+  const countMethodless = (found: GraphNode[]) => (method ? found.filter((n) => routeMethod(n) === null).length : 0);
   const exact = routes.filter((n) => routePaths(n).includes(path));
-  if (exact.length) return exact;
+  if (exact.length) return { routes: exact, partial: false, methodless: countMethodless(exact) };
   // otherwise the query's segments must appear as whole consecutive segments of the path: "/font" finds
   // /article/{p}/font, but "/" or "/fo" finds nothing
   const want = path.split('/').filter((x) => x !== '');
-  if (!want.length) return [];
+  if (!want.length) return { routes: [], partial: false, methodless: 0 };
   const has = (p: string) => {
     const segs = p.split('/').filter((x) => x !== '');
     for (let i = 0; i + want.length <= segs.length; i++) if (want.every((w, k) => segs[i + k] === w)) return true;
     return false;
   };
-  return routes.filter((n) => routePaths(n).some(has));
+  const found = routes.filter((n) => routePaths(n).some(has));
+  return { routes: found, partial: found.length > 0, methodless: countMethodless(found) };
 }
+
+export const findRoutes = (g: Graph, query: string): GraphNode[] => matchRoutes(g, query).routes;
 
 // route_authz answers this many matching routes in full; the rest are counted
 const MAX_ROUTE_ANSWERS = 10;
@@ -304,7 +317,9 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
   if (!permE.length && !exempt.length && routeAuthzMissing(g)) return { state: 'unknown', text: ROUTE_AUTHZ_MISSING };
   if (permE.length) {
     const unknown = permE.some((e) => e.band === 'unknown');
-    const text = `requires ${permissionExpression(g, permE)}${unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : ''}`;
+    const guessed = !unknown && permE.some((e) => e.band === 'heuristic');
+    const caveat = unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : guessed ? ' (HEURISTIC: confirm at the cited line)' : '';
+    const text = `requires ${permissionExpression(g, permE)}${caveat}`;
     return { state: unknown ? 'unknown' : 'permission', text };
   }
   if (exempt.length) return { state: 'exempt', text: `exempt: ${exempt.map((e) => g.byId.get(e.to)?.name ?? e.to).join('; ')}` };
@@ -333,7 +348,8 @@ export function routeSiblings(g: Graph, route: GraphNode): { text: string; odd: 
 
 export function routeAuthz(g: Graph, query: string): QueryResult {
   const title = `route authz of ${query}`;
-  const found = findRoutes(g, query);
+  const match = matchRoutes(g, query);
+  const found = match.routes;
   if (!found.length) return notFound('route_authz', query, title, 'route', 'paths match with :param and {param} segments treated alike');
   const routes = found.slice(0, MAX_ROUTE_ANSWERS);
   const sections: Section[] = [];
@@ -342,6 +358,8 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
   const next: string[] = [];
   if (found.length > routes.length) notes.push(`${found.length} routes match; the first ${routes.length} are answered, pass a longer path or a method for the rest`);
   else if (routes.length > 1) notes.push(`${routes.length} routes match; each served copy is listed separately`);
+  if (match.partial) notes.push(`matched as part of the path: ${routes.length > 1 ? 'these routes are' : 'this route is'} longer than ${JSON.stringify(query)}`);
+  if (match.methodless) notes.push(`${match.methodless} matched route(s) have no recorded method: the method in the query could not be checked for them`);
   for (const r of routes) {
     const a = r.attrs ?? {};
     const where = [a.base && `base ${String(a.base)}`, a.mount && `mount ${String(a.mount)}`].filter(Boolean).join(', ');
