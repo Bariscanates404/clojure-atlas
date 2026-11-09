@@ -186,5 +186,79 @@
       "compojure.middleware/redirect-to-canonical": "src/compojure/middleware.clj:15",
       "compojure.middleware/assoc-path": "src/compojure/middleware.clj:20"
     }
+  },
+  {
+    "id": "a01",
+    "repo": "mount",
+    "question": "Which definitions call mount.core/unpound?",
+    "tool": "callers",
+    "args": {"var": "mount.core/unpound"},
+    "expected": [],
+    "absence": "none",
+    "evidence": {
+      "the definition is the only place the name appears in the repo (grep -rn unpound: one hit)": "src/mount/core.cljc:43"
+    }
+  },
+  {
+    "id": "a02",
+    "repo": "integrant",
+    "question": "Which definitions call integrant.core/stop?",
+    "tool": "callers",
+    "args": {"var": "integrant.core/stop"},
+    "expected": [],
+    "absence": "not-found",
+    "evidence": {
+      "the function that stops a system is halt!; no var named stop is defined in src (grep -rn 'defn stop': no hit)": "src/integrant/core.cljc:660"
+    }
+  },
+  {
+    "id": "a03",
+    "repo": "mount",
+    "question": "Which handlers does the re-frame event :app/start run?",
+    "tool": "event_flow",
+    "args": {"name": ":app/start"},
+    "expected": [],
+    "absence": "capability-off",
+    "capability": "events",
+    "evidence": {
+      "no re-frame, reg-event-db or reg-event-fx anywhere in the repo (grep -rniE 're-frame|reg-event': no hit); deps list no re-frame": "deps.edn:1"
+    }
+  },
+  {
+    "id": "a04",
+    "repo": "mount",
+    "question": "Which routes require the :admin permission?",
+    "tool": "permission_routes",
+    "args": {"permission": ":admin"},
+    "expected": [],
+    "absence": "capability-off",
+    "capability": "route_authz",
+    "evidence": {
+      "the only routes are two compojure routes with no check; no .clojure-atlas.edn, no permission or authz code in the repo": "dev/clj/app/www.clj:11"
+    }
+  },
+  {
+    "id": "a05",
+    "repo": "usermanager",
+    "question": "Which tests reach usermanager.main/-main?",
+    "tool": "tests_for",
+    "args": {"symbol": "usermanager.main/-main"},
+    "expected": [],
+    "absence": "none",
+    "evidence": {
+      "the main test namespace only requires usermanager.main and defines no test; -main is never called outside its definition": "test/usermanager/main_test.clj:3"
+    }
+  },
+  {
+    "id": "a06",
+    "repo": "usermanager",
+    "question": "Which handler serves the route GET /admin?",
+    "tool": "route_authz",
+    "args": {"route": "GET /admin"},
+    "expected": [],
+    "absence": "not-found",
+    "evidence": {
+      "the routing table lists /, /user/delete/:id, /user/form, /user/form/:id, /user/list, /user/save, /reset and resources; no /admin": "src/usermanager/main.clj:125"
+    }
   }
 ]

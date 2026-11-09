@@ -1,16 +1,25 @@
 # Benchmark
 
-12 questions about public corpus repos, each answered by one MCP tool on the graph
+18 questions about public corpus repos, each answered by one MCP tool on the graph
 `scripts/coverage.ts` builds at the sha pinned in [corpus.json](../corpus.json). The expected answers were
 verified by hand in the source, without the tool; each one's file:line is in
-[bench/questions.json](../bench/questions.json). A question passes when the answer names every expected definition
-and nothing else. Measured by `node bench/score.ts <corpus-dir>`; every number below comes from that run.
+[bench/questions.json](../bench/questions.json). Measured by `node bench/score.ts <corpus-dir>`; every number below
+comes from that run, and the run refuses a graph built by another clojure-atlas version than the code it scores.
 
-**12 of 12 questions pass.** Expected items found: 28 of 28; items answered: 28.
+**Positive questions: 12 of 12 pass.** A question passes when the answer names every
+expected definition and nothing else. Expected items found: 28 of 28; items answered: 28.
 
-The questions were fixed before the first run, which scored 11 of 12: q07 showed that registrations and dispatches
-through `re-frame.alpha` (re-frame's alpha namespace re-exporting `re-frame.core`) were not recognized. The builder
-was fixed, with a fixture; the question was kept as it was.
+**Absence questions: 4 of 6 pass.** The correct answer is that there is none. One passes only
+when the answer states that kind of absence and names nothing: *none* (the thing exists, nothing relates to it, the
+answer says zero), *not-found* (the codebase has no such thing, the answer says so), *capability-off* (the graph
+cannot answer, because the extractor for this kind of fact found nothing to extract from, and the answer says that
+instead of reading as plain absence).
+
+The positive questions were fixed before the first run, which scored 11 of 12: q07 showed that registrations and
+dispatches through `re-frame.alpha` (re-frame's alpha namespace re-exporting `re-frame.core`) were not recognized.
+The builder was fixed, with a fixture; the question was kept as it was.
+
+## Positive questions
 
 | id | repo | tool | question | expected | found | missing | extra | pass |
 |---|---|---|---|---|---|---|---|---|
@@ -26,3 +35,14 @@ was fixed, with a fixture; the question was kept as it was.
 | q10 | pedestal | route_authz | Which handler var does the route GET /admin reach? | 1 | 1 | - | - | yes |
 | q11 | usermanager | tests_for | Which deftests exercise usermanager.model.user-manager/get-user-by-id? | 2 | 2 | - | - | yes |
 | q12 | compojure | key_flow | Which definitions produce or consume the :compojure/path request key? | 3 | 3 | - | - | yes |
+
+## Absence questions
+
+| id | repo | tool | question | correct answer | states it | names nothing | pass |
+|---|---|---|---|---|---|---|---|
+| a01 | mount | callers | Which definitions call mount.core/unpound? | none | yes | yes | yes |
+| a02 | integrant | callers | Which definitions call integrant.core/stop? | not-found | yes | yes | yes |
+| a03 | mount | event_flow | Which handlers does the re-frame event :app/start run? | capability-off (events) | no | yes | no |
+| a04 | mount | permission_routes | Which routes require the :admin permission? | capability-off (route_authz) | no | yes | no |
+| a05 | usermanager | tests_for | Which tests reach usermanager.main/-main? | none | yes | yes | yes |
+| a06 | usermanager | route_authz | Which handler serves the route GET /admin? | not-found | yes | yes | yes |

@@ -17,7 +17,7 @@
     "dist/**/*.js"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18.0"
   },
   "keywords": [
     "clojure",

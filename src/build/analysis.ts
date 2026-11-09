@@ -222,7 +222,45 @@ export function normalize(raw: Raw): Analysis {
       .map((r) => ({ file: s(r.filename) ?? '', row: n(r.row) ?? 0, message: s(r.message) ?? '' })),
     (x) => key(x.file, x.row, x.message),
   );
-  return { nsDefs, nsUses, varDefs, varUses, keywords, protocolImpls, syntaxErrors };
+  return withoutProtocolParams(withoutRichComments({ nsDefs, nsUses, varDefs, varUses, keywords, protocolImpls, syntaxErrors }));
+}
+
+const CORE_NAMESPACE = /^(clojure|cljs)\.core$/;
+const UNKNOWN_NAMESPACE = 'clj-kondo/unknown-namespace';
+
+// The calls of one clojure.core macro, by file: kondo gives such a call the span of its whole form.
+function macroCalls(a: Analysis, name: string): Map<string, VarUse[]> {
+  const byFile = new Map<string, VarUse[]>();
+  for (const u of a.varUses) if (u.macro && u.name === name && CORE_NAMESPACE.test(u.to)) byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
+  return byFile;
+}
+
+// What stands inside a (comment ...) form is never run: a call, a definition, a require or a keyword there is not
+// part of the program, so none of it is kept (the `comment` usage itself stays, it is a call to the macro).
+function withoutRichComments(a: Analysis): Analysis {
+  const comments = macroCalls(a, 'comment');
+  if (comments.size === 0) return a;
+  const inside = (file: string, row: number, col: number, self?: VarUse) =>
+    (comments.get(file) ?? []).some((c) => c !== self && contains(c, row, col));
+  return {
+    ...a,
+    nsUses: a.nsUses.filter((x) => !inside(x.file, x.row, x.col)),
+    varDefs: a.varDefs.filter((x) => !inside(x.file, x.row, x.col)),
+    varUses: a.varUses.filter((x) => !inside(x.file, x.row, x.col, x)),
+    keywords: a.keywords.filter((x) => !inside(x.file, x.row, x.col)),
+    protocolImpls: a.protocolImpls.filter((x) => !inside(x.file, x.row, x.col)),
+  };
+}
+
+// kondo reports the parameters of a protocol method signature, (defprotocol P (m [this x])), as usages of names it
+// cannot resolve; they are locals of a signature that has no body, so they are dropped.
+function withoutProtocolParams(a: Analysis): Analysis {
+  const protocols = macroCalls(a, 'defprotocol');
+  if (protocols.size === 0) return a;
+  return {
+    ...a,
+    varUses: a.varUses.filter((u) => u.to !== UNKNOWN_NAMESPACE || !(protocols.get(u.file) ?? []).some((p) => contains(p, u.row, u.col))),
+  };
 }
 
 // Several runs (one per chunk of files) into one model; chunks never share a file.

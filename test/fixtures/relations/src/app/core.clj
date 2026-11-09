@@ -35,3 +35,10 @@
 (defn on-change [_ _ _ _] nil)
 (def state (atom nil))
 (add-watch state ::watch on-change)
+
+(defn only-in-rich-comment [x] x)
+
+(comment
+  (only-in-rich-comment 1)
+  (save! {} 2)
+  (defn scratch [x] (audit x)))
