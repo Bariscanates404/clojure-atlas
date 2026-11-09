@@ -46,9 +46,9 @@ edge namespace:app.events -defines-> definition:app.events/handle-stamp static_p
 edge namespace:app.events -defines-> definition:app.events/on-saved static_proven src/app/events.cljs:9
 edge namespace:app.events -defines-> definition:app.events/std-interceptors static_proven src/app/events.cljs:22
 edge namespace:app.events -defines-> definition:app.events/view static_proven src/app/events.cljs:17
-edge namespace:app.events -references-> definition:app.events/handle-stamp static_proven src/app/events.cljs:26
-edge namespace:app.events -references-> definition:app.events/on-saved static_proven src/app/events.cljs:11
 edge namespace:app.events -references-> definition:app.events/std-interceptors static_proven src/app/events.cljs:26
+edge namespace:app.events -registers_handler-> definition:app.events/handle-stamp static_proven src/app/events.cljs:26 {"via":"reg-event-db"}
+edge namespace:app.events -registers_handler-> definition:app.events/on-saved static_proven src/app/events.cljs:11 {"via":"reg-event-fx"}
 edge namespace:user -defines-> definition:user/go static_proven dev/user.cljs:4
 edge subscription::app.events/count -registers-> handler:subscription :app.events/count src/app/events.cljs:15 static_proven src/app/events.cljs:15
 edge subscription::app.events/items -registers-> handler:subscription :app.events/items src/app/events.cljs:13 static_proven src/app/events.cljs:13

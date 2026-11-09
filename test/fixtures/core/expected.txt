@@ -29,11 +29,11 @@ edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_pro
 edge definition:demo.core-test/f-test -tests-> definition:demo.core/f static_proven test/demo/core_test.clj:9
 edge definition:demo.core-test/fixture-map -produces_key-> key::a static_proven test/demo/core_test.clj:5 {"via":"map-literal"}
 edge definition:demo.core/Square -references-> definition:demo.core/Shape static_proven src/demo/core.clj:5
-edge definition:demo.core/area -calls-> implementation:src/demo/core.clj:5:29 heuristic src/demo/core.clj:5 {"via":"protocol dispatch"}
+edge definition:demo.core/area -may_dispatch_to-> implementation:src/demo/core.clj:5:29 heuristic src/demo/core.clj:5
 edge definition:demo.core/f -calls-> definition:demo.util/helper static_proven src/demo/core.clj:10 {"arity":1,"arity_band":"static_proven"}
 edge definition:demo.core/f -consumes_key-> key::a static_proven src/demo/core.clj:10 {"via":"keyword-fn"}
-edge definition:demo.core/f -references-> definition:demo.util/helper static_proven src/demo/core.clj:11
-edge definition:demo.core/m -references-> definition:demo.core/f static_proven src/demo/core.clj:15
+edge definition:demo.core/f -passes_callback-> definition:demo.util/helper static_proven src/demo/core.clj:11 {"via":"map"}
+edge definition:demo.core/m -calls-> definition:demo.core/f static_proven src/demo/core.clj:15
 edge definition:demo.core/m -references-> definition:demo.core/table static_proven src/demo/core.clj:15
 edge definition:demo.core/secret -calls-> definition:demo.core/->Square static_proven src/demo/core.clj:17 {"arity":1,"arity_band":"static_proven"}
 edge definition:demo.core/table -produces_key-> key::a static_proven src/demo/core.clj:7 {"via":"map-literal"}

@@ -29,7 +29,7 @@ edge namespace:model.malli -defines-> definition:model.malli/valid-user? static_
 edge namespace:model.spec -defines-> definition:model.spec/email? static_proven src/model/spec.clj:4
 edge namespace:model.spec -defines-> definition:model.spec/just-data static_proven src/model/spec.clj:11
 edge namespace:model.spec -defines-> definition:model.spec/valid-person? static_proven src/model/spec.clj:9
-edge schema::model.spec/email -references-> definition:model.spec/email? static_proven src/model/spec.clj:6
+edge schema::model.spec/email -references-> definition:model.spec/email? static_proven src/model/spec.clj:6 {"via":"alias"}
 edge schema::model.spec/person -uses_schema-> schema::model.spec/email static_proven src/model/spec.clj:7
 edge schema:model.malli/Address -registers-> definition:model.malli/Address static_proven src/model/malli.clj:4
 edge schema:model.malli/User -registers-> definition:model.malli/User static_proven src/model/malli.clj:6

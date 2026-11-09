@@ -29,6 +29,8 @@ export interface VarDef extends Span {
   definedBy?: string;
   test: boolean;
   macro: boolean;
+  // a function: kondo knows its arities, or it is a multimethod
+  fn: boolean;
   private: boolean;
   langs: string[];
 }
@@ -48,6 +50,8 @@ export interface VarUse extends Span {
   to: string;
   name: string;
   arity?: number;
+  // a macro call: the code it expands to is not visible
+  macro: boolean;
   defmethod: boolean;
   dispatch?: string;
 }
@@ -143,6 +147,7 @@ export function normalize(raw: Raw): Analysis {
       ...(s(r['defined-by']) ? { definedBy: s(r['defined-by']) } : {}),
       test: r.test === true,
       macro: r.macro === true,
+      fn: r.macro !== true && (Array.isArray(r['fixed-arities']) || n(r['varargs-min-arity']) !== undefined || r['defined-by'] === 'clojure.core/defmulti'),
       private: r.private === true,
       langs: s(r.lang) ? [s(r.lang) as string] : [],
     })),
@@ -162,6 +167,7 @@ export function normalize(raw: Raw): Analysis {
         to: s(r.to) ?? '',
         name: s(r.name) ?? '',
         ...(n(r.arity) !== undefined ? { arity: n(r.arity) } : {}),
+        macro: r.macro === true,
         defmethod: r.defmethod === true,
         ...(s(r['dispatch-val-str']) ? { dispatch: s(r['dispatch-val-str']) } : {}),
       })),

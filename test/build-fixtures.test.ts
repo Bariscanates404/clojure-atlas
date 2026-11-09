@@ -9,6 +9,7 @@ import { buildFixture, fixtureDir, rowsText } from './helpers/atlas-fixture.ts';
 
 const FIXTURES: [string, string][] = [
   ['core', 'definitions, defines, requires, calls vs references, tests, protocol impls, not-vars, language namespaces'],
+  ['relations', 'calls vs references vs passed callbacks (vector, partial, comp, apply, alias, closure, empty map), a handler registered with add-watch, macro expansion, binding/with-redefs as UNKNOWN, dispatch candidates for defmulti, extend-type, extend-protocol, reify'],
   ['multimethods', 'defmethod nodes, resolved keyword dispatch, heuristic dispatch edges, a library multimethod'],
   ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event'],
   ['routes', 'compojure context mounts, reitit route data with middleware, pedestal table routes and interceptors'],

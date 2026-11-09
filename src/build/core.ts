@@ -1,14 +1,15 @@
 // The core graph every codebase gets: namespaces and definitions, and the edges kondo resolves statically:
-// defines (namespace -> definition), requires (namespace -> namespace), calls and references (a usage with and
-// without an argument list) and tests (a deftest -> what it uses).
-import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
+// defines (namespace -> definition), requires (namespace -> namespace), each var usage as the relation relations.ts
+// names (calls, references, passes_callback, registers_handler, expands_via, rebinds) and tests (a deftest -> what it uses).
+import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../mcp/keyflow.ts';
 import type { VarDef, VarUse } from './analysis.ts';
 import { defId, nsId, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids } from './reader.ts';
+import { classify } from './relations.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
 
-export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
+const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
 // in it, not resolved by kondo at all, or pointing into a library.
@@ -104,10 +105,10 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const unresolved = new Map<string, number>();
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
-  const link = (from: string, to: string, kind: string, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
+  const link = (from: string, to: string, kind: string, band: Band, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
     if (from === to) return;
-    edges.push({ from, to, kind, band: 'static_proven', file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
-    if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band: 'static_proven', file: u.file, line: u.nameRow });
+    edges.push({ from, to, kind, band, file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
+    if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band, file: u.file, line: u.nameRow });
   };
   const isAssertion = assertionHeads(ctx);
   const usage = (u: VarUse) => {
@@ -132,11 +133,15 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
       return;
     }
     stats.resolved++;
-    const call = u.arity !== undefined ? formAt(ctx.forms(u.file), u.row, u.col) : undefined;
-    const attrs = u.arity !== undefined
-      ? { arity: u.arity, arity_band: 'static_proven', ...(call ? callArgs(call, u.arity, signatures.get(full) ?? null, (f) => ctx.nameOf(u.file, f)) : {}) }
-      : undefined;
-    link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), u.arity !== undefined ? 'calls' : 'references', u, attrs);
+    const rel = classify(ctx, u);
+    const call = rel.kind === 'calls' && u.arity !== undefined ? formAt(ctx.forms(u.file), u.row, u.col) : undefined;
+    const attrs = {
+      ...(rel.via ? { via: rel.via } : {}),
+      ...(rel.kind === 'calls' && u.arity !== undefined
+        ? { arity: u.arity, arity_band: 'static_proven', ...(call ? callArgs(call, u.arity, signatures.get(full) ?? null, (f) => ctx.nameOf(u.file, f)) : {}) }
+        : {}),
+    };
+    link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), rel.kind, rel.band, u, Object.keys(attrs).length ? attrs : undefined);
   };
   for (const u of ctx.analysis.varUses) usage(u);
 

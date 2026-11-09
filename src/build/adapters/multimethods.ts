@@ -1,5 +1,5 @@
 // Multimethods: one dispatch arm per defmethod (multimethod plus dispatch value), defined by its namespace and reached
-// from the defmulti through a HEURISTIC call edge (which method runs is decided by the dispatch value at runtime).
+// from the defmulti through a HEURISTIC may_dispatch_to edge (the dispatch value at runtime picks the method).
 // A top-level defmethod owns the usages in its body.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { isTestFile } from '../../mcp/keyflow.ts';
@@ -32,7 +32,7 @@ export function methods(ctx: Context): Method[] {
 
 export const multimethods: Adapter = {
   name: 'multimethods',
-  edgeKinds: ['defines', 'calls'],
+  edgeKinds: ['defines', 'may_dispatch_to'],
   detect: (ctx) => (ctx.analysis.varUses.some((u) => u.defmethod) ? 'defmethod' : null),
   containers: (ctx): Container[] => methods(ctx).map((m) => ({ id: methodId(m.multi, m.dispatch), span: m.span })),
   run: (ctx) => {
@@ -49,7 +49,7 @@ export const multimethods: Adapter = {
       });
       edges.push({ from: nsId(m.use.from), to: id, kind: 'defines', band: 'static_proven', file: m.span.file, line: m.span.row });
       if (ctx.defs.has(m.multi)) {
-        edges.push({ from: defId(m.multi), to: id, kind: 'calls', band: 'heuristic', file: m.span.file, line: m.span.row, attrs: { via: 'multimethod dispatch', dispatch: m.dispatch } });
+        edges.push({ from: defId(m.multi), to: id, kind: 'may_dispatch_to', band: 'heuristic', file: m.span.file, line: m.span.row, attrs: { dispatch: m.dispatch } });
       }
     }
     return { nodes, edges };

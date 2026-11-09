@@ -1,6 +1,6 @@
 // Protocol implementations: each method a defrecord, deftype, extend-type, extend-protocol or reify implements is an
 // implementation node that implements the protocol method (when the protocol is in the project, which also reaches it
-// through a HEURISTIC call: the implementation that runs depends on the value). A top-level one owns its body.
+// through a HEURISTIC may_dispatch_to: which one runs depends on the value). A top-level one owns its body.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import type { ProtocolImpl } from '../analysis.ts';
 import { defId, nsId, type Adapter, type Container } from '../model.ts';
@@ -9,7 +9,7 @@ const implementationId = (p: ProtocolImpl) => `implementation:${p.file}:${p.row}
 
 export const implementations: Adapter = {
   name: 'implementations',
-  edgeKinds: ['implements', 'calls', 'defines'],
+  edgeKinds: ['implements', 'may_dispatch_to', 'defines'],
   detect: (ctx) => (ctx.analysis.protocolImpls.length ? 'protocol implementations' : null),
   containers: (ctx): Container[] => ctx.analysis.protocolImpls.map((p) => ({ id: implementationId(p), span: p })),
   run: (ctx) => {
@@ -27,7 +27,7 @@ export const implementations: Adapter = {
       edges.push({ from: nsId(p.implNs), to: id, kind: 'defines', band: 'static_proven', file: p.file, line: p.row });
       if (!ctx.defs.has(method)) continue;
       edges.push({ from: id, to: defId(method), kind: 'implements', band: 'static_proven', file: p.file, line: p.row });
-      edges.push({ from: defId(method), to: id, kind: 'calls', band: 'heuristic', file: p.file, line: p.row, attrs: { via: 'protocol dispatch' } });
+      edges.push({ from: defId(method), to: id, kind: 'may_dispatch_to', band: 'heuristic', file: p.file, line: p.row });
     }
     return { nodes, edges };
   },

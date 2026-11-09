@@ -24,9 +24,9 @@ node key_table:src/cart/core.clj:4:3 [key_table] src/cart/core.clj:4 {"shape":"v
 node namespace:cart.core [namespace] src/cart/core.clj:1
 edge definition:cart.core/checkout -consumes_key-> key::count heuristic src/cart/core.clj:18 {"via":"update"}
 edge definition:cart.core/checkout -consumes_key-> key::items static_proven src/cart/core.clj:14 {"via":"destructure"}
+edge definition:cart.core/checkout -passes_callback-> definition:cart.core/line-total static_proven src/cart/core.clj:16 {"via":"map"}
 edge definition:cart.core/checkout -produces_key-> key::count heuristic src/cart/core.clj:18 {"via":"update"}
 edge definition:cart.core/checkout -produces_key-> key::total heuristic src/cart/core.clj:16 {"via":"assoc"}
-edge definition:cart.core/checkout -references-> definition:cart.core/line-total static_proven src/cart/core.clj:16
 edge definition:cart.core/checkout -removes_key-> key::draft heuristic src/cart/core.clj:17 {"via":"dissoc"}
 edge definition:cart.core/configure -consumes_key-> key::verbose static_proven src/cart/core.clj:11 {"via":"destructure"}
 edge definition:cart.core/configure -produces_key-> key::verbose static_proven src/cart/core.clj:11 {"via":"assoc"}

@@ -144,7 +144,11 @@ function treeOrder(rows: Row[]): { row: Row; level: number }[] {
   return out;
 }
 
-const edgeWord = (r: Row) => (r.kind === 'references' ? 'referenced by' : r.kind === 'calls' ? 'called by' : `${r.kind ?? 'linked'} by`);
+const EDGE_WORDS: Record<string, string> = {
+  calls: 'called by', references: 'referenced by', passes_callback: 'passed as a callback by', registers_handler: 'registered as a handler by', expands_via: 'expanded by',
+  may_dispatch_to: 'may be dispatched to by', rebinds: 'rebound by',
+};
+const edgeWord = (r: Row) => EDGE_WORDS[r.kind ?? ''] ?? `${r.kind ?? 'linked'} by`;
 
 interface Level {
   details: boolean;

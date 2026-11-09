@@ -11,11 +11,11 @@ node key::r [key] undefined:undefined
 node key::side [key] undefined:undefined
 node namespace:shapes.core [namespace] src/shapes/core.clj:1
 node namespace:shapes.util [namespace] src/shapes/util.clj:1
-edge definition:shapes.core/area -calls-> dispatch_arm:shapes.core/area@:default heuristic src/shapes/core.clj:8 {"via":"multimethod dispatch","dispatch":":default"}
-edge definition:shapes.core/area -calls-> dispatch_arm:shapes.core/area@:shapes.core/circle heuristic src/shapes/core.clj:6 {"via":"multimethod dispatch","dispatch":":shapes.core/circle"}
-edge definition:shapes.core/area -calls-> dispatch_arm:shapes.core/area@:shapes.core/poly heuristic src/shapes/core.clj:14 {"via":"multimethod dispatch","dispatch":":shapes.core/poly"}
-edge definition:shapes.core/area -calls-> dispatch_arm:shapes.core/area@:shapes.util/square heuristic src/shapes/util.clj:6 {"via":"multimethod dispatch","dispatch":":shapes.util/square"}
-edge definition:shapes.core/total -references-> definition:shapes.core/area static_proven src/shapes/core.clj:12
+edge definition:shapes.core/area -may_dispatch_to-> dispatch_arm:shapes.core/area@:default heuristic src/shapes/core.clj:8 {"dispatch":":default"}
+edge definition:shapes.core/area -may_dispatch_to-> dispatch_arm:shapes.core/area@:shapes.core/circle heuristic src/shapes/core.clj:6 {"dispatch":":shapes.core/circle"}
+edge definition:shapes.core/area -may_dispatch_to-> dispatch_arm:shapes.core/area@:shapes.core/poly heuristic src/shapes/core.clj:14 {"dispatch":":shapes.core/poly"}
+edge definition:shapes.core/area -may_dispatch_to-> dispatch_arm:shapes.core/area@:shapes.util/square heuristic src/shapes/util.clj:6 {"dispatch":":shapes.util/square"}
+edge definition:shapes.core/total -passes_callback-> definition:shapes.core/area static_proven src/shapes/core.clj:12 {"via":"map"}
 edge dispatch_arm:shapes.core/area@:shapes.core/circle -calls-> definition:shapes.util/square static_proven src/shapes/core.clj:6 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"r"}]}
 edge dispatch_arm:shapes.core/area@:shapes.core/circle -consumes_key-> key::r static_proven src/shapes/core.clj:6 {"via":"destructure"}
 edge dispatch_arm:shapes.core/area@:shapes.util/square -calls-> definition:shapes.util/square static_proven src/shapes/util.clj:6 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"side"}]}

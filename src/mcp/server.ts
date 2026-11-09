@@ -81,14 +81,14 @@ function baseGraph(file: string, opts: ServerOptions): Graph {
 export const TOOLS: ToolDef[] = [
   {
     name: 'callers',
-    description: 'Direct callers of a definition (ns/name or definition: id), each with file:line and band, counted per component.',
+    description: 'Direct callers of a definition (ns/name or definition: id): sites that call it, each with file:line and band, counted per component.',
     required: ['var'],
-    props: { var: { type: 'string' }, include_references: { type: 'boolean', description: 'also list non-call value uses' } },
+    props: { var: { type: 'string' }, include_references: { type: 'boolean', description: 'also list value uses, callbacks (partial, comp, map ...), registered handlers (re-frame reg-*, add-watch), macro expansions, dispatch candidates and rebindings' } },
     run: (g, a) => callers(g, str(a, 'var'), { includeReferences: a.include_references === true }),
   },
   {
     name: 'blast_radius',
-    description: 'Transitive callers and referrers of a definition, walked until no new caller appears (or up to an explicit depth). Starts with the total, deepest depth, counts per depth and per component and the entry points reached; depth 1-2 rows are listed, deeper rows are paged with section="deeper".',
+    description: 'Potential impact over known dependency relations: transitive callers and other dependents (value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings) of a definition, walked until no new one appears (or up to an explicit depth). Starts with the total, deepest depth, counts per depth and per component and the entry points reached; depth 1-2 rows are listed, deeper rows are paged with section="deeper".',
     required: ['var'],
     props: { var: { type: 'string' }, depth: { type: 'number', description: 'cap the walk at this depth (min 1); omit to walk to the end' } },
     run: (g, a) => blastRadius(g, str(a, 'var'), typeof a.depth === 'number' ? a.depth : undefined),

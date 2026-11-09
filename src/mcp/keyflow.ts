@@ -303,7 +303,7 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     const attrs = callAttrs(edge);
     return { edge, caller: g.byId.get(edge.from)?.name ?? edge.from, attrs, arity: attrs ? arityFor(arities, attrs.arity) : undefined };
   });
-  const valueEdges = inEdges(g, fn.id, ['references']).filter((e) => e.attrs?.via !== 'refer');
+  const valueEdges = inEdges(g, fn.id, ['references', 'passes_callback', 'registers_handler']).filter((e) => e.attrs?.via !== 'refer');
   const f = signatureFindings(g, fn, arities, calls, valueEdges.length > 0);
   const callerRows: Row[] = calls.map((c) => {
     const r = edgeRow(g, c.edge.from, c.edge, { label: callLabel(c) });

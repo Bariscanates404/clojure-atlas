@@ -1,0 +1,106 @@
+node definition:app.core/*sink* [definition] src/app/core.clj:31 {"defined_by":"clojure.core/def"}
+node definition:app.core/aliased [definition] src/app/core.clj:15 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to f"]}],"variadic":false}]}}
+node definition:app.core/audit [definition] src/app/core.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:app.core/handlers [definition] src/app/core.clj:7 {"defined_by":"clojure.core/def"}
+node definition:app.core/log! [definition] src/app/core.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:app.core/make-logger [definition] src/app/core.clj:19 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/never-runs [definition] src/app/core.clj:23 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/on-change [definition] src/app/core.clj:35 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"},{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.core/pipeline [definition] src/app/core.clj:11 {"defined_by":"clojure.core/def"}
+node definition:app.core/returns-fn [definition] src/app/core.clj:21 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/run-all [definition] src/app/core.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"xs","reads_complete":false,"escapes":["passed to apply"]}],"variadic":false}]}}
+node definition:app.core/save! [definition] src/app/core.clj:3 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"db","reads_complete":false,"escapes":["passed to assoc"]},{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to assoc"]}],"variadic":false}]}}
+node definition:app.core/saver [definition] src/app/core.clj:9 {"defined_by":"clojure.core/def"}
+node definition:app.core/state [definition] src/app/core.clj:36 {"defined_by":"clojure.core/def"}
+node definition:app.core/test-double [definition] src/app/core.clj:33 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/threaded [definition] src/app/core.clj:25 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to ->"]}],"variadic":false}]}}
+node definition:app.core/with-log [definition] src/app/core.clj:27 {"defined_by":"clojure.core/defmacro","macro":true}
+node definition:app.core/wrapped [definition] src/app/core.clj:29 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.shapes/->Box [definition] src/app/shapes.clj:10 {"defined_by":"clojure.core/defrecord"}
+node definition:app.shapes/Box [definition] src/app/shapes.clj:10 {"defined_by":"clojure.core/defrecord"}
+node definition:app.shapes/Named [definition] src/app/shapes.clj:9 {"defined_by":"clojure.core/defprotocol"}
+node definition:app.shapes/anon [definition] src/app/shapes.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.shapes/area [definition] src/app/shapes.clj:3 {"defined_by":"clojure.core/defmulti"}
+node definition:app.shapes/describe [definition] src/app/shapes.clj:15 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["passed to area","passed to label"]}],"variadic":false}]}}
+node definition:app.shapes/label [definition] src/app/shapes.clj:9 {"defined_by":"clojure.core/defprotocol"}
+node definition:app.shapes/map->Box [definition] src/app/shapes.clj:10 {"defined_by":"clojure.core/defrecord"}
+node dispatch_arm:app.shapes/area@:app.shapes/circle [dispatch_arm] src/app/shapes.clj:4 {"dispatch_value":":app.shapes/circle","multimethod":"app.shapes/area"}
+node dispatch_arm:app.shapes/area@:app.shapes/shape [dispatch_arm] src/app/shapes.clj:5 {"dispatch_value":":app.shapes/shape","multimethod":"app.shapes/area"}
+node implementation:src/app/shapes.clj:11:24 [implementation] src/app/shapes.clj:11 {"defined_by":"clojure.core/extend-type","protocol":"app.shapes/Named","method":"app.shapes/label","impl_ns":"app.shapes"}
+node implementation:src/app/shapes.clj:12:31 [implementation] src/app/shapes.clj:12 {"defined_by":"clojure.core/extend-protocol","protocol":"app.shapes/Named","method":"app.shapes/label","impl_ns":"app.shapes"}
+node implementation:src/app/shapes.clj:13:28 [implementation] src/app/shapes.clj:13 {"defined_by":"clojure.core/reify","protocol":"app.shapes/Named","method":"app.shapes/label","impl_ns":"app.shapes"}
+node key::n [key] undefined:undefined
+node key::x [key] undefined:undefined
+node namespace:app.core [namespace] src/app/core.clj:1
+node namespace:app.shapes [namespace] src/app/shapes.clj:1
+edge definition:app.core/aliased -references-> definition:app.core/log! static_proven src/app/core.clj:16 {"via":"alias"}
+edge definition:app.core/handlers -references-> definition:app.core/log! static_proven src/app/core.clj:7
+edge definition:app.core/handlers -references-> definition:app.core/save! static_proven src/app/core.clj:7
+edge definition:app.core/make-logger -calls-> definition:app.core/log! static_proven src/app/core.clj:19 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:app.core/never-runs -passes_callback-> definition:app.core/save! static_proven src/app/core.clj:23 {"via":"map"}
+edge definition:app.core/pipeline -passes_callback-> definition:app.core/audit static_proven src/app/core.clj:11 {"via":"comp"}
+edge definition:app.core/pipeline -passes_callback-> definition:app.core/log! static_proven src/app/core.clj:11 {"via":"comp"}
+edge definition:app.core/returns-fn -references-> definition:app.core/audit static_proven src/app/core.clj:21
+edge definition:app.core/run-all -calls-> definition:app.core/save! heuristic src/app/core.clj:13 {"via":"apply"}
+edge definition:app.core/save! -produces_key-> key::x static_proven src/app/core.clj:3 {"via":"assoc"}
+edge definition:app.core/saver -passes_callback-> definition:app.core/save! static_proven src/app/core.clj:9 {"via":"partial"}
+edge definition:app.core/test-double -calls-> definition:app.core/save! static_proven src/app/core.clj:33 {"arity":2,"arity_band":"static_proven","args":[{"i":0,"shape":"map","keys":[],"band":"static_proven"}]}
+edge definition:app.core/test-double -rebinds-> definition:app.core/*sink* unknown src/app/core.clj:33 {"via":"binding"}
+edge definition:app.core/test-double -rebinds-> definition:app.core/save! unknown src/app/core.clj:33 {"via":"with-redefs"}
+edge definition:app.core/threaded -calls-> definition:app.core/audit static_proven src/app/core.clj:25 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/threaded -calls-> definition:app.core/log! static_proven src/app/core.clj:25 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/with-log -calls-> definition:app.core/log! static_proven src/app/core.clj:27
+edge definition:app.core/wrapped -calls-> definition:app.core/audit static_proven src/app/core.clj:29 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/wrapped -expands_via-> definition:app.core/with-log static_proven src/app/core.clj:29
+edge definition:app.shapes/anon -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:13
+edge definition:app.shapes/area -may_dispatch_to-> dispatch_arm:app.shapes/area@:app.shapes/circle heuristic src/app/shapes.clj:4 {"dispatch":":app.shapes/circle"}
+edge definition:app.shapes/area -may_dispatch_to-> dispatch_arm:app.shapes/area@:app.shapes/shape heuristic src/app/shapes.clj:5 {"dispatch":":app.shapes/shape"}
+edge definition:app.shapes/describe -calls-> definition:app.shapes/area static_proven src/app/shapes.clj:15 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:app.shapes/describe -calls-> definition:app.shapes/label static_proven src/app/shapes.clj:15 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"x"}]}
+edge definition:app.shapes/label -may_dispatch_to-> implementation:src/app/shapes.clj:11:24 heuristic src/app/shapes.clj:11
+edge definition:app.shapes/label -may_dispatch_to-> implementation:src/app/shapes.clj:12:31 heuristic src/app/shapes.clj:12
+edge definition:app.shapes/label -may_dispatch_to-> implementation:src/app/shapes.clj:13:28 heuristic src/app/shapes.clj:13
+edge implementation:src/app/shapes.clj:11:24 -consumes_key-> key::n static_proven src/app/shapes.clj:11 {"via":"keyword-fn"}
+edge implementation:src/app/shapes.clj:11:24 -implements-> definition:app.shapes/label static_proven src/app/shapes.clj:11
+edge implementation:src/app/shapes.clj:12:31 -implements-> definition:app.shapes/label static_proven src/app/shapes.clj:12
+edge implementation:src/app/shapes.clj:13:28 -implements-> definition:app.shapes/label static_proven src/app/shapes.clj:13
+edge namespace:app.core -defines-> definition:app.core/*sink* static_proven src/app/core.clj:31
+edge namespace:app.core -defines-> definition:app.core/aliased static_proven src/app/core.clj:15
+edge namespace:app.core -defines-> definition:app.core/audit static_proven src/app/core.clj:5
+edge namespace:app.core -defines-> definition:app.core/handlers static_proven src/app/core.clj:7
+edge namespace:app.core -defines-> definition:app.core/log! static_proven src/app/core.clj:4
+edge namespace:app.core -defines-> definition:app.core/make-logger static_proven src/app/core.clj:19
+edge namespace:app.core -defines-> definition:app.core/never-runs static_proven src/app/core.clj:23
+edge namespace:app.core -defines-> definition:app.core/on-change static_proven src/app/core.clj:35
+edge namespace:app.core -defines-> definition:app.core/pipeline static_proven src/app/core.clj:11
+edge namespace:app.core -defines-> definition:app.core/returns-fn static_proven src/app/core.clj:21
+edge namespace:app.core -defines-> definition:app.core/run-all static_proven src/app/core.clj:13
+edge namespace:app.core -defines-> definition:app.core/save! static_proven src/app/core.clj:3
+edge namespace:app.core -defines-> definition:app.core/saver static_proven src/app/core.clj:9
+edge namespace:app.core -defines-> definition:app.core/state static_proven src/app/core.clj:36
+edge namespace:app.core -defines-> definition:app.core/test-double static_proven src/app/core.clj:33
+edge namespace:app.core -defines-> definition:app.core/threaded static_proven src/app/core.clj:25
+edge namespace:app.core -defines-> definition:app.core/with-log static_proven src/app/core.clj:27
+edge namespace:app.core -defines-> definition:app.core/wrapped static_proven src/app/core.clj:29
+edge namespace:app.core -references-> definition:app.core/state static_proven src/app/core.clj:37
+edge namespace:app.core -registers_handler-> definition:app.core/on-change static_proven src/app/core.clj:37 {"via":"add-watch"}
+edge namespace:app.shapes -defines-> definition:app.shapes/->Box static_proven src/app/shapes.clj:10
+edge namespace:app.shapes -defines-> definition:app.shapes/Box static_proven src/app/shapes.clj:10
+edge namespace:app.shapes -defines-> definition:app.shapes/Named static_proven src/app/shapes.clj:9
+edge namespace:app.shapes -defines-> definition:app.shapes/anon static_proven src/app/shapes.clj:13
+edge namespace:app.shapes -defines-> definition:app.shapes/area static_proven src/app/shapes.clj:3
+edge namespace:app.shapes -defines-> definition:app.shapes/describe static_proven src/app/shapes.clj:15
+edge namespace:app.shapes -defines-> definition:app.shapes/label static_proven src/app/shapes.clj:9
+edge namespace:app.shapes -defines-> definition:app.shapes/map->Box static_proven src/app/shapes.clj:10
+edge namespace:app.shapes -defines-> dispatch_arm:app.shapes/area@:app.shapes/circle static_proven src/app/shapes.clj:4
+edge namespace:app.shapes -defines-> dispatch_arm:app.shapes/area@:app.shapes/shape static_proven src/app/shapes.clj:5
+edge namespace:app.shapes -defines-> implementation:src/app/shapes.clj:11:24 static_proven src/app/shapes.clj:11
+edge namespace:app.shapes -defines-> implementation:src/app/shapes.clj:12:31 static_proven src/app/shapes.clj:12
+edge namespace:app.shapes -defines-> implementation:src/app/shapes.clj:13:28 static_proven src/app/shapes.clj:13
+edge namespace:app.shapes -passes_callback-> definition:app.shapes/area static_proven src/app/shapes.clj:7 {"via":"prefer-method"}
+edge namespace:app.shapes -references-> definition:app.shapes/Box static_proven src/app/shapes.clj:11
+edge namespace:app.shapes -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:11
+edge namespace:app.shapes -references-> definition:app.shapes/Named static_proven src/app/shapes.clj:12
+usages resolved=27 unresolved=0 unknown=1 not-vars=1 external=45
+adapters multimethods=defmethod:4 implementations=protocol implementations:9 events=off:0 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:2 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

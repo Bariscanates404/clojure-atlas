@@ -15,7 +15,9 @@ const MAX_DEPTH = 3;
 
 // ---------- callers / blast radius ----------
 
-const CALL_KINDS = ['calls', 'references'] as const;
+// Every relation through which a change to a definition can reach another: an actual call, a value use, a function
+// passed as a callback or registered as a handler, a macro expansion, a dispatch candidate and a dynamic rebinding.
+const DEPENDENCY_KINDS = ['calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'may_dispatch_to', 'rebinds'] as const;
 
 export function callers(g: Graph, query: string, opts: { includeReferences?: boolean } = {}): QueryResult {
   const title = `callers of ${query}`;
@@ -23,7 +25,7 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
   if (!hits.length) return notFound('callers', query, title, 'definition', 'use a fully qualified name (ns/name)');
   if (hits.length > 1) return ambiguous('callers', query, title, hits, 'var');
   const target = hits[0];
-  const kinds = opts.includeReferences ? CALL_KINDS : (['calls'] as const);
+  const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
   const rows = inEdges(g, target.id, kinds).map((e) => {
     const r = edgeRow(g, e.from, e);
     return { ...r, cross: !!r.component && r.component !== target.component };
@@ -64,7 +66,7 @@ function reverseReach(g: Graph, start: string, max: number): { reached: Reach[];
   for (let d = 1; d <= max && frontier.length; d++) {
     const next: { id: string; band: Band }[] = [];
     for (const f of frontier) {
-      for (const e of inEdges(g, f.id, CALL_KINDS)) {
+      for (const e of inEdges(g, f.id, DEPENDENCY_KINDS)) {
         if (seen.has(e.from)) continue;
         seen.add(e.from);
         const band = weakest(f.band, e.band);
@@ -74,7 +76,7 @@ function reverseReach(g: Graph, start: string, max: number): { reached: Reach[];
     }
     frontier = next;
   }
-  const beyond = frontier.some((f) => inEdges(g, f.id, CALL_KINDS).some((e) => !seen.has(e.from)));
+  const beyond = frontier.some((f) => inEdges(g, f.id, DEPENDENCY_KINDS).some((e) => !seen.has(e.from)));
   return { reached, beyond };
 }
 
@@ -128,6 +130,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
     notes.push(`${countLine('entry points reached', byEntry, true)}${routes.length ? `; first routes: ${routes.join(', ')}` : ''}`);
   }
   if (beyond) notes.push(`callers continue beyond depth ${max}; omit depth to walk to the end`);
+  notes.push('potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings): a path here may never run');
   if (deeper.length) notes.push(`${deeper.length} caller(s) at depth ${SHALLOW_DEPTH + 1}+ are in section "deeper": page with section="deeper" offset= limit=`);
   const scope = capped ? `depth ${max}` : 'all depths';
   const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${SHALLOW_DEPTH}` }];
@@ -742,7 +745,7 @@ function outsideCallers(g: Graph, changed: GraphNode[], deleted: Set<string>): {
   const broken: Row[] = [];
   for (const n of changed) {
     const gone = n.file !== undefined && deleted.has(n.file);
-    for (const e of inEdges(g, n.id, CALL_KINDS)) {
+    for (const e of inEdges(g, n.id, DEPENDENCY_KINDS)) {
       if (changedIds.has(e.from)) continue;
       const r = edgeRow(g, e.from, e, { parentId: n.id, parentLabel: n.name, depth: 1 });
       const row = { ...r, cross: !!r.component && r.component !== n.component, ...(gone ? { detail: `calls ${n.name}, which this change deletes` } : {}) };

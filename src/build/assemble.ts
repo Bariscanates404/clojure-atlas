@@ -79,7 +79,7 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
   }
 
   const capabilities: Capability[] = [
-    ...[['definitions', ['defines', 'requires', 'calls', 'references', 'tests']] as const, ...adapters.map((a) => [a.name, a.edgeKinds] as const)].map(([name, kinds]): Capability => {
+    ...[['definitions', ['defines', 'requires', 'calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'rebinds', 'tests']] as const, ...adapters.map((a) => [a.name, a.edgeKinds] as const)].map(([name, kinds]): Capability => {
       const rows = kept.get(name);
       const why = detected.get(name);
       const missing = why ? null : adapters.find((a) => a.name === name)?.unavailable?.(ctx);
