@@ -2,10 +2,19 @@ node definition:app.events/api-url [definition] src/app/events.cljs:18 {"defined
 node definition:app.events/create! [definition] src/app/events.cljs:12 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"user","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
 node definition:app.events/ping [definition] src/app/events.cljs:14 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:app.events/raw [definition] src/app/events.cljs:16 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.profiles/home-url [definition] src/app/profiles.cljs:15 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.profiles/load-fixed-profile! [definition] src/app/profiles.cljs:9 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.profiles/load-home! [definition] src/app/profiles.cljs:17 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.profiles/load-profile! [definition] src/app/profiles.cljs:6 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"id","reads_complete":false,"escapes":["passed to user-url"]}],"variadic":false}]}}
+node definition:app.profiles/load-with-query! [definition] src/app/profiles.cljs:12 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.profiles/user-url [definition] src/app/profiles.cljs:4 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"id","reads_complete":false,"escapes":["passed to str"]}],"variadic":false}]}}
 node definition:server.api/app [definition] src/server/api.clj:8 {"defined_by":"clojure.core/def"}
 node definition:server.api/create-user [definition] src/server/api.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
 node definition:server.api/list-users [definition] src/server/api.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
 node definition:server.api/show-user [definition] src/server/api.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:server.profiles/profile [definition] src/server/profiles.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
+node definition:server.profiles/router [definition] src/server/profiles.clj:7 {"defined_by":"clojure.core/def"}
+node definition:server.profiles/show [definition] src/server/profiles.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_req","reads_complete":true}],"variadic":false}]}}
 node event::app.events/load-user [event] src/app/events.cljs:9 {"registered_by":"re-frame.core/reg-event-fx"}
 node event::app.events/load-users [event] src/app/events.cljs:6 {"registered_by":"re-frame.core/reg-event-fx"}
 node event::app.events/reload [event] src/app/events.cljs:23 {"registered_by":"re-frame.core/reg-event-fx"}
@@ -16,6 +25,7 @@ node handler:event :app.events/reload src/app/events.cljs:23 [handler] src/app/e
 node handler:event :app.events/remove-user src/app/events.cljs:20 [handler] src/app/events.cljs:20
 node key::backend-request [key] undefined:undefined
 node key::get [key] undefined:undefined {"other_uses":3}
+node key::handler [key] undefined:undefined
 node key::http-xhrio [key] undefined:undefined
 node key::method [key] undefined:undefined
 node key::on-success [key] undefined:undefined
@@ -24,7 +34,9 @@ node key::post [key] undefined:undefined
 node key::status [key] undefined:undefined
 node key::uri [key] undefined:undefined
 node namespace:app.events [namespace] src/app/events.cljs:1
+node namespace:app.profiles [namespace] src/app/profiles.cljs:1
 node namespace:server.api [namespace] src/server/api.clj:1
+node namespace:server.profiles [namespace] src/server/profiles.clj:1
 node request:src/app/events.cljs:10:55 [request] src/app/events.cljs:10 {"method":"get","path":"/api/users/{p}","literal_uri":false,"dynamic":true}
 node request:src/app/events.cljs:12:22 [request] src/app/events.cljs:12 {"method":"post","path":"/api/users","literal_uri":true,"dynamic":false}
 node request:src/app/events.cljs:14:15 [request] src/app/events.cljs:14 {"method":"get","path":"/api/health","literal_uri":true,"dynamic":false}
@@ -32,14 +44,30 @@ node request:src/app/events.cljs:16:14 [request] src/app/events.cljs:16 {"method
 node request:src/app/events.cljs:21:53 [request] src/app/events.cljs:21 {"method":"delete","path":"/api/users/{p}","literal_uri":false,"dynamic":true}
 node request:src/app/events.cljs:24:45 [request] src/app/events.cljs:24 {"method":"get","path":"/api/users","literal_uri":true,"dynamic":false}
 node request:src/app/events.cljs:7:45 [request] src/app/events.cljs:7 {"method":"get","path":"/api/users/","literal_uri":true,"dynamic":false}
+node request:src/app/profiles.cljs:10:3 [request] src/app/profiles.cljs:10 {"method":"get","path":"/users/5/profile","literal_uri":true,"dynamic":false}
+node request:src/app/profiles.cljs:13:3 [request] src/app/profiles.cljs:13 {"method":"get","path":"/users/list?full=1","literal_uri":true,"dynamic":false}
+node request:src/app/profiles.cljs:18:3 [request] src/app/profiles.cljs:18 {"method":"get","path":"/users/me","literal_uri":true,"dynamic":false}
+node request:src/app/profiles.cljs:7:3 [request] src/app/profiles.cljs:7 {"method":"get","path":"/users/{p}/profile","literal_uri":false,"dynamic":true}
 node route:GET /api/users @server.api/app [route] src/server/api.clj:11 {"method":"get","path":"/api/users","full_path":"/api/users","base":"server.api/app","mount":"","library":"reitit"}
 node route:GET /api/users/:id @server.api/app [route] src/server/api.clj:12 {"method":"get","path":"/api/users/:id","full_path":"/api/users/:id","base":"server.api/app","mount":"","library":"reitit"}
+node route:GET /users/:id @server.profiles/router [route] src/server/profiles.clj:9 {"method":"get","path":"/users/:id","full_path":"/users/:id","base":"server.profiles/router","mount":"","library":"reitit"}
+node route:GET /users/:id/profile @server.profiles/router [route] src/server/profiles.clj:10 {"method":"get","path":"/users/:id/profile","full_path":"/users/:id/profile","base":"server.profiles/router","mount":"","library":"reitit"}
+node route:GET /users/list @server.profiles/router [route] src/server/profiles.clj:8 {"method":"get","path":"/users/list","full_path":"/users/list","base":"server.profiles/router","mount":"","library":"reitit"}
 node route:POST /api/users @server.api/app [route] src/server/api.clj:11 {"method":"post","path":"/api/users","full_path":"/api/users","base":"server.api/app","mount":"","library":"reitit"}
 edge definition:app.events/create! -issues_request-> request:src/app/events.cljs:12:22 static_proven src/app/events.cljs:12
 edge definition:app.events/create! -produces_key-> key::params static_proven src/app/events.cljs:12 {"via":"map-literal"}
 edge definition:app.events/ping -issues_request-> request:src/app/events.cljs:14:15 static_proven src/app/events.cljs:14
 edge definition:app.events/raw -issues_request-> request:src/app/events.cljs:16:14 static_proven src/app/events.cljs:16
 edge definition:app.events/raw -produces_key-> key::method static_proven src/app/events.cljs:16 {"via":"map-literal"}
+edge definition:app.profiles/load-fixed-profile! -calls-> definition:app.profiles/user-url static_proven src/app/profiles.cljs:10 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.profiles/load-fixed-profile! -issues_request-> request:src/app/profiles.cljs:10:3 static_proven src/app/profiles.cljs:10
+edge definition:app.profiles/load-fixed-profile! -produces_key-> key::handler static_proven src/app/profiles.cljs:10 {"via":"map-literal"}
+edge definition:app.profiles/load-home! -calls-> definition:app.profiles/home-url static_proven src/app/profiles.cljs:18 {"arity":0,"arity_band":"static_proven"}
+edge definition:app.profiles/load-home! -issues_request-> request:src/app/profiles.cljs:18:3 static_proven src/app/profiles.cljs:18
+edge definition:app.profiles/load-profile! -calls-> definition:app.profiles/user-url static_proven src/app/profiles.cljs:7 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"id"}]}
+edge definition:app.profiles/load-profile! -issues_request-> request:src/app/profiles.cljs:7:3 heuristic src/app/profiles.cljs:7
+edge definition:app.profiles/load-profile! -produces_key-> key::handler static_proven src/app/profiles.cljs:7 {"via":"map-literal"}
+edge definition:app.profiles/load-with-query! -issues_request-> request:src/app/profiles.cljs:13:3 static_proven src/app/profiles.cljs:13
 edge definition:server.api/app -produces_key-> key::get static_proven src/server/api.clj:11 {"via":"map-literal"}
 edge definition:server.api/app -produces_key-> key::get static_proven src/server/api.clj:12 {"via":"map-literal"}
 edge definition:server.api/app -produces_key-> key::post static_proven src/server/api.clj:11 {"via":"map-literal"}
@@ -49,6 +77,17 @@ edge definition:server.api/app -references-> definition:server.api/show-user sta
 edge definition:server.api/create-user -produces_key-> key::status static_proven src/server/api.clj:5 {"via":"map-literal"}
 edge definition:server.api/list-users -produces_key-> key::status static_proven src/server/api.clj:4 {"via":"map-literal"}
 edge definition:server.api/show-user -produces_key-> key::status static_proven src/server/api.clj:6 {"via":"map-literal"}
+edge definition:server.profiles/profile -produces_key-> key::status static_proven src/server/profiles.clj:5 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::get static_proven src/server/profiles.clj:10 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::get static_proven src/server/profiles.clj:8 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::get static_proven src/server/profiles.clj:9 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::handler static_proven src/server/profiles.clj:10 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::handler static_proven src/server/profiles.clj:8 {"via":"map-literal"}
+edge definition:server.profiles/router -produces_key-> key::handler static_proven src/server/profiles.clj:9 {"via":"map-literal"}
+edge definition:server.profiles/router -references-> definition:server.profiles/profile static_proven src/server/profiles.clj:10
+edge definition:server.profiles/router -references-> definition:server.profiles/show static_proven src/server/profiles.clj:8
+edge definition:server.profiles/router -references-> definition:server.profiles/show static_proven src/server/profiles.clj:9
+edge definition:server.profiles/show -produces_key-> key::status static_proven src/server/profiles.clj:4 {"via":"map-literal"}
 edge event::app.events/load-user -registers-> handler:event :app.events/load-user src/app/events.cljs:9 static_proven src/app/events.cljs:9
 edge event::app.events/load-users -registers-> handler:event :app.events/load-users src/app/events.cljs:6 static_proven src/app/events.cljs:6
 edge event::app.events/reload -registers-> handler:event :app.events/reload src/app/events.cljs:23 static_proven src/app/events.cljs:23
@@ -79,17 +118,31 @@ edge namespace:app.events -defines-> definition:app.events/api-url static_proven
 edge namespace:app.events -defines-> definition:app.events/create! static_proven src/app/events.cljs:12
 edge namespace:app.events -defines-> definition:app.events/ping static_proven src/app/events.cljs:14
 edge namespace:app.events -defines-> definition:app.events/raw static_proven src/app/events.cljs:16
+edge namespace:app.profiles -defines-> definition:app.profiles/home-url static_proven src/app/profiles.cljs:15
+edge namespace:app.profiles -defines-> definition:app.profiles/load-fixed-profile! static_proven src/app/profiles.cljs:9
+edge namespace:app.profiles -defines-> definition:app.profiles/load-home! static_proven src/app/profiles.cljs:17
+edge namespace:app.profiles -defines-> definition:app.profiles/load-profile! static_proven src/app/profiles.cljs:6
+edge namespace:app.profiles -defines-> definition:app.profiles/load-with-query! static_proven src/app/profiles.cljs:12
+edge namespace:app.profiles -defines-> definition:app.profiles/user-url static_proven src/app/profiles.cljs:4
 edge namespace:server.api -defines-> definition:server.api/app static_proven src/server/api.clj:8
 edge namespace:server.api -defines-> definition:server.api/create-user static_proven src/server/api.clj:5
 edge namespace:server.api -defines-> definition:server.api/list-users static_proven src/server/api.clj:4
 edge namespace:server.api -defines-> definition:server.api/show-user static_proven src/server/api.clj:6
+edge namespace:server.profiles -defines-> definition:server.profiles/profile static_proven src/server/profiles.clj:5
+edge namespace:server.profiles -defines-> definition:server.profiles/router static_proven src/server/profiles.clj:7
+edge namespace:server.profiles -defines-> definition:server.profiles/show static_proven src/server/profiles.clj:4
 edge request:src/app/events.cljs:10:55 -requests_route-> route:GET /api/users/:id @server.api/app heuristic src/app/events.cljs:10 {"copies":1,"reason":"method and canonical path match one route"}
 edge request:src/app/events.cljs:12:22 -requests_route-> route:POST /api/users @server.api/app static_proven src/app/events.cljs:12 {"copies":1,"reason":"method and canonical path match one route"}
 edge request:src/app/events.cljs:24:45 -requests_route-> route:GET /api/users @server.api/app static_proven src/app/events.cljs:24 {"copies":1,"reason":"method and canonical path match one route"}
 edge request:src/app/events.cljs:7:45 -requests_route-> route:GET /api/users @server.api/app static_proven src/app/events.cljs:7 {"copies":1,"reason":"method and canonical path match one route"}
+edge request:src/app/profiles.cljs:13:3 -requests_route-> route:GET /users/list @server.profiles/router static_proven src/app/profiles.cljs:13 {"copies":1,"reason":"method and canonical path match one route"}
+edge request:src/app/profiles.cljs:7:3 -requests_route-> route:GET /users/:id/profile @server.profiles/router heuristic src/app/profiles.cljs:7 {"copies":1,"reason":"method and canonical path match one route"}
 edge route:GET /api/users @server.api/app -routes_to-> definition:server.api/list-users static_proven src/server/api.clj:11
 edge route:GET /api/users/:id @server.api/app -routes_to-> definition:server.api/show-user static_proven src/server/api.clj:12
+edge route:GET /users/:id @server.profiles/router -routes_to-> definition:server.profiles/show static_proven src/server/profiles.clj:9
+edge route:GET /users/:id/profile @server.profiles/router -routes_to-> definition:server.profiles/profile static_proven src/server/profiles.clj:10
+edge route:GET /users/list @server.profiles/router -routes_to-> definition:server.profiles/show static_proven src/server/profiles.clj:8
 edge route:POST /api/users @server.api/app -routes_to-> definition:server.api/create-user static_proven src/server/api.clj:11
-usages resolved=5 unresolved=0 unknown=0 not-vars=0 external=24
-adapters multimethods=off:0 implementations=off:0 events=re-frame.core:4 routes=reitit:3 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:24 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:11 selectors=off:0 browser_tests=off:0
-files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
+usages resolved=11 unresolved=0 unknown=0 not-vars=0 external=42
+adapters multimethods=off:0 implementations=off:0 events=re-frame.core:4 routes=reitit:6 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:34 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:17 selectors=off:0 browser_tests=off:0
+files sources=4 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
