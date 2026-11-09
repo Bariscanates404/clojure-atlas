@@ -58,12 +58,12 @@ describe('components', () => {
 describe('coverage table', () => {
   it('prints one row per repo with every adapter column', () => {
     const row: CoverageRow = {
-      repo: 'demo', sha: 'a', files: 3, syntaxErrorFiles: 0, definitions: 9, resolved: 19, unresolved: 1, unknown: 0, resolvedPct: 95,
+      repo: 'demo', sha: 'a', filesExpected: 4, files: 3, syntaxErrorFiles: 0, definitions: 9, resolved: 19, unresolved: 1, unknown: 2, resolutionRate: 95,
       adapters: { events: 2 }, nodes: 10, edges: 20, unknownEdges: 1, buildMs: 1500, graphBytes: 2048,
     };
     const lines = coverageTable([row]).split('\n');
     assert.equal(lines.length, 3);
-    assert.equal(lines[2], '| demo | 3 | 0 | 9 | 19 | 1 | 0 | 95.0% | 2 | 1 | 1.5 s | 2 KB |');
+    assert.equal(lines[2], '| demo | 4 | 3 | 0 | 9 | 19 | 1 | 95.0% | 2 | 2 | 1 | 1.5 s | 2 KB |');
   });
 });
 

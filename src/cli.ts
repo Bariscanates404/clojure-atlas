@@ -61,7 +61,8 @@ async function main(argv: string[]): Promise<void> {
     writeGraph(doc, out);
     const row = coverageRow(doc, statSync(out).size);
     process.stderr.write(`clojure-atlas: ${row.files} files, ${row.definitions} definitions, ${row.nodes} nodes, ${row.edges} edges; `
-      + `${row.resolvedPct.toFixed(1)}% of project var usages resolved; ${(row.buildMs / 1000).toFixed(1)} s -> ${out}\n`);
+      + `resolution rate of var usages in recognized project namespaces ${row.resolutionRate.toFixed(1)}% (${row.resolved} of ${row.resolved + row.unresolved}), `
+      + `${row.unknown} usages in an unknown namespace; ${(row.buildMs / 1000).toFixed(1)} s -> ${out}\n`);
     return;
   }
   if (cmd === 'mcp') {

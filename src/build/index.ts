@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { ADAPTERS } from './adapters/index.ts';
 import { assemble, type AtlasDocument } from './assemble.ts';
 import { EMPTY_CONFIG, parseConfig } from './config.ts';
-import { componentOf, listFiles } from './files.ts';
+import { componentOf, expectedSources, listFiles } from './files.ts';
 import { analyze, effectiveLintAs } from './kondo.ts';
 import { kondo } from './kondo-binary.ts';
 import { analyzerVersion, projectKnownSymbols, snapshotOf } from '../snapshot.ts';
@@ -34,7 +34,7 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
     repo_name: path.basename(root), ref: snap.ref, sha: snap.sha, built_at: new Date().toISOString(),
     snapshot: snap.id, dirty_files: snap.dirty.length, config_hash: snap.configHash, config_sources: snap.configSources, analyzer: snap.analyzer,
   }, {
-    sources: files.sources.length, edn: files.edn.length, skipped_large: files.skippedLarge.length,
+    expected: expectedSources(root, files), sources: files.sources.length, edn: files.edn.length, skipped_large: files.skippedLarge.length,
   });
   doc.stats.build_ms = Date.now() - started;
   return doc;

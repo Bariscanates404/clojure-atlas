@@ -6,13 +6,15 @@ import type { AtlasDocument } from './build/assemble.ts';
 export interface CoverageRow {
   repo: string;
   sha: string;
+  filesExpected: number;
   files: number;
   syntaxErrorFiles: number;
   definitions: number;
   resolved: number;
   unresolved: number;
   unknown: number;
-  resolvedPct: number;
+  // resolution rate of var usages in recognized project namespaces: resolved / (resolved + unresolved)
+  resolutionRate: number;
   adapters: Record<string, number>;
   nodes: number;
   edges: number;
@@ -23,17 +25,18 @@ export interface CoverageRow {
 
 export function coverageRow(doc: AtlasDocument, graphBytes: number): CoverageRow {
   const u = doc.stats.usages;
-  const counted = u.resolved + u.unresolved + u.unknown;
+  const inProject = u.resolved + u.unresolved;
   return {
     repo: doc.source.repo_name ?? '?',
     sha: doc.source.sha,
+    filesExpected: doc.stats.files.expected,
     files: doc.stats.files.sources,
     syntaxErrorFiles: doc.stats.syntax_errors.files,
     definitions: doc.stats.definitions,
     resolved: u.resolved,
     unresolved: u.unresolved,
     unknown: u.unknown,
-    resolvedPct: counted ? (100 * u.resolved) / counted : 100,
+    resolutionRate: inProject ? (100 * u.resolved) / inProject : 100,
     // edges an adapter added; nodes for one that adds no edges (key tables)
     adapters: Object.fromEntries(Object.entries(doc.stats.adapters).map(([k, a]) => [k, doc.capabilities.find((c) => c.name === k)?.edge_kinds?.length ? a.edges : a.nodes])),
     nodes: doc.nodes.length,
@@ -49,11 +52,11 @@ const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} M
 
 export function coverageTable(rows: readonly CoverageRow[]): string {
   const adapters = [...new Set(rows.flatMap((r) => Object.keys(r.adapters)))];
-  const head = ['repo', 'files', 'syntax-error files', 'definitions', 'resolved', 'unresolved', 'unknown', 'resolved %', ...adapters, 'unknown edges', 'build', 'graph'];
+  const head = ['repo', 'files expected', 'files analyzed', 'syntax-error files', 'definitions', 'resolved', 'unresolved', 'resolution rate', 'unknown namespace', ...adapters, 'unknown edges', 'build', 'graph'];
   const lines = [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`];
   for (const r of rows) {
     lines.push(`| ${[
-      r.repo, r.files, r.syntaxErrorFiles, r.definitions, r.resolved, r.unresolved, r.unknown, pct(r.resolvedPct),
+      r.repo, r.filesExpected, r.files, r.syntaxErrorFiles, r.definitions, r.resolved, r.unresolved, pct(r.resolutionRate), r.unknown,
       ...adapters.map((a) => r.adapters[a] ?? 0), r.unknownEdges, `${(r.buildMs / 1000).toFixed(1)} s`, kb(r.graphBytes),
     ].join(' | ')} |`);
   }

@@ -13,7 +13,8 @@ export interface AdapterStats {
 }
 
 export interface BuildStats {
-  files: { sources: number; edn: number; skipped_large: number };
+  // expected: Clojure files the repo tracks (build output and dependencies included); sources: the ones analyzed
+  files: { expected: number; sources: number; edn: number; skipped_large: number };
   syntax_errors: { files: number; errors: number };
   definitions: number;
   usages: UsageStats;

@@ -36,11 +36,11 @@ for (const entry of corpus) {
     + `- most frequent unresolved: ${u.topUnresolved.map(([n, k]) => `\`${n}\` ${k}`).join(', ') || 'none'}\n`
     + `- most frequent unknown: ${u.topUnknown.map(([n, k]) => `\`${n}\` ${k}`).join(', ') || 'none'}\n`
     + `- adapters: ${Object.entries(doc.stats.adapters).map(([k, a]) => `${k} ${a.detected ? `(${a.detected}) ${a.edges} edges` : 'off'}`).join(', ')}\n`);
-  if (row.resolvedPct < 95) {
-    gaps.push(`- **${entry.name}** ${row.resolvedPct.toFixed(1)}%: ${u.unknown} unknown (most: ${names(u.topUnknown)}); `
-      + `${u.unresolved} unresolved (most: ${names(u.topUnresolved, 3)})`);
+  if (row.resolutionRate < 95 || row.unknown > row.resolved * 0.05) {
+    gaps.push(`- **${entry.name}** resolution rate ${row.resolutionRate.toFixed(1)}%, ${row.unknown} usages in an unknown namespace `
+      + `(most: ${names(u.topUnknown)}); ${u.unresolved} unresolved (most: ${names(u.topUnresolved, 3)})`);
   }
-  process.stderr.write(`${entry.name}: ${row.resolvedPct.toFixed(1)}% resolved, ${(row.buildMs / 1000).toFixed(1)} s\n`);
+  process.stderr.write(`${entry.name}: resolution rate ${row.resolutionRate.toFixed(1)}%, ${row.unknown} unknown namespace, ${(row.buildMs / 1000).toFixed(1)} s\n`);
 }
 
 if (!only.length) {
@@ -50,20 +50,25 @@ Measured by \`node scripts/coverage.ts <corpus-dir>\` over the repos pinned in [
 the recorded sha. Every number below comes from that run.
 
 How to read the columns:
-- **files**: Clojure sources analyzed (.clj, .cljs, .cljc; build output, dependencies and hidden directories skipped).
+- **files expected**: Clojure files git tracks in the repo (.clj, .cljs, .cljc, project.clj excluded).
+- **files analyzed**: the ones clj-kondo analyzed (build output, dependencies, hidden directories and files over the
+  size limit skipped).
 - **syntax-error files**: files clj-kondo could not fully parse.
-- **resolved / unresolved / unknown**: var usages that name a project namespace. *resolved* found its definition;
+- **resolved / unresolved**: var usages that name a project namespace. *resolved* found its definition;
   *unresolved* names a project namespace but no definition in it (a var created by a macro clj-kondo does not know,
-  or by \`intern\`); *unknown* is a symbol clj-kondo could not resolve at all (mostly bindings of macros it does not
-  know). Usages of library vars (clojure.core and dependencies) are not counted, and neither are symbols that can
-  never be vars (special forms, auto-gensyms, \`&\`, clojure.test's \`thrown?\`).
-- **resolved %**: resolved / (resolved + unresolved + unknown).
+  or by \`intern\`). Usages of library vars (clojure.core and dependencies) are not counted, and neither are
+  symbols that can never be vars (special forms, auto-gensyms, \`&\`, clojure.test's \`thrown?\`).
+- **resolution rate**: resolved / (resolved + unresolved): of the usages clj-kondo attributes to a project
+  namespace, the share the graph links to a definition. It says nothing about the next column.
+- **unknown namespace**: symbols clj-kondo could not attribute to any namespace (mostly bindings of macros it does
+  not know). Some are var usages the graph misses, most are locals; nothing static tells which, so they are
+  reported as a raw count and kept out of the rate.
 - adapter columns: edges each adapter added (0 when its library is not used); key_tables counts tables.
 - **unknown edges**: edges in band UNKNOWN (attribute references of unproven role).
 
 ${coverageTable(rows)}
 
-## Repos under 95% resolved
+## Repos under 95% resolution rate, or with unknown-namespace usages above 5% of resolved
 
 What is left in each is one of two kinds, both visible in the names below:
 - **unknown**: a symbol bound by a macro clj-kondo does not know, so it cannot tell a local from a var
