@@ -1,0 +1,5 @@
+(ns shop.auth)
+(defn wrap-permission [handler _perm] handler)
+(defn wrap-session [handler] handler)
+(defn require! [req _perm] req)
+(defn tenant-of [req] req)

@@ -9,23 +9,31 @@ import path from 'node:path';
 import { concat, normalize, type Analysis } from './analysis.ts';
 
 // Library macros that define a var but that clj-kondo does not know without the library's exported config.
-const LINT_AS = '{mount.core/defstate clojure.core/def mount.lite/defstate clojure.core/def}';
+const LINT_AS: Record<string, string> = { 'mount.core/defstate': 'clojure.core/def', 'mount.lite/defstate': 'clojure.core/def' };
 
-const CONFIG = `{:output {:format :json}
- :lint-as ${LINT_AS}
+const config = (lintAs: Record<string, string>) => `{:output {:format :json}
+ :lint-as {${Object.entries({ ...LINT_AS, ...lintAs }).map(([k, v]) => `${k} ${v}`).join(' ')}}
  :linters ^:replace {:syntax {:level :error}}
  :analysis {:keywords true :context true :protocol-impls true :locals false}}`;
 
 const CHUNK = 300;
 
-export function kondoBinary(): string {
-  const pkg = createRequire(import.meta.url).resolve('clj-kondo/package.json');
-  return path.join(path.dirname(pkg), 'bin', 'clj-kondo');
+// The npm "clj-kondo" package when it is installed (its bin is a node script), else clj-kondo on PATH (the
+// single-file bundle runs without node_modules).
+export function kondoCommand(): string[] {
+  try {
+    const pkg = createRequire(import.meta.url).resolve('clj-kondo/package.json');
+    return [process.execPath, path.join(path.dirname(pkg), 'bin', 'clj-kondo')];
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') throw err;
+    return ['clj-kondo'];
+  }
 }
 
-function runChunk(root: string, files: string[]): Promise<Analysis> {
+function runChunk(root: string, files: string[], lintAs: Record<string, string>): Promise<Analysis> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [kondoBinary(), '--repro', '--cache', 'false', '--parallel', '--config', CONFIG, '--lint', ...files], {
+    const [cmd, ...pre] = kondoCommand();
+    const child = spawn(cmd, [...pre, '--repro', '--cache', 'false', '--parallel', '--config', config(lintAs), '--lint', ...files], {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -33,7 +41,7 @@ function runChunk(root: string, files: string[]): Promise<Analysis> {
     const err: Buffer[] = [];
     child.stdout.on('data', (d: Buffer) => out.push(d));
     child.stderr.on('data', (d: Buffer) => err.push(d));
-    child.on('error', reject);
+    child.on('error', (err) => reject(new Error(`cannot run ${cmd}: ${err.message}; install the npm package clj-kondo or put clj-kondo on PATH`)));
     child.on('close', (code) => {
       // kondo exits 2 or 3 when it reports warnings or errors; the JSON is complete either way
       const text = Buffer.concat(out).toString('utf8');
@@ -47,7 +55,7 @@ function runChunk(root: string, files: string[]): Promise<Analysis> {
   });
 }
 
-export async function analyze(root: string, files: string[]): Promise<Analysis> {
+export async function analyze(root: string, files: string[], lintAs: Record<string, string> = {}): Promise<Analysis> {
   const chunks: string[][] = [];
   for (let k = 0; k < files.length; k += CHUNK) chunks.push(files.slice(k, k + CHUNK));
   const lanes = Math.max(1, Math.min(chunks.length, Math.floor(availableParallelism() / 2)));
@@ -56,7 +64,7 @@ export async function analyze(root: string, files: string[]): Promise<Analysis> 
   await Promise.all(Array.from({ length: lanes }, async () => {
     while (nextChunk < chunks.length) {
       const k = nextChunk++;
-      results[k] = await runChunk(root, chunks[k]);
+      results[k] = await runChunk(root, chunks[k], lintAs);
     }
   }));
   return concat(results);

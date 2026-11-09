@@ -14,13 +14,13 @@ node namespace:web.compojure-app [namespace] src/web/compojure_app.clj:1
 node namespace:web.handlers [namespace] src/web/handlers.clj:1
 node namespace:web.pedestal-app [namespace] src/web/pedestal_app.clj:1
 node namespace:web.reitit-app [namespace] src/web/reitit_app.clj:1
-node route:ANY /ping @web.reitit-app [route] src/web/reitit_app.clj:6 {"method":"any","path":"/ping","full_path":"/ping","base":"web.reitit-app","mount":"","library":"reitit"}
+node route:ANY /ping @web.reitit-app/app [route] src/web/reitit_app.clj:6 {"method":"any","path":"/ping","full_path":"/ping","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:GET / @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:9 {"method":"get","path":"/","full_path":"/api/users/:id/","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
-node route:GET /api/items @web.reitit-app [route] src/web/reitit_app.clj:8 {"method":"get","path":"/api/items","full_path":"/api/items","base":"web.reitit-app","mount":"","library":"reitit"}
+node route:GET /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:8 {"method":"get","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:GET /health @web.compojure-app/app [route] src/web/compojure_app.clj:6 {"method":"get","path":"/health","full_path":"/health","base":"web.compojure-app/app","mount":"","library":"compojure"}
-node route:GET /health @web.pedestal-app [route] src/web/pedestal_app.clj:8 {"method":"get","path":"/health","full_path":"/health","base":"web.pedestal-app","mount":"","library":"pedestal"}
-node route:GET /items @web.pedestal-app [route] src/web/pedestal_app.clj:7 {"method":"get","path":"/items","full_path":"/items","base":"web.pedestal-app","mount":"","library":"pedestal"}
-node route:POST /api/items @web.reitit-app [route] src/web/reitit_app.clj:8 {"method":"post","path":"/api/items","full_path":"/api/items","base":"web.reitit-app","mount":"","library":"reitit"}
+node route:GET /health @web.pedestal-app/table [route] src/web/pedestal_app.clj:8 {"method":"get","path":"/health","full_path":"/health","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
+node route:GET /items @web.pedestal-app/table [route] src/web/pedestal_app.clj:7 {"method":"get","path":"/items","full_path":"/items","base":"web.pedestal-app/table","mount":"","library":"pedestal"}
+node route:POST /api/items @web.reitit-app/app [route] src/web/reitit_app.clj:8 {"method":"post","path":"/api/items","full_path":"/api/items","base":"web.reitit-app/app","mount":"","library":"reitit"}
 node route:POST /avatar @web.compojure-app/app/api/users/:id [route] src/web/compojure_app.clj:10 {"method":"post","path":"/avatar","full_path":"/api/users/:id/avatar","base":"web.compojure-app/app","mount":"/api/users/:id","library":"compojure"}
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6
 edge definition:web.compojure-app/app -calls-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:9
@@ -50,19 +50,19 @@ edge namespace:web.pedestal-app -requires-> namespace:web.handlers static_proven
 edge namespace:web.reitit-app -defines-> definition:web.reitit-app/app static_proven src/web/reitit_app.clj:12
 edge namespace:web.reitit-app -defines-> definition:web.reitit-app/routes static_proven src/web/reitit_app.clj:5
 edge namespace:web.reitit-app -requires-> namespace:web.handlers static_proven src/web/reitit_app.clj:3
-edge route:ANY /ping @web.reitit-app -routes_to-> definition:web.handlers/health static_proven src/web/reitit_app.clj:6
+edge route:ANY /ping @web.reitit-app/app -routes_to-> definition:web.handlers/health static_proven src/web/reitit_app.clj:6
 edge route:GET / @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/show-user static_proven src/web/compojure_app.clj:9
-edge route:GET /api/items @web.reitit-app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:8 {"order":1,"level":"route"}
-edge route:GET /api/items @web.reitit-app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:7 {"order":0,"level":"route","inherited_from":"/api"}
-edge route:GET /api/items @web.reitit-app -routes_to-> definition:web.handlers/list-items static_proven src/web/reitit_app.clj:9
+edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:8 {"order":1,"level":"route"}
+edge route:GET /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:7 {"order":0,"level":"route","inherited_from":"/api"}
+edge route:GET /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/list-items static_proven src/web/reitit_app.clj:9
 edge route:GET /health @web.compojure-app/app -routes_to-> definition:web.handlers/health static_proven src/web/compojure_app.clj:6
-edge route:GET /health @web.pedestal-app -routes_to-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
-edge route:GET /items @web.pedestal-app -guarded_by-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7 {"order":0,"level":"route"}
-edge route:GET /items @web.pedestal-app -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
-edge route:POST /api/items @web.reitit-app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:8 {"order":1,"level":"route"}
-edge route:POST /api/items @web.reitit-app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:10 {"order":2,"level":"method"}
-edge route:POST /api/items @web.reitit-app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:7 {"order":0,"level":"route","inherited_from":"/api"}
-edge route:POST /api/items @web.reitit-app -routes_to-> definition:web.handlers/create-item static_proven src/web/reitit_app.clj:10
+edge route:GET /health @web.pedestal-app/table -routes_to-> definition:web.handlers/health static_proven src/web/pedestal_app.clj:8
+edge route:GET /items @web.pedestal-app/table -guarded_by-> definition:web.handlers/audit static_proven src/web/pedestal_app.clj:7 {"order":0,"level":"route"}
+edge route:GET /items @web.pedestal-app/table -routes_to-> definition:web.handlers/list-items static_proven src/web/pedestal_app.clj:7
+edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-auth static_proven src/web/reitit_app.clj:8 {"order":1,"level":"route"}
+edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:10 {"order":2,"level":"method"}
+edge route:POST /api/items @web.reitit-app/app -guarded_by-> definition:web.handlers/wrap-log static_proven src/web/reitit_app.clj:7 {"order":0,"level":"route","inherited_from":"/api"}
+edge route:POST /api/items @web.reitit-app/app -routes_to-> definition:web.handlers/create-item static_proven src/web/reitit_app.clj:10
 edge route:POST /avatar @web.compojure-app/app/api/users/:id -routes_to-> definition:web.handlers/upload static_proven src/web/compojure_app.clj:10
 usages resolved=13 unresolved=0 unknown=0 not-vars=0 external=20
 adapters multimethods=off:0 events=off:0 routes=compojure, pedestal, reitit:14 data_attributes=off:0 system=off:0 schemas=off:0

@@ -28,7 +28,7 @@ export function listFiles(root: string): RepoFiles {
         if (!e.name.startsWith('.') && !SKIP_DIRS.has(e.name)) visit(p);
         continue;
       }
-      if (!e.isFile()) continue;
+      if (!e.isFile() || e.name.startsWith('.')) continue;
       if (MODULE_FILES.has(e.name)) out.moduleRoots.push(rel);
       // project.clj is Leiningen build configuration, not code
       if ((!SOURCE_EXT.test(e.name) && !EDN_EXT.test(e.name)) || e.name === 'project.clj') continue;

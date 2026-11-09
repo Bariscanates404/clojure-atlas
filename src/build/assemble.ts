@@ -2,6 +2,7 @@
 // per id wins, one edge per site), edges whose ends are not nodes dropped and counted, capabilities with their band
 // counts, and the coverage statistics `clojure-atlas coverage` prints.
 import { BANDS, FORMAT, VERSION, compareText, type Capability, type GraphDocument, type GraphEdge, type GraphNode, type GraphSource } from '../mcp/graph.ts';
+import { declaresAuthz } from './config.ts';
 import { core, implementationContainers, type UsageStats } from './core.ts';
 import { makeOwner, type Adapter, type Context, type Rows } from './model.ts';
 
@@ -24,7 +25,7 @@ export interface BuildStats {
 export type AtlasDocument = GraphDocument & { stats: BuildStats };
 
 // Capabilities the MCP tools ask for that a Clojure source analysis does not produce.
-const NOT_EXTRACTED = ['route_authz', 'signatures', 'key_flow', 'key_tables', 'selectors', 'browser_tests', 'requests'];
+const NOT_EXTRACTED = ['signatures', 'key_flow', 'key_tables', 'selectors', 'browser_tests', 'requests'];
 
 function bandCounts(edges: readonly GraphEdge[]): Record<string, number> {
   const out: Record<string, number> = {};
@@ -33,6 +34,16 @@ function bandCounts(edges: readonly GraphEdge[]): Record<string, number> {
     if (k) out[b] = k;
   }
   return out;
+}
+
+const AUTHZ_KINDS = ['requires_permission', 'exempted_by'];
+
+// Route authorization is project-specific: it is extracted only where .clojure-atlas.edn says how it is declared,
+// so elsewhere a route without a check reads as unknown, never as unguarded.
+function routeAuthz(ctx: Context, edges: readonly GraphEdge[]): Capability {
+  if (!declaresAuthz(ctx.config)) return { name: 'route_authz', status: 'absent', note: 'not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn' };
+  const mine = edges.filter((e) => AUTHZ_KINDS.includes(e.kind));
+  return { name: 'route_authz', status: 'available', edge_kinds: AUTHZ_KINDS, edges: mine.length, bands: bandCounts(mine), note: 'as declared in .clojure-atlas.edn' };
 }
 
 const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}`;
@@ -73,6 +84,7 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
         ...(name === 'definitions' ? {} : { note: why ? `switched on by ${why}` : 'not used: nothing in this codebase switches it on' }),
       };
     }),
+    routeAuthz(ctx, [...edges.values()]),
     ...NOT_EXTRACTED.map((name): Capability => ({ name, status: 'absent', note: 'not extracted from Clojure sources by clojure-atlas' })),
   ];
 

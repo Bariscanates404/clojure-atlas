@@ -1,0 +1,133 @@
+node authz_exemption:load balancer probe [authz_exemption] src/shop/routes.clj:21
+node definition:shop.auth/require! [definition] src/shop/auth.clj:4 {"defined_by":"clojure.core/defn"}
+node definition:shop.auth/tenant-of [definition] src/shop/auth.clj:5 {"defined_by":"clojure.core/defn"}
+node definition:shop.auth/wrap-permission [definition] src/shop/auth.clj:2 {"defined_by":"clojure.core/defn"}
+node definition:shop.auth/wrap-session [definition] src/shop/auth.clj:3 {"defined_by":"clojure.core/defn"}
+node definition:shop.catalog/catalog-routes [definition] src/shop/catalog.clj:11 {"defined_by":"clojure.core/defn"}
+node definition:shop.catalog/editor-authz [definition] src/shop/catalog.clj:7 {"defined_by":"clojure.core/def","private":true}
+node definition:shop.catalog/item-authz [definition] src/shop/catalog.clj:9 {"defined_by":"clojure.core/defn-","private":true}
+node definition:shop.catalog/reader [definition] src/shop/catalog.clj:5 {"defined_by":"clojure.core/def","private":true}
+node definition:shop.handlers/collect [definition] src/shop/handlers.clj:7 {"defined_by":"clojure.core/defn"}
+node definition:shop.handlers/delete-order [definition] src/shop/handlers.clj:6 {"defined_by":"clojure.core/defn"}
+node definition:shop.handlers/health [definition] src/shop/handlers.clj:8 {"defined_by":"clojure.core/defn"}
+node definition:shop.handlers/list-orders [definition] src/shop/handlers.clj:5 {"defined_by":"shop.macros/defhandler"}
+node definition:shop.handlers/report [definition] src/shop/handlers.clj:9 {"defined_by":"clojure.core/defn"}
+node definition:shop.legacy/legacy [definition] src/shop/legacy.clj:5 {"defined_by":"clojure.core/def"}
+node definition:shop.macros/defhandler [definition] src/shop/macros.clj:2 {"defined_by":"clojure.core/defmacro","macro":true}
+node definition:shop.routes/admin-routes [definition] src/shop/routes.clj:17 {"defined_by":"clojure.core/def"}
+node definition:shop.routes/app [definition] src/shop/routes.clj:19 {"defined_by":"clojure.core/defn"}
+node definition:shop.routes/order-routes [definition] src/shop/routes.clj:6 {"defined_by":"clojure.core/defn"}
+node definition:shop.routes/report-routes [definition] src/shop/routes.clj:13 {"defined_by":"clojure.core/defn"}
+node definition:shop.web/GET* [definition] src/shop/web.clj:4 {"defined_by":"clojure.core/defmacro","macro":true}
+node namespace:shop.auth [namespace] src/shop/auth.clj:1
+node namespace:shop.catalog [namespace] src/shop/catalog.clj:1
+node namespace:shop.handlers [namespace] src/shop/handlers.clj:1
+node namespace:shop.legacy [namespace] src/shop/legacy.clj:1
+node namespace:shop.macros [namespace] src/shop/macros.clj:1
+node namespace:shop.routes [namespace] src/shop/routes.clj:1
+node namespace:shop.web [namespace] src/shop/web.clj:1
+node permission::admin [permission] src/shop/routes.clj:9
+node permission::audit [permission] src/shop/routes.clj:11
+node permission::delete-order [permission] src/shop/routes.clj:6
+node permission::edit-catalog [permission] src/shop/catalog.clj:14
+node permission::export [permission] src/shop/catalog.clj:16
+node permission::read-catalog [permission] src/shop/catalog.clj:12
+node permission::read-items [permission] src/shop/catalog.clj:13
+node permission::read-orders [permission] src/shop/routes.clj:9
+node permission::read-reports [permission] src/shop/routes.clj:14
+node permission::write-orders [permission] src/shop/routes.clj:11
+node permission:perm [permission] src/shop/routes.clj:15 {"dynamic":true}
+node route:DELETE /api/orders/:id @shop.routes/app [route] src/shop/routes.clj:10 {"method":"delete","path":"/api/orders/:id","full_path":"/api/orders/:id","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /admin @shop.routes/admin-routes [route] src/shop/routes.clj:17 {"method":"get","path":"/admin","full_path":"/admin","base":"shop.routes/admin-routes","mount":"","library":"reitit"}
+node route:GET /api/orders @shop.routes/app [route] src/shop/routes.clj:8 {"method":"get","path":"/api/orders","full_path":"/api/orders","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /api/reports @shop.routes/app [route] src/shop/routes.clj:14 {"method":"get","path":"/api/reports","full_path":"/api/reports","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /catalog/browse @shop.catalog/catalog-routes [route] src/shop/catalog.clj:17 {"method":"get","path":"/catalog/browse","full_path":"/catalog/browse","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+node route:GET /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"get","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+node route:GET /health @shop.routes/app [route] src/shop/routes.clj:21 {"method":"get","path":"/health","full_path":"/health","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /legacy @shop.legacy/legacy [route] src/shop/legacy.clj:5 {"method":"get","path":"/legacy","full_path":"/legacy","base":"shop.legacy/legacy","mount":"","library":"compojure"}
+node route:POST /catalog/export @shop.catalog/catalog-routes [route] src/shop/catalog.clj:15 {"method":"post","path":"/catalog/export","full_path":"/catalog/export","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+node route:PUT /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"put","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+edge definition:shop.catalog/catalog-routes -calls-> definition:shop.catalog/item-authz static_proven src/shop/catalog.clj:13
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.catalog/editor-authz static_proven src/shop/catalog.clj:14
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.catalog/reader static_proven src/shop/catalog.clj:12
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.handlers/report static_proven src/shop/catalog.clj:13
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.handlers/report static_proven src/shop/catalog.clj:15
+edge definition:shop.catalog/catalog-routes -references-> definition:shop.handlers/report static_proven src/shop/catalog.clj:17
+edge definition:shop.handlers/delete-order -calls-> definition:shop.auth/require! static_proven src/shop/handlers.clj:6
+edge definition:shop.legacy/legacy -calls-> definition:shop.handlers/health static_proven src/shop/legacy.clj:5
+edge definition:shop.legacy/legacy -calls-> definition:shop.web/GET* static_proven src/shop/legacy.clj:5
+edge definition:shop.routes/admin-routes -references-> definition:shop.handlers/report static_proven src/shop/routes.clj:17
+edge definition:shop.routes/app -calls-> definition:shop.routes/order-routes static_proven src/shop/routes.clj:23
+edge definition:shop.routes/app -calls-> definition:shop.routes/report-routes static_proven src/shop/routes.clj:24
+edge definition:shop.routes/app -references-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22
+edge definition:shop.routes/app -references-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25
+edge definition:shop.routes/app -references-> definition:shop.handlers/health static_proven src/shop/routes.clj:21
+edge definition:shop.routes/order-routes -calls-> definition:shop.handlers/collect static_proven src/shop/routes.clj:8
+edge definition:shop.routes/order-routes -references-> definition:shop.auth/tenant-of static_proven src/shop/routes.clj:9
+edge definition:shop.routes/order-routes -references-> definition:shop.handlers/delete-order static_proven src/shop/routes.clj:10
+edge definition:shop.routes/order-routes -references-> definition:shop.handlers/list-orders static_proven src/shop/routes.clj:8
+edge definition:shop.routes/report-routes -references-> definition:shop.auth/wrap-permission static_proven src/shop/routes.clj:14
+edge definition:shop.routes/report-routes -references-> definition:shop.handlers/report static_proven src/shop/routes.clj:15
+edge namespace:shop.auth -defines-> definition:shop.auth/require! static_proven src/shop/auth.clj:4
+edge namespace:shop.auth -defines-> definition:shop.auth/tenant-of static_proven src/shop/auth.clj:5
+edge namespace:shop.auth -defines-> definition:shop.auth/wrap-permission static_proven src/shop/auth.clj:2
+edge namespace:shop.auth -defines-> definition:shop.auth/wrap-session static_proven src/shop/auth.clj:3
+edge namespace:shop.catalog -defines-> definition:shop.catalog/catalog-routes static_proven src/shop/catalog.clj:11
+edge namespace:shop.catalog -defines-> definition:shop.catalog/editor-authz static_proven src/shop/catalog.clj:7
+edge namespace:shop.catalog -defines-> definition:shop.catalog/item-authz static_proven src/shop/catalog.clj:9
+edge namespace:shop.catalog -defines-> definition:shop.catalog/reader static_proven src/shop/catalog.clj:5
+edge namespace:shop.catalog -requires-> namespace:shop.handlers static_proven src/shop/catalog.clj:3
+edge namespace:shop.handlers -calls-> definition:shop.macros/defhandler static_proven src/shop/handlers.clj:5
+edge namespace:shop.handlers -defines-> definition:shop.handlers/collect static_proven src/shop/handlers.clj:7
+edge namespace:shop.handlers -defines-> definition:shop.handlers/delete-order static_proven src/shop/handlers.clj:6
+edge namespace:shop.handlers -defines-> definition:shop.handlers/health static_proven src/shop/handlers.clj:8
+edge namespace:shop.handlers -defines-> definition:shop.handlers/list-orders static_proven src/shop/handlers.clj:5
+edge namespace:shop.handlers -defines-> definition:shop.handlers/report static_proven src/shop/handlers.clj:9
+edge namespace:shop.handlers -requires-> namespace:shop.auth static_proven src/shop/handlers.clj:2
+edge namespace:shop.handlers -requires-> namespace:shop.macros static_proven src/shop/handlers.clj:3
+edge namespace:shop.legacy -defines-> definition:shop.legacy/legacy static_proven src/shop/legacy.clj:5
+edge namespace:shop.legacy -requires-> namespace:shop.handlers static_proven src/shop/legacy.clj:3
+edge namespace:shop.legacy -requires-> namespace:shop.web static_proven src/shop/legacy.clj:2
+edge namespace:shop.macros -defines-> definition:shop.macros/defhandler static_proven src/shop/macros.clj:2
+edge namespace:shop.routes -defines-> definition:shop.routes/admin-routes static_proven src/shop/routes.clj:17
+edge namespace:shop.routes -defines-> definition:shop.routes/app static_proven src/shop/routes.clj:19
+edge namespace:shop.routes -defines-> definition:shop.routes/order-routes static_proven src/shop/routes.clj:6
+edge namespace:shop.routes -defines-> definition:shop.routes/report-routes static_proven src/shop/routes.clj:13
+edge namespace:shop.routes -requires-> namespace:shop.auth static_proven src/shop/routes.clj:3
+edge namespace:shop.routes -requires-> namespace:shop.handlers static_proven src/shop/routes.clj:4
+edge namespace:shop.web -defines-> definition:shop.web/GET* static_proven src/shop/web.clj:4
+edge route:DELETE /api/orders/:id @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22 {"order":1,"level":"route","inherited_from":"/api"}
+edge route:DELETE /api/orders/:id @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::audit static_proven src/shop/routes.clj:11 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":2}
+edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::delete-order heuristic src/shop/routes.clj:6 {"check":2,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
+edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::write-orders static_proven src/shop/routes.clj:11 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":2}
+edge route:DELETE /api/orders/:id @shop.routes/app -routes_to-> definition:shop.handlers/delete-order static_proven src/shop/routes.clj:10
+edge route:GET /admin @shop.routes/admin-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/routes.clj:17
+edge route:GET /api/orders @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22 {"order":1,"level":"route","inherited_from":"/api"}
+edge route:GET /api/orders @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:GET /api/orders @shop.routes/app -requires_permission-> permission::admin static_proven src/shop/routes.clj:9 {"check":1,"checks":1,"alternative":2,"alternatives":2,"all_of":1,"tenant":"auth/tenant-of"}
+edge route:GET /api/orders @shop.routes/app -requires_permission-> permission::read-orders static_proven src/shop/routes.clj:9 {"check":1,"checks":1,"alternative":1,"alternatives":2,"all_of":1,"tenant":"auth/tenant-of"}
+edge route:GET /api/orders @shop.routes/app -routes_to-> definition:shop.handlers/list-orders static_proven src/shop/routes.clj:8
+edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-permission static_proven src/shop/routes.clj:14 {"order":2,"level":"route"}
+edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22 {"order":1,"level":"route","inherited_from":"/api"}
+edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:GET /api/reports @shop.routes/app -requires_permission-> permission::read-reports static_proven src/shop/routes.clj:14 {"check":2,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
+edge route:GET /api/reports @shop.routes/app -requires_permission-> permission:perm unknown src/shop/routes.clj:15 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
+edge route:GET /api/reports @shop.routes/app -routes_to-> definition:shop.handlers/report static_proven src/shop/routes.clj:15
+edge route:GET /catalog/browse @shop.catalog/catalog-routes -requires_permission-> permission::read-catalog static_proven src/shop/catalog.clj:12 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
+edge route:GET /catalog/browse @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:17
+edge route:GET /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::read-items static_proven src/shop/catalog.clj:13 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1,"tenant":":item"}
+edge route:GET /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:13
+edge route:GET /health @shop.routes/app -exempted_by-> authz_exemption:load balancer probe static_proven src/shop/routes.clj:21 {"label":"load balancer probe"}
+edge route:GET /health @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
+edge route:GET /health @shop.routes/app -routes_to-> definition:shop.handlers/health static_proven src/shop/routes.clj:21
+edge route:GET /legacy @shop.legacy/legacy -routes_to-> definition:shop.handlers/health static_proven src/shop/legacy.clj:5
+edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::admin static_proven src/shop/catalog.clj:16 {"check":2,"checks":2,"alternative":2,"alternatives":2,"all_of":1}
+edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::export static_proven src/shop/catalog.clj:16 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
+edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::read-items static_proven src/shop/catalog.clj:16 {"check":2,"checks":2,"alternative":1,"alternatives":2,"all_of":1}
+edge route:POST /catalog/export @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:15
+edge route:PUT /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::edit-catalog static_proven src/shop/catalog.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
+edge route:PUT /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
+usages resolved=23 unresolved=0 unknown=0 not-vars=0 external=24
+adapters multimethods=off:0 events=off:0 routes=compojure, reitit:32 data_attributes=off:0 system=off:0 schemas=off:0

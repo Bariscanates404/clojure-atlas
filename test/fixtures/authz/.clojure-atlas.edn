@@ -1,0 +1,5 @@
+{:route-authz {:key :authz :permission :permission :exempt :exempt :scope :tenant :alternative :or}
+ :permission-middleware [shop.auth/wrap-permission]
+ :permission-fns [shop.auth/require!]
+ :route-macros {shop.web/GET* compojure.core/GET}
+ :lint-as {shop.macros/defhandler clojure.core/defn}}

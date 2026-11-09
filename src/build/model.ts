@@ -2,6 +2,7 @@
 // finds the node it belongs to (its var, else the top-level form that holds it, else its namespace).
 import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
 import { keywordName, type Analysis, type Keyword, type Span, type VarDef, type VarUse } from './analysis.ts';
+import type { ProjectConfig } from './config.ts';
 import { contains, readForms, type Form } from './reader.ts';
 
 export interface Rows {
@@ -17,6 +18,7 @@ export interface Container {
 
 export interface Context {
   analysis: Analysis;
+  config: ProjectConfig;
   projectNs: ReadonlySet<string>;
   // "ns/name" to its first definition
   defs: ReadonlyMap<string, VarDef>;
@@ -55,7 +57,7 @@ const LANGUAGE_NS = /^(clojure|cljs)\.(core|string|set|walk|test|edn|zip|data|pp
 export const defId = (fullName: string) => `definition:${fullName}`;
 export const nsId = (ns: string) => `namespace:${ns}`;
 
-export function createContext(analysis: Analysis, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
+export function createContext(analysis: Analysis, config: ProjectConfig, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
   const defs = new Map<string, VarDef>();
   for (const d of analysis.varDefs) if (d.name && !LANGUAGE_NS.test(d.ns) && !defs.has(`${d.ns}/${d.name}`)) defs.set(`${d.ns}/${d.name}`, d);
   const cache = new Map<string, Form[]>();
@@ -66,6 +68,7 @@ export function createContext(analysis: Analysis, sources: ReadonlyMap<string, s
   for (const k of analysis.keywords) keywords.set(at(k.file, k.row, k.col), k);
   const useAt = (file: string, row: number, col: number) => uses.get(at(file, row, col));
   return {
+    config,
     useAt,
     defAt: (file, row, col) => {
       const u = useAt(file, row, col);
