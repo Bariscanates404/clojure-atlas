@@ -15,6 +15,15 @@ const MAX_DEPTH = 3;
 
 const FQN_HINT = 'use a fully qualified name (ns/name)';
 
+// A depth below 1 asks for no walk at all: that is stated, never silently raised to 1.
+function invalidDepth(name: string, query: string, title: string, depth: number): QueryResult {
+  const verdict = `depth ${depth} is not valid: pass 1 or more${name === 'blast_radius' ? ', or omit it to walk to the end' : ''}`;
+  return { name, query, title, found: false, verdict, matches: [], sections: [], notes: [verdict], next: [] };
+}
+
+const fractionNote = (depth: number, used: number): string[] =>
+  Number.isInteger(depth) ? [] : [`depth ${depth} was read as ${used}`];
+
 // ---------- callers / blast radius ----------
 
 // Every relation through which a change to a definition can reach another: an actual call, a value use, a function
@@ -123,12 +132,13 @@ const countLine = (label: string, counts: Map<string, number>, sort: boolean, to
 // Transitive callers until no new caller appears; an explicit `depth` caps the walk. Cycles stop at the first visit.
 export function blastRadius(g: Graph, query: string, depth?: number): QueryResult {
   const title = `blast radius of ${query}`;
+  if (depth !== undefined && depth < 1) return invalidDepth('blast_radius', query, title, depth);
   const hits = resolve(g, ['definition'], query);
   if (!hits.length) return notFound('blast_radius', query, title, 'definition', FQN_HINT);
   if (hits.length > 1) return ambiguous('blast_radius', query, title, hits, 'var');
   const target = hits[0];
   const capped = depth !== undefined && Number.isFinite(depth);
-  const max = capped ? Math.max(1, Math.floor(depth)) : Number.POSITIVE_INFINITY;
+  const max = capped ? Math.floor(depth) : Number.POSITIVE_INFINITY;
   const { reached, beyond } = reverseReach(g, target.id, max);
   const rows = reached.map((r) => {
     const row = edgeRow(g, r.id, r.edge, {
@@ -149,7 +159,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   }
   const shallow = rows.filter((r) => (r.depth ?? 0) <= SHALLOW_DEPTH);
   const deeper = rows.filter((r) => (r.depth ?? 0) > SHALLOW_DEPTH);
-  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)];
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows), ...(capped ? fractionNote(depth, max) : [])];
   if (rows.length) {
     notes.push(countLine('by depth', byDepth, false, byDepth.size));
     notes.push(countLine('by component', byComp, true));
@@ -162,7 +172,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   notes.push('potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings): a path here may never run');
   if (deeper.length) notes.push(`${deeper.length} caller(s) at depth ${SHALLOW_DEPTH + 1}+ are in section "deeper": page with section="deeper" offset= limit=`);
   const scope = capped ? `depth ${max}` : 'all depths';
-  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${SHALLOW_DEPTH}` }];
+  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${Math.min(max, SHALLOW_DEPTH)}` }];
   if (deeper.length) sections.push({ name: 'deeper', rows: deeper, tree: true });
   return {
     name: 'blast_radius',
@@ -656,6 +666,7 @@ const testsBeyondNote = (max: number): string => `callers continue beyond depth 
 
 export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResult {
   const title = `tests for ${query}`;
+  if (depth < 1) return invalidDepth('tests_for', query, title, depth);
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
   if (!hits.length) {
     const viaBrowser = testsCovering(g, query);
@@ -664,7 +675,8 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
   }
   if (hits.length > 1) return ambiguous('tests_for', query, title, hits, 'symbol');
   const target = hits[0];
-  const max = Math.max(1, Math.min(MAX_DEPTH, Math.floor(Number.isFinite(depth) ? depth : MAX_DEPTH)));
+  const asked = Number.isFinite(depth) ? Math.floor(depth) : MAX_DEPTH;
+  const max = Math.min(MAX_DEPTH, asked);
   // seeds: the definition itself, or the readers/writers/dispatchers/subscribers of a non-code target
   const seeds: { id: string; band: Band }[] = target.kind === 'definition'
     ? [{ id: target.id, band: 'static_proven' }]
@@ -698,7 +710,8 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
     if (!ns.has(comp)) ns.set(comp, new Set());
     ns.get(comp)?.add(r.label.slice(0, i));
   }
-  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows])];
+  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows]), ...fractionNote(depth, asked)];
+  if (asked > max) notes.push(`depth ${depth} was cut to ${max}, the most this query walks`);
   if (beyond) notes.push(testsBeyondNote(max));
   for (const [comp, set] of ns) notes.push(`run in ${comp}: ${[...set].sort().join(' ')}`);
   const direct = unitRows.filter((r) => r.depth === 1).length;

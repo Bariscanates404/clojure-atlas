@@ -85,7 +85,7 @@ describe('tests_for', () => {
     assert.deepEqual(labels(d1, 'clojure.test').sort(), ['t.core-test/direct', 't.core-test/guessed']);
   });
 
-  const clamp: [number, number][] = [[0, 1], [9, 3], [Number.NaN, 3]];
+  const clamp: [number, number][] = [[9, 3], [Number.NaN, 3]];
   for (const [given, used] of clamp) {
     it(`depth ${given} is used as ${used}`, () => assert.match(testsFor(g, 'core/f', given).sections[0].searched ?? '', new RegExp(`depth ${used}$`)));
   }

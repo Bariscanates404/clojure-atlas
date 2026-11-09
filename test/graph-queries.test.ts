@@ -214,10 +214,37 @@ describe('blast radius', () => {
     assert.match(r.notes.join(' '), /callers continue beyond depth 2/);
   });
 
-  const depthForms: [number, string][] = [[0, 'depth 1)'], [-5, 'depth 1)'], [1.7, 'depth 1)'], [99, 'depth 99)'], [Number.NaN, 'all depths)']];
+  const depthForms: [number, string][] = [[1.7, 'depth 1)'], [99, 'depth 99)'], [Number.NaN, 'all depths)']];
   for (const [given, shown] of depthForms) {
     it(`depth ${given} is shown as ${shown}`, () => assert.ok(blastRadius(g, 'core/t', given).title.endsWith(shown)));
   }
+
+  it('a fractional depth is read down and says so', () => {
+    assert.match(blastRadius(g, 'core/t', 1.7).notes.join(' '), /depth 1\.7 was read as 1/);
+    assert.doesNotMatch(blastRadius(g, 'core/t', 2).notes.join(' '), /was read as/);
+  });
+
+  for (const depth of [0, -5]) {
+    it(`depth ${depth} is stated as invalid, not walked as depth 1`, () => {
+      for (const r of [blastRadius(g, 'core/t', depth), testsFor(g, 'core/t', depth)]) {
+        assert.equal(r.found, false, r.name);
+        assert.match(r.verdict, new RegExp(`depth ${depth} is not valid: pass 1 or more`), r.name);
+        assert.deepEqual(r.sections, [], r.name);
+      }
+    });
+  }
+
+  it('tests_for says when it cut a depth above 3', () => {
+    assert.match(testsFor(g, 'core/t', 7).notes.join(' '), /depth 7 was cut to 3/);
+    assert.doesNotMatch(testsFor(g, 'core/t', 3).notes.join(' '), /was cut/);
+  });
+
+  it('the shallow section states the depth it really searched', () => {
+    const searched = (r: QueryResult) => r.sections.find((x) => x.name === 'affected')?.searched;
+    assert.match(searched(blastRadius(g, 'core/t', 1)) ?? '', /up to depth 1$/);
+    assert.match(searched(blastRadius(g, 'core/t', 3)) ?? '', /up to depth 2$/);
+    assert.match(searched(blastRadius(g, 'core/t')) ?? '', /up to depth 2$/);
+  });
 
   it('summary notes carry counts per depth and per component', () => {
     const notes = blastRadius(g, 'core/t').notes.join('\n');
