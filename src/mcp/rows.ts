@@ -3,6 +3,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { NOT_USED } from '../shared/capability.ts';
 import { capability, inEdges, compareText } from './graph.ts';
+import { degradation, unparsedFor } from './degraded.ts';
 
 export interface Row {
   label: string;
@@ -54,6 +55,8 @@ export interface QueryResult {
   next: string[];
   // the arguments were rejected before any search: there is no name to spell-check
   badArgument?: boolean;
+  // the name was not found but its file could not be parsed: the answer is not a spelling matter
+  unparsed?: string[];
 }
 
 
@@ -103,10 +106,15 @@ export const call = (tool: string, args: Record<string, string | number>) =>
 
 // Not found is only as strong as the capabilities that could have produced a match: their state is always named.
 export function notFound(g: Graph, name: string, query: string, title: string, what: string, caps: string[], note?: string): QueryResult {
+  const unparsed = unparsedFor(degradation(g.doc), query);
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
     verdict: `no ${what} matches ${JSON.stringify(query)}`,
-    notes: [...capabilityNotes(g, caps), ...(note ? [note] : [])],
+    notes: [
+      ...(unparsed.length ? [`${query} probably lives in ${unparsed.join(', ')}, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem`] : []),
+      ...capabilityNotes(g, caps), ...(note ? [note] : []),
+    ],
+    ...(unparsed.length ? { unparsed } : {}),
   };
 }
 

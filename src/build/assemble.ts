@@ -7,6 +7,9 @@ import { NOT_USED } from '../shared/capability.ts';
 import { core, type UsageStats } from './core.ts';
 import { makeOwner, type Adapter, type Context, type Rows } from './model.ts';
 
+// the unparsed files named in the graph; the count beside them stays exact
+const MAX_NAMED_FILES = 500;
+
 export interface AdapterStats {
   detected: string | null;
   nodes: number;
@@ -16,7 +19,7 @@ export interface AdapterStats {
 export interface BuildStats {
   // expected: Clojure files the repo tracks (build output and dependencies included); sources: the ones analyzed
   files: { expected: number; sources: number; edn: number; skipped_large: number };
-  syntax_errors: { files: number; errors: number };
+  syntax_errors: { files: number; errors: number; names: string[] };
   definitions: number;
   usages: UsageStats;
   adapters: Record<string, AdapterStats>;
@@ -111,7 +114,7 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     edges: [...edges.values()].sort((a, b) => compareText(edgeKey(a), edgeKey(b))),
     stats: {
       files,
-      syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length },
+      syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES) },
       definitions: ctx.defs.size,
       usages: base.stats,
       adapters: adapterStats,

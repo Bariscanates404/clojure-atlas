@@ -9,6 +9,7 @@ import {
 } from './queries.ts';
 import { keyFlow, keySiblings, signatureImpact } from './keyflow.ts';
 import { PAGING_PROPS, render, renderOptionsOf, withSource, type GroupBy } from './render.ts';
+import { degradation, degradedLine } from './degraded.ts';
 import { staleness, type StalenessOptions } from './staleness.ts';
 import { VERSION } from '../version.ts';
 
@@ -196,8 +197,10 @@ export function toolList(): unknown[] {
 export function graphInfo(g: Graph, base: string | undefined, opts: ServerOptions): string {
   const s = g.doc.source;
   const st = staleness(g, base, opts);
+  const degraded = degradation(g.doc);
   const lines = [
     ...(st.header ? [st.header] : []),
+    ...(degraded ? [degradedLine(degraded)] : []),
     `graph ${s.repo_name ?? '?'} @ ${s.ref ?? '?'} sha ${s.sha} built ${s.built_at ?? '?'}: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges`,
     ...(s.snapshot ? [`snapshot ${s.snapshot}: ${s.dirty_files ?? 0} uncommitted file(s), analyzer ${s.analyzer ?? '?'}`] : []),
     ...(s.config_hash ? [`config ${s.config_hash.slice(0, 12)} from ${(s.config_sources ?? []).join(', ') || 'no project config files'}`] : []),
@@ -222,10 +225,12 @@ export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions
   if (invalid) return invalid;
   const res = tool.run(g, args, opts);
   const st = staleness(g, base, opts);
-  const header = st.header;
+  const degraded = degradation(g.doc);
+  const degradedText = degraded ? degradedLine(degraded) : undefined;
+  const header = [st.header, degradedText].filter(Boolean).join('\n') || null;
   const groupBy = ['component', 'file', 'none'].includes(String(args.group_by)) ? (args.group_by as GroupBy) : undefined;
   const ro = renderOptionsOf(args);
-  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }), { stale: st.stale, notice: header }), isError: false };
+  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }), { stale: st.stale, notice: st.header, ...(degradedText ? { degraded: degradedText } : {}) }), isError: false };
   return { text: render(res, { ...ro, groupBy, header }), isError: false };
 }
 

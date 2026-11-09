@@ -4,6 +4,7 @@ import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AtlasDocument } from './build/assemble.ts';
+import { degradation, degradedLine } from './mcp/degraded.ts';
 import { buildGraph, DEFAULT_GRAPH, writeGraph } from './build/index.ts';
 import { coverageRow, coverageTable, pct } from './coverage.ts';
 import { GraphFormatError, loadGraph, type Graph } from './mcp/graph.ts';
@@ -117,6 +118,8 @@ async function build(dir: string, outArg: string | undefined): Promise<void> {
   process.stderr.write(`clojure-atlas: ${row.files} files, ${row.definitions} definitions, ${row.nodes} nodes, ${row.edges} edges; `
     + `resolution rate of var usages in recognized project namespaces ${pct(row.resolutionRate)} (${row.resolved} of ${row.resolved + row.unresolved}), `
     + `${row.unknown} usages in an unknown namespace; ${(row.buildMs / 1000).toFixed(1)} s -> ${out}\n`);
+  const degraded = degradation(doc);
+  if (degraded) process.stderr.write(`clojure-atlas: ${degradedLine(degraded)}\n`);
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -130,6 +133,8 @@ async function main(argv: string[]): Promise<void> {
   } else if (c.cmd === 'mcp') {
     const g = readGraph(c.graph);
     process.stderr.write(`clojure-atlas: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges at ${shortSha(g.doc.source.sha)}\n`);
+    const loaded = degradation(g.doc);
+    if (loaded) process.stderr.write(`clojure-atlas: ${degradedLine(loaded)}\n`);
     const repo = c.repo;
     const analyzer = analyzerFor(g.doc.source.analyzer);
     serveStdio(g, {
