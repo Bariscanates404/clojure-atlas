@@ -66,10 +66,16 @@ const LOCATOR_FNS = /^(locator|getBy[A-Z]\w*|\$|\$\$|frameLocator)$/;
 const TEST_FNS = new Set(['test', 'it']);
 const SKIP_TEST_PROPS = new Set(['describe', 'beforeEach', 'afterEach', 'beforeAll', 'afterAll', 'use', 'step', 'extend', 'info', 'setTimeout', 'slow']);
 
-// .qa-x class tokens and [data-testid="x"] in a CSS selector string.
+// Playwright selector engines whose text is not CSS: text=Save.pdf, xpath=..., //div, role=button[name="a.b"]
+const OTHER_ENGINE = /^\s*((text|xpath|id|role|internal:[\w-]+)=|\/\/)/;
+
+// .qa-x class tokens and [data-testid="x"] in a CSS selector string. A dot inside quotes or an attribute test is not
+// a class, and a part written for another engine has none.
 export function selectorsIn(css: string): Selector[] {
   const out: Selector[] = [];
-  for (const m of css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) out.push({ kind: 'class', value: m[1] });
+  const cssParts = css.split('>>').filter((part) => !OTHER_ENGINE.test(part)).join(' ');
+  const bare = cssParts.replace(/"[^"]*"|'[^']*'/g, '""').replace(/\[[^\]]*\]/g, '[]');
+  for (const m of bare.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) out.push({ kind: 'class', value: m[1] });
   for (const m of css.matchAll(/\[data-testid=["']?([^"'\]]+)["']?\]/g)) out.push({ kind: 'testid', value: m[1] });
   return out;
 }
@@ -94,8 +100,8 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
         const names = new Set<string>(n.members.map((m: Node) => m.name?.getText?.(sf)).filter(Boolean));
         const members: PageObjectMember[] = [];
         let locates = false;
-        for (const m of n.members) {
-          if (!m.name || !(ts.isPropertyDeclaration(m) || ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))) continue;
+        // the locators and sibling members a piece of code names
+        const inspect = (root: Node) => {
           const selectors: Selector[] = [];
           const uses = new Set<string>();
           const scan = (x: Node): void => {
@@ -109,10 +115,31 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
             if (ts.isPropertyAccessExpression(x) && x.expression.kind === ts.SyntaxKind.ThisKeyword && names.has(x.name.text)) uses.add(x.name.text);
             ts.forEachChild(x, scan);
           };
-          scan(m);
-          members.push({ name: m.name.getText(sf), line: lineOf(sf, m.getStart(sf)), endLine: lineOf(sf, m.getEnd()), selectors, uses: [...uses].sort() });
+          scan(root);
+          return { selectors, uses };
+        };
+        const added = (name: string, line: number, endLine: number, found: { selectors: Selector[]; uses: Set<string> }) => {
+          const own = members.find((m) => m.name === name);
+          if (!own) members.push({ name, line, endLine, selectors: found.selectors, uses: [...found.uses].sort() });
+          else {
+            own.selectors.push(...found.selectors);
+            own.uses = [...new Set([...own.uses, ...found.uses])].sort();
+          }
+        };
+        for (const m of n.members) {
+          if (!m.name || !(ts.isPropertyDeclaration(m) || ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))) continue;
+          added(m.name.getText(sf), lineOf(sf, m.getStart(sf)), lineOf(sf, m.getEnd()), inspect(m));
         }
-        const base = n.heritageClauses?.[0]?.types?.[0]?.expression?.getText(sf);
+        // this.x = page.locator(...) in the constructor belongs to member x
+        for (const ctor of n.members.filter(ts.isConstructorDeclaration)) {
+          const assigned = (x: Node): void => {
+            const left = ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.EqualsToken ? x.left : undefined;
+            if (left && ts.isPropertyAccessExpression(left) && left.expression.kind === ts.SyntaxKind.ThisKeyword) added(left.name.text, lineOf(sf, x.getStart(sf)), lineOf(sf, x.getEnd()), inspect(x.right));
+            ts.forEachChild(x, assigned);
+          };
+          if (ctor.body) assigned(ctor.body);
+        }
+        const base = n.heritageClauses?.find((h: Node) => h.token === ts.SyntaxKind.ExtendsKeyword)?.types?.[0]?.expression?.getText(sf);
         classes0.push({ name: n.name.text, file: rel(sf), line: lineOf(sf, n.getStart(sf)), ...(base ? { base } : {}), members, locates });
       }
       ts.forEachChild(n, visit);
@@ -124,25 +151,32 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
   const bases = new Set(classes0.filter((c) => c.locates && c.base).map((c) => c.base));
   const pageObjects: PageObject[] = classes0.filter((c) => c.locates || bases.has(c.name)).map(({ locates: _, ...c }) => c);
   const classes = new Map(pageObjects.map((p) => [p.name, new Set(p.members.map((m) => m.name))]));
-  const memberOf = (access: Node): string | undefined => {
-    // the declaration's own name: the symbol of `export default class X` is named "default"
-    const decl = checker.getTypeAtLocation(access.expression)?.getSymbol?.()?.declarations?.[0];
-    const cls = decl && ts.isClassDeclaration(decl) ? decl.name?.text : undefined;
-    return cls && classes.get(cls)?.has(access.name.text) ? `${cls}.${access.name.text}` : undefined;
+  // the class that declares a property, which for an inherited one is its base class; named by the declaration itself,
+  // since the symbol of `export default class X` is called "default"
+  const declaringClass = (prop: Node | undefined): string | undefined => {
+    const decl = prop?.valueDeclaration?.parent;
+    return decl && ts.isClassDeclaration(decl) ? decl.name?.text : undefined;
   };
+  const pageMember = (cls: string | undefined, name: string) => (cls && classes.get(cls)?.has(name) ? `${cls}.${name}` : undefined);
+  const memberOf = (access: Node): string | undefined => pageMember(declaringClass(checker.getSymbolAtLocation(access.name)), access.name.text);
   // const { qaX } = page; qaX(): an identifier bound by destructuring a page object names its member
   const boundMember = (id: Node): string | undefined => {
     const decl = checker.getSymbolAtLocation(id)?.valueDeclaration;
     if (!decl || !ts.isBindingElement(decl) || !ts.isObjectBindingPattern(decl.parent) || decl.name === id) return undefined;
-    const source = checker.getTypeAtLocation(decl.parent)?.getSymbol?.()?.declarations?.[0];
-    const cls = source && ts.isClassDeclaration(source) ? source.name?.text : undefined;
     const name = (decl.propertyName ?? decl.name).getText();
-    return cls && classes.get(cls)?.has(name) ? `${cls}.${name}` : undefined;
+    return pageMember(declaringClass(checker.getPropertyOfType(checker.getTypeAtLocation(decl.parent), name)), name);
+  };
+  // expect(x), expect.soft(x) or expect.poll(x)
+  const isExpectCall = (n: Node): boolean => {
+    if (!ts.isCallExpression(n)) return false;
+    const callee = n.expression;
+    if (ts.isIdentifier(callee)) return callee.text === 'expect';
+    return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'expect' && ['soft', 'poll'].includes(callee.name.text);
   };
   // expect(<member access or its call>).not?.toX(...): the matcher
   const matcherOf = (n: Node): string | undefined => {
     let x = n;
-    while (x.parent && !(ts.isCallExpression(x.parent) && ts.isIdentifier(x.parent.expression) && x.parent.expression.text === 'expect')) {
+    while (x.parent && !isExpectCall(x.parent)) {
       if (ts.isBlock(x.parent) || ts.isSourceFile(x.parent)) return undefined;
       x = x.parent;
     }
@@ -158,7 +192,8 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
   const titleOf = (n: Node): string | undefined => {
     if (!n) return undefined;
     if (ts.isTemplateExpression(n)) return n.head.text + n.templateSpans.map((sp: Node) => `\${…}${sp.literal.text}`).join('');
-    return literal(n) ?? '<dynamic title>';
+    // test.skip(({ browserName }) => ..., 'reason') takes a condition where a title would stand
+    return ts.isArrowFunction(n) || ts.isFunctionExpression(n) ? undefined : literal(n) ?? '<dynamic title>';
   };
   const tests: BrowserTest[] = [];
   for (const sf of program.getSourceFiles()) {
@@ -166,15 +201,21 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
     const visit = (n: Node, describe: string[]): void => {
       if (ts.isCallExpression(n)) {
         const callee = n.expression;
-        const head = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) ? callee.expression.text : undefined;
-        const prop = ts.isPropertyAccessExpression(callee) ? callee.name.text : undefined;
+        // test.describe.serial(...): the identifier at the root and every property name after it
+        const props: string[] = [];
+        let root = callee;
+        while (ts.isPropertyAccessExpression(root)) {
+          props.unshift(root.name.text);
+          root = root.expression;
+        }
+        const head = ts.isIdentifier(root) ? root.text : undefined;
         const title = titleOf(n.arguments[0]);
         const body = n.arguments.find((a: Node) => ts.isArrowFunction(a) || ts.isFunctionExpression(a));
-        if (head && TEST_FNS.has(head) && title !== undefined && body && prop === 'describe') {
+        if (head && TEST_FNS.has(head) && title !== undefined && body && props.includes('describe')) {
           ts.forEachChild(body, (c: Node) => visit(c, [...describe, title]));
           return;
         }
-        if (head && TEST_FNS.has(head) && title !== undefined && body && !SKIP_TEST_PROPS.has(prop ?? '')) {
+        if (head && TEST_FNS.has(head) && title !== undefined && body && !props.some((p) => SKIP_TEST_PROPS.has(p))) {
           const refs: TestRef[] = [];
           const scan = (x: Node): void => {
             if (ts.isPropertyAccessExpression(x) || ts.isIdentifier(x)) {
