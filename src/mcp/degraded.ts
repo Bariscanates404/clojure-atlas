@@ -5,9 +5,12 @@
 import type { GraphDocument } from './graph.ts';
 
 export interface Degradation {
+  // files kondo produced nothing for (no namespace, no definition): their definitions and calls are missing
   files: number;
-  // repo-relative paths of the files that could not be parsed (capped at build time; `files` is the true count)
+  // repo-relative paths of those files (capped at build time; `files` is the true count)
   names: string[];
+  // files with syntax errors that kondo still analyzed: some forms in them may be missing, the rest is in the graph
+  recovered: { files: number; names: string[] };
   edges: number;
   // files over the size limit, never read: the true count and the first names (capped at build time)
   large: { files: number; names: string[] };
@@ -23,7 +26,7 @@ const SHOWN = 3;
 export const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 interface Stats {
-  syntax_errors?: { files?: unknown; names?: unknown };
+  syntax_errors?: { files?: unknown; names?: unknown; recovered?: unknown; recovered_names?: unknown };
   dropped_edges?: unknown;
   files?: { skipped_large?: unknown; skipped_large_names?: unknown; timed_out?: unknown; timed_out_names?: unknown; unread?: unknown; unread_names?: unknown };
   duplicate_namespaces?: unknown;
@@ -31,8 +34,12 @@ interface Stats {
 
 export function degradation(doc: GraphDocument): Degradation | null {
   const stats = (doc as { stats?: Stats }).stats;
-  const files = typeof stats?.syntax_errors?.files === 'number' ? stats.syntax_errors.files : 0;
-  const names = strings(stats?.syntax_errors?.names);
+  const withErrors = typeof stats?.syntax_errors?.files === 'number' ? stats.syntax_errors.files : 0;
+  const recoveredFiles = typeof stats?.syntax_errors?.recovered === 'number' ? stats.syntax_errors.recovered : 0;
+  const recoveredNames = strings(stats?.syntax_errors?.recovered_names);
+  const files = Math.max(0, withErrors - recoveredFiles);
+  const names = strings(stats?.syntax_errors?.names).filter((n) => !recoveredNames.includes(n));
+  const recovered = { files: recoveredFiles, names: recoveredNames };
   const edges = typeof stats?.dropped_edges === 'number' ? stats.dropped_edges : 0;
   const largeNames = strings(stats?.files?.skipped_large_names);
   const large = { files: typeof stats?.files?.skipped_large === 'number' ? stats.files.skipped_large : 0, names: largeNames };
@@ -42,8 +49,8 @@ export function degradation(doc: GraphDocument): Degradation | null {
   const duplicates = Array.isArray(stats?.duplicate_namespaces)
     ? stats.duplicate_namespaces.flatMap((d: unknown) => (typeof (d as { ns?: unknown })?.ns === 'string' ? [(d as { ns: string }).ns] : []))
     : [];
-  return files > 0 || edges > 0 || large.files > 0 || duplicates.length > 0 || timedOut.files > 0 || unread.files > 0
-    ? { files, names, edges, large, duplicates, timedOut, unread } : null;
+  return files > 0 || recovered.files > 0 || edges > 0 || large.files > 0 || duplicates.length > 0 || timedOut.files > 0 || unread.files > 0
+    ? { files, names, recovered, edges, large, duplicates, timedOut, unread } : null;
 }
 
 const listed = (names: readonly string[], total: number) => `${names.slice(0, SHOWN).join(', ')}${total > SHOWN ? ', ...' : ''}`;
@@ -53,6 +60,9 @@ export function degradedLine(d: Degradation): string {
   const parts: string[] = [];
   if (d.files) {
     parts.push(`${d.files} file(s) could not be parsed${d.names.length ? ` (${listed(d.names, d.files)})` : ''}, so their definitions and calls are missing`);
+  }
+  if (d.recovered.files) {
+    parts.push(`${d.recovered.files} file(s) have syntax errors but were analyzed${d.recovered.names.length ? ` (${listed(d.recovered.names, d.recovered.files)})` : ''}; some forms in them may be missing`);
   }
   if (d.large.files) {
     const shown = d.large.names.length ? ` (${listed(d.large.names, d.large.files)})` : '';
@@ -83,6 +93,9 @@ const matching = (names: readonly string[], query: string): string[] => {
 // The unparsed files a name could live in: "demo.broken/oops" or "demo.broken" matches src/demo/broken.clj (also
 // with underscores for dashes), a repo path matches itself.
 export const unparsedFor = (d: Degradation | null, query: string): string[] => matching(d?.names ?? [], query);
+
+// The files with syntax errors that were still analyzed, a name could live in: a form kondo could not read may be the one missing.
+export const recoveredFor = (d: Degradation | null, query: string): string[] => matching(d?.recovered.names ?? [], query);
 
 // The files a name could live in that were never analyzed: killed by the timeout, or tracked but outside the file walk.
 export const unanalyzedFor = (d: Degradation | null, query: string): { timedOut: string[]; unread: string[] } =>

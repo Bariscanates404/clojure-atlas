@@ -25,7 +25,8 @@ export interface BuildStats {
   };
   // namespaces defined in more than one file: one graph node stands for them all, and usages of them are heuristic
   duplicate_namespaces: { ns: string; files: string[] }[];
-  syntax_errors: { files: number; errors: number; names: string[] };
+  // names: every file kondo reported a syntax error in; recovered_names: those it still analyzed (their namespace or a definition is in the graph)
+  syntax_errors: { files: number; errors: number; names: string[]; recovered: number; recovered_names: string[] };
   definitions: number;
   usages: UsageStats;
   adapters: Record<string, AdapterStats>;
@@ -118,6 +119,8 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     adapterStats[a.name] = { detected: detected.get(a.name) ?? null, nodes: rows?.nodes.length ?? 0, edges: rows?.edges.length ?? 0 };
   }
   const syntaxFiles = new Set(ctx.analysis.syntaxErrors.map((e) => e.file));
+  const analyzed = new Set([...ctx.analysis.nsDefs, ...ctx.analysis.varDefs].map((d) => d.file));
+  const recovered = [...syntaxFiles].filter((f) => analyzed.has(f)).sort(compareText);
   return {
     format: FORMAT,
     version: VERSION,
@@ -130,7 +133,10 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
         ...files, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
         unread_names: files.unread_names.slice(0, MAX_NAMED_FILES), timed_out_names: files.timed_out_names.slice(0, MAX_NAMED_FILES),
       },
-      syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES) },
+      syntax_errors: {
+        files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES),
+        recovered: recovered.length, recovered_names: recovered.slice(0, MAX_NAMED_FILES),
+      },
       duplicate_namespaces: [...ctx.duplicateNs].map(([ns, files]) => ({ ns, files })).sort((a, b) => compareText(a.ns, b.ns)),
       definitions: ctx.defs.size,
       usages: base.stats,
