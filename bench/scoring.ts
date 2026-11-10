@@ -8,7 +8,7 @@ import { analyzerFor } from '../src/snapshot.ts';
 
 // none: the thing exists and nothing relates to it; not-found: the thing is not in the codebase; capability-off: the
 // graph cannot answer, because the extractor for this kind of fact found nothing to extract from
-export type Absence = 'none' | 'not-found' | 'capability-off';
+export type Absence = 'none' | 'not-found' | 'used-undefined' | 'capability-off';
 
 export interface Question {
   id: string;
@@ -70,6 +70,7 @@ const namedRows = (tool: string, result: QueryResult): number =>
 // capability is not available (named, with a word saying so, in the verdict or a note).
 function statesAbsence(q: Question, result: QueryResult): boolean {
   if (q.absence === 'not-found') return !result.found && result.matches.length === 0;
+  if (q.absence === 'used-undefined') return !result.found && (result.used?.length ?? 0) > 0 && /macro/.test(result.notes.join('\n'));
   if (q.absence === 'none') return result.found && /(^|\D)0 /.test(result.verdict);
   const text = [result.verdict, ...result.notes].join('\n');
   const name = q.capability ?? '';

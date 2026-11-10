@@ -5,6 +5,7 @@ import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { keywordName, type Keyword, type VarUse } from '../analysis.ts';
 import { contains, flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { defId, groupBy, type Adapter, type Container, type Context, type Owner } from '../model.ts';
+import { entries } from './route-data.ts';
 
 // re-frame.alpha re-exports re-frame.core's registration and dispatch fns
 const RF = new Set(['re-frame.core', 're-frame.alpha']);
@@ -50,10 +51,7 @@ const eventId = (f: Form | undefined): Form | undefined => {
   return id && unwrap(id).t === 'keyword' ? unwrap(id) : undefined;
 };
 
-const entries = (m: Form): [string | undefined, Form][] => {
-  const xs = flatChildren(m);
-  return xs.flatMap((k, i): [string | undefined, Form][] => (i % 2 === 0 && xs[i + 1] ? [[textOf(unwrap(k)), unwrap(xs[i + 1])]] : []));
-};
+const textEntries = (m: Form): [string | undefined, Form][] => entries(m).map(([k, v]) => [textOf(unwrap(k)), unwrap(v)]);
 
 // Events dispatched by the :dispatch-n and :dispatch-later effects, which kondo's re-frame analysis does not follow.
 // The map is only known to be an effect map by its keys, so these are not proven.
@@ -64,12 +62,12 @@ function effectDispatches(ctx: Context): Keyword[] {
   for (const file of files) {
     for (const f of walk(ctx.forms(file))) {
       if (f.t !== 'map') continue;
-      for (const [key, value] of entries(f)) {
+      for (const [key, value] of textEntries(f)) {
         if (value.t !== 'vector') continue;
         const events = key === ':dispatch-n'
           ? flatChildren(value)
           : key === ':dispatch-later'
-            ? flatChildren(value).flatMap((m) => (unwrap(m).t === 'map' ? entries(unwrap(m)).filter(([k]) => k === ':dispatch').map(([, v]) => v) : []))
+            ? flatChildren(value).flatMap((m) => (unwrap(m).t === 'map' ? textEntries(unwrap(m)).filter(([k]) => k === ':dispatch').map(([, v]) => v) : []))
             : [];
         for (const e of events) {
           const id = eventId(e);

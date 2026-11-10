@@ -41,9 +41,10 @@ describe('route authz end to end through the MCP queries', () => {
     assert.match(routeAuthz(g, 'GET /api/orders').verdict, /^requires \(:read-orders OR :admin\)$/);
     assert.match(routeAuthz(g, 'DELETE /api/orders/:id').verdict, /\(:audit AND :write-orders\) AND :delete-order/);
     assert.match(routeAuthz(g, 'GET /health').verdict, /^exempt: load balancer probe$/);
-    assert.match(routeAuthz(g, 'GET /admin').verdict, /NO permission check/);
-    assert.match(routeAuthz(g, 'POST /catalog/export').verdict, /^requires :export AND \(:read-items OR :admin\)$/);
-    assert.match(routeAuthz(g, 'GET /catalog/browse').verdict, /^requires :read-catalog$/);
+    // no router in the fixture reaches this tree, so what wraps it is unread: not provably unguarded
+    assert.match(routeAuthz(g, 'GET /admin').verdict, /^not provable: the route's middleware could not be read/);
+    assert.match(routeAuthz(g, 'POST /catalog/export').verdict, /^requires :export AND \(:read-items OR :admin\) \(middleware not extracted: further checks UNKNOWN\)$/);
+    assert.match(routeAuthz(g, 'GET /catalog/browse').verdict, /^requires :read-catalog \(middleware not extracted: further checks UNKNOWN\)$/);
     assert.match(permissionRoutes(g, ':admin').verdict, /guards 2 route copy\(ies\): 0 require it, 2 accept it as one of alternatives/);
   });
   it('without a declaration the capability is absent and an unchecked route is unknown, not unguarded', async () => {

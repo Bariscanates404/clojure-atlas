@@ -1,12 +1,14 @@
-// Ring middleware around compojure routes, read where a route var is passed on: ->, ->>, nested calls, wrap-routes,
-// then up through the definition holding the wrapped value and its uses. Any shape not plainly read (let, apply, an
-// unknown call) makes the middleware unknown, never none.
+// Ring middleware around a routing table, read where a compojure route var or a reitit router is passed on: ->, ->>,
+// nested calls, wrap-routes, reitit's ring-handler (and the :middleware of its options), then up through the definition
+// holding the wrapped value and its uses. Any shape not plainly read (let, apply, an unknown call) makes the middleware
+// unknown, never none.
 import { isTestFile } from '../../shared/testfile.ts';
 import type { VarUse } from '../analysis.ts';
-import { contains, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
+import { contains, flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { CORE_NS, groupBy, UNKNOWN_NS, type Context } from '../model.ts';
+import { COMPOJURE, entry } from './route-data.ts';
 
-const COMPOJURE = 'compojure.core';
+const RING_HANDLER = 'reitit.ring/ring-handler';
 const SERVER = /^(ring\.adapter\.|org\.httpkit\.server$|aleph\.http$|immutant\.web$)/;
 
 export interface Wrapper {
@@ -15,6 +17,8 @@ export interface Wrapper {
   file: string;
   line: number;
   library: boolean;
+  // the permission argument when this is a configured permission middleware: (wrap-permission handler :admin)
+  permission?: { form: Form; file: string };
 }
 
 export interface Wrapping {
@@ -52,7 +56,8 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
     const use = u && u.t === 'symbol' ? ctx.useAt(file, u.row, u.col) : undefined;
     return use && use.to !== UNKNOWN_NS ? use : undefined;
   };
-  const wrapper = (use: VarUse, file: string, line: number): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)) });
+  const wrapper = (use: VarUse, file: string, line: number, arg?: Form): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)),
+    ...(arg && ctx.config.permissionMiddleware.includes(fullName(use)) ? { permission: { form: arg, file } } : {}) });
   const headName = (file: string, f: Form): string => {
     const use = useOf(file, f);
     return use ? fullName(use) : '';
@@ -65,9 +70,28 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
     if (!use) return undefined;
     if (use.to === COMPOJURE && use.name === 'wrap-routes' && s.t === 'list') {
       const arg = useOf(file, s.children[1]);
-      return arg ? wrapper(arg, file, unwrap(s.children[1]).row) : undefined;
+      return arg ? wrapper(arg, file, unwrap(s.children[1]).row, s.children[2]) : undefined;
     }
-    return isMiddleware(use) ? wrapper(use, file, head.row) : undefined;
+    return isMiddleware(use) ? wrapper(use, file, head.row, s.t === 'list' ? s.children[1] : undefined) : undefined;
+  };
+  // an element of a :middleware vector: a symbol, or a vector or call whose head is the middleware and whose next element is its argument
+  const itemOf = (file: string, f: Form): Wrapper | undefined => {
+    const item = unwrap(f);
+    const parts = item.t === 'vector' || item.t === 'list' ? flatChildren(item) : [item];
+    const head = unwrap(parts[0] ?? item);
+    const use = useOf(file, head);
+    return use ? wrapper(use, file, head.row, parts[1]) : undefined;
+  };
+  // ring-handler's options map: its :middleware wraps the whole handler, innermost last in the vector; null when unreadable
+  const optionsWrappers = (file: string, opts: Form | undefined): Wrapper[] | null => {
+    if (!opts) return [];
+    const o = unwrap(opts);
+    if (o.t !== 'map') return null;
+    const mw = entry(o, ':middleware');
+    const v = mw && unwrap(mw);
+    if (!v) return [];
+    const items = v.t === 'vector' ? flatChildren(v).map((x) => itemOf(file, x)) : [];
+    return v.t === 'vector' && items.every((x) => x) ? items.flatMap((x) => (x ? [x] : [])).reverse() : null;
   };
 
   // from a value up to the top: the wrappers met, innermost first, then those around the definition holding the value
@@ -102,8 +126,15 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
       } else if (use.to === COMPOJURE && use.name === 'wrap-routes') {
         const arg = index === 1 ? useOf(file, parent.children[2]) : undefined;
         if (!arg) return [null];
-        wrappers.push(wrapper(arg, file, unwrap(parent.children[2]).row));
-      } else if (index === 1 && isMiddleware(use)) wrappers.push(wrapper(use, file, head.row));
+        wrappers.push(wrapper(arg, file, unwrap(parent.children[2]).row, parent.children[3]));
+      } else if (index === 1 && fullName(use) === RING_HANDLER) {
+        const own = optionsWrappers(file, parent.children[3]);
+        if (!own) return [null];
+        wrappers.push(...own);
+      } else if (index === 1 && /^reitit\./.test(use.to)) {
+        // the router handed to a lookup (match-by-name, routes): it serves nothing there
+        return [];
+      } else if (index === 1 && isMiddleware(use)) wrappers.push(wrapper(use, file, head.row, parent.children[2]));
       else if (index === 1 && SERVER.test(use.to)) return [wrappers];
       else return [null];
       cur = parent;

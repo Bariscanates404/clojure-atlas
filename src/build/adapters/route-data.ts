@@ -2,6 +2,8 @@
 // path, nested routes join their paths, and route data is a map of keyword keys.
 import { flatChildren, textOf, unwrap, type Form } from '../reader.ts';
 
+export const COMPOJURE = 'compojure.core';
+
 export const keywordOf = (f: Form): string | undefined => (unwrap(f).t === 'keyword' ? textOf(unwrap(f)) : undefined);
 
 export function entries(m: Form): [Form, Form][] {

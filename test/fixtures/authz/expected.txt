@@ -56,16 +56,16 @@ node permission::read-status [permission] src/shop/catalog.clj:20
 node permission::write-orders [permission] src/shop/routes.clj:11
 node permission:perm [permission] src/shop/routes.clj:15 {"dynamic":true}
 node route:DELETE /api/orders/:id @shop.routes/app [route] src/shop/routes.clj:10 {"method":"delete","path":"/api/orders/:id","full_path":"/api/orders/:id","base":"shop.routes/app","mount":"","library":"reitit"}
-node route:GET /admin @shop.routes/admin-routes [route] src/shop/routes.clj:17 {"method":"get","path":"/admin","full_path":"/admin","base":"shop.routes/admin-routes","mount":"","library":"reitit"}
+node route:GET /admin @shop.routes/admin-routes [route] src/shop/routes.clj:17 {"method":"get","path":"/admin","full_path":"/admin","base":"shop.routes/admin-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /api/orders @shop.routes/app [route] src/shop/routes.clj:8 {"method":"get","path":"/api/orders","full_path":"/api/orders","base":"shop.routes/app","mount":"","library":"reitit"}
 node route:GET /api/reports @shop.routes/app [route] src/shop/routes.clj:14 {"method":"get","path":"/api/reports","full_path":"/api/reports","base":"shop.routes/app","mount":"","library":"reitit"}
-node route:GET /catalog/browse @shop.catalog/catalog-routes [route] src/shop/catalog.clj:17 {"method":"get","path":"/catalog/browse","full_path":"/catalog/browse","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
-node route:GET /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"get","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+node route:GET /catalog/browse @shop.catalog/catalog-routes [route] src/shop/catalog.clj:17 {"method":"get","path":"/catalog/browse","full_path":"/catalog/browse","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
+node route:GET /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"get","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /health @shop.routes/app [route] src/shop/routes.clj:21 {"method":"get","path":"/health","full_path":"/health","base":"shop.routes/app","mount":"","library":"reitit"}
 node route:GET /legacy @shop.legacy/legacy [route] src/shop/legacy.clj:5 {"method":"get","path":"/legacy","full_path":"/legacy","base":"shop.legacy/legacy","mount":"","library":"compojure"}
-node route:GET /status @shop.catalog/status-routes [route] src/shop/catalog.clj:20 {"method":"get","path":"/status","full_path":"/status","base":"shop.catalog/status-routes","mount":"","library":"reitit"}
-node route:POST /catalog/export @shop.catalog/catalog-routes [route] src/shop/catalog.clj:15 {"method":"post","path":"/catalog/export","full_path":"/catalog/export","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
-node route:PUT /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"put","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit"}
+node route:GET /status @shop.catalog/status-routes [route] src/shop/catalog.clj:20 {"method":"get","path":"/status","full_path":"/status","base":"shop.catalog/status-routes","mount":"","library":"reitit","middleware":"unknown"}
+node route:POST /catalog/export @shop.catalog/catalog-routes [route] src/shop/catalog.clj:15 {"method":"post","path":"/catalog/export","full_path":"/catalog/export","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
+node route:PUT /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"put","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 edge definition:shop.catalog/catalog-routes -calls-> definition:shop.catalog/item-authz static_proven src/shop/catalog.clj:13 {"arity":1,"arity_band":"static_proven"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:13 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:14 {"via":"map-literal"}

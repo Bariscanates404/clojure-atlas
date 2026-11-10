@@ -3,7 +3,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { NOT_USED } from '../shared/capability.ts';
 import { capability, inEdges, compareText } from './graph.ts';
-import { degradation, skippedFor, unparsedFor } from './degraded.ts';
+import { degradation, skippedFor, strings, unparsedFor } from './degraded.ts';
 
 export interface Row {
   label: string;
@@ -59,6 +59,8 @@ export interface QueryResult {
   badArgument?: boolean;
   // the name was not found but its file could not be parsed: the answer is not a spelling matter
   unparsed?: string[];
+  // the name was not found but the build saw it used, at these sites: defined by something clj-kondo cannot expand
+  used?: string[];
 }
 
 
@@ -108,21 +110,34 @@ export const call = (tool: string, args: Record<string, string | number>) =>
 
 const NOT_SPELLING = ': its definitions are not in the graph, so this is not a spelling problem';
 
+export const MACRO_HINT = 'probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn';
+
+// The names the build recorded as used but never defined that the query names: qualified, or bare when it has no namespace.
+function usedUndefined(g: Graph, query: string): [string, string[]][] {
+  const recorded = (g.doc as { stats?: { usages?: { unresolvedSites?: Record<string, unknown> } } }).stats?.usages?.unresolvedSites ?? {};
+  const q = query.replace(/^definition:/, '');
+  return Object.entries(recorded).flatMap(([name, sites]): [string, string[]][] => (name === q || (!q.includes('/') && name.endsWith(`/${q}`)) ? [[name, strings(sites)]] : []));
+}
+
 // Not found is only as strong as the capabilities that could have produced a match: their state is always named.
 export function notFound(g: Graph, name: string, query: string, title: string, what: string, caps: string[], note?: string): QueryResult {
   const degraded = degradation(g.doc);
   const parseFailed = unparsedFor(degraded, query);
   const skipped = skippedFor(degraded, query);
   const unparsed = [...parseFailed, ...skipped];
+  const used = what === 'definition' ? usedUndefined(g, query) : [];
+  const at = (sites: string[]) => sites.join(', ');
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
-    verdict: `no ${what} matches ${JSON.stringify(query)}`,
+    verdict: `no ${what} matches ${JSON.stringify(query)}${used.length ? `; used at ${used.map(([, s]) => at(s)).join('; ')} but no definition was found` : ''}`,
     notes: [
+      ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${MACRO_HINT}`),
       ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
       ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
       ...capabilityNotes(g, caps), ...(note ? [note] : []),
     ],
     ...(unparsed.length ? { unparsed } : {}),
+    ...(used.length ? { used: used.map(([full]) => full) } : {}),
   };
 }
 

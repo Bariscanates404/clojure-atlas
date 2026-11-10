@@ -22,7 +22,13 @@ export interface UsageStats {
   // the most frequent unresolved names, to explain the gap
   topUnresolved: [string, number][];
   topUnknown: [string, number][];
+  // where a qualified name was used that no definition matches (a project name never defined, or a bare symbol that
+  // resolved nowhere in its namespace), as file:line, at most SITES_PER_NAME each: the MCP answers "probably a macro" from it
+  unresolvedSites: Record<string, string[]>;
 }
+
+const SITES_PER_NAME = 5;
+const MAX_SITE_NAMES = 3000;
 
 // `[lib :as-alias x]` only names a namespace for ::x/kw keywords; nothing is loaded, unless the same vector also
 // says :as or :refer.
@@ -122,10 +128,13 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     }
   }
 
-  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [] };
+  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [], unresolvedSites: {} };
   const unresolved = new Map<string, number>();
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+  // names project code uses but no definition matches; the ones naming a project namespace come first when the list is cut
+  const sites = { named: new Map<string, string[]>(), bare: new Map<string, string[]>() };
+  const noteSite = (m: Map<string, string[]>, full: string, u: VarUse) => m.set(full, [...(m.get(full) ?? []), `${u.file}:${u.row}`]);
   const link = (from: string, to: string, kind: string, band: Band, u: { file: string; nameRow: number }, attrs?: Record<string, unknown>) => {
     edges.push({ from, to, kind, band, file: u.file, line: u.nameRow, ...(attrs ? { attrs } : {}) });
     if (testIds.has(from)) edges.push({ from, to, kind: 'tests', band, file: u.file, line: u.nameRow });
@@ -140,6 +149,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     if (u.to === UNKNOWN_NS) {
       stats.unknown++;
       bump(unknown, u.name);
+      noteSite(sites.bare, `${u.from}/${u.name}`, u);
       return;
     }
     if (!ctx.projectNs.has(u.to)) {
@@ -150,6 +160,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     if (!ctx.defs.has(full)) {
       stats.unresolved++;
       bump(unresolved, full);
+      noteSite(sites.named, full, u);
       return;
     }
     stats.resolved++;
@@ -172,5 +183,8 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
 
   stats.topUnresolved = top(unresolved);
   stats.topUnknown = top(unknown);
+  const ranked = (m: Map<string, string[]>) => [...m].sort((a, b) => b[1].length - a[1].length || compareText(a[0], b[0]));
+  stats.unresolvedSites = Object.fromEntries([...ranked(sites.named), ...ranked(sites.bare).filter(([full]) => !sites.named.has(full))]
+    .slice(0, MAX_SITE_NAMES).map(([full, at]) => [full, [...new Set(at)].sort(compareText).slice(0, SITES_PER_NAME)]));
   return { nodes, edges, stats };
 }

@@ -4,7 +4,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { BANDS, capability, inEdges, outEdges, weakest, compareText } from './graph.ts';
 import {
-  ambiguous, call, capabilityNotes, countBy, edgeRow, gated, nodeRow, notFound, resolve, unknownNote,
+  ambiguous, call, capabilityNotes, countBy, edgeRow, gated, MACRO_HINT, nodeRow, notFound, resolve, unknownNote,
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
@@ -321,6 +321,22 @@ const ROUTE_AUTHZ_MISSING = 'not provable: route authz not in this graph';
 const middlewareUnread = (route: GraphNode | undefined): boolean => route?.attrs?.middleware === 'unknown';
 const CHAIN_UNREAD_MORE = 'middleware not extracted: further checks UNKNOWN';
 
+// The routes adapter sets attrs.unresolved_handler on a route whose handler is used but defined nowhere (a macro kondo cannot expand).
+const unresolvedHandler = (route: GraphNode | undefined): string | undefined =>
+  typeof route?.attrs?.unresolved_handler === 'string' ? route.attrs.unresolved_handler : undefined;
+
+// Why the check of a route may hide in what the build could not read: unread middleware, a handler it could not resolve,
+// or middleware it only guessed at (what a guessed wrapper does is not proven, so a check may sit in it).
+function unreadParts(g: Graph, route: GraphNode | undefined): string[] {
+  if (!route) return [];
+  const guessed = outEdges(g, route.id, ['guarded_by']).filter((e) => e.band !== 'static_proven').length;
+  return [
+    ...(middlewareUnread(route) ? ['its middleware could not be read'] : []),
+    ...(unresolvedHandler(route) ? [`its handler ${unresolvedHandler(route)} is not resolved`] : []),
+    ...(guessed ? [`${guessed} middleware link(s) are HEURISTIC`] : []),
+  ];
+}
+
 export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; text: string } {
   const permE = outEdges(g, routeId, ['requires_permission']);
   const exempt = outEdges(g, routeId, ['exempted_by']);
@@ -336,6 +352,8 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
   if (exempt.length) return { state: 'exempt', text: `exempt: ${exempt.map((e) => g.byId.get(e.to)?.name ?? e.to).join('; ')}` };
   if (chainUnread) return { state: 'unknown',
     text: `not provable: the route's middleware could not be read, and no check or exemption is recorded on the route itself (${CHAIN_UNREAD_MORE})` };
+  const unread = unreadParts(g, g.byId.get(routeId));
+  if (unread.length) return { state: 'unknown', text: `no permission check found in what could be read (${unread.join('; ')}); not provable that none exists` };
   return { state: 'none', text: 'NO permission check and NO exemption recorded' };
 }
 
@@ -403,7 +421,8 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
     const unread = middlewareUnread(r);
     sections.push(
       { name: `${head}: verdict ${verdict}`, short: 'route', rows: [nodeRow(r)], ordered: true },
-      ...gated(g, ['routes'], [{ name: `${head}: handler`, short: 'handler', rows: handler, ordered: true, searched: 'routes_to edges' }]),
+      ...gated(g, ['routes'], [{ name: `${head}: handler`, short: 'handler', rows: handler, ordered: true, searched: 'routes_to edges',
+        ...(unresolvedHandler(r) ? { unextracted: 'not resolved (UNKNOWN)' } : {}) }]),
       { name: `${head}: ${unread ? 'middleware' : 'middleware (outermost first)'}`, short: 'middleware', rows: mw, ordered: true,
         searched: 'guarded_by edges', ...(unread ? { unextracted: 'not extracted (UNKNOWN)' } : {}) },
       ...gated(g, ['route_authz'], [
@@ -411,6 +430,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
         { name: `${head}: exempt`, short: 'exempt', rows: exempt, ordered: true, searched: 'exempted_by edges' },
       ]),
     );
+    if (unresolvedHandler(r)) notes.push(`${r.name}: handler ${unresolvedHandler(r)} is used but no definition was found: ${MACRO_HINT}`);
     if (unread && mw.length) notes.push(`${r.name}: middleware not extracted (UNKNOWN); the chain listed is partial`);
     const sib = routeSiblings(g, r);
     if (sib) notes.push(`${r.name}: ${sib.text}`);
@@ -440,6 +460,8 @@ export function permissionRoutes(g: Graph, query: string): QueryResult {
     })
     .sort((a, b) => compareText(a.label, b.label));
   const alone = perms.filter((p) => p.alternatives === 1).length;
+  const named = new Set(perms.map((p) => p.edge.from));
+  const unread = (g.byKind.get('route') ?? []).filter((r) => !named.has(r.id) && unreadParts(g, r).length && routeVerdict(g, r.id).state === 'unknown').length;
   return {
     name: 'permission_routes',
     query,
@@ -449,7 +471,9 @@ export function permissionRoutes(g: Graph, query: string): QueryResult {
     matches: [perm.id],
     sections: gated(g, ['route_authz'], [{ name: 'routes', rows, searched: 'requires_permission edges into this permission' }]),
     counts: { required: alone, 'one of alternatives': rows.length - alone },
-    notes: [...capabilityNotes(g, ['route_authz']), ...unknownNote(rows)],
+    notes: [...capabilityNotes(g, ['route_authz']), ...unknownNote(rows),
+      ...(unread ? [`${unread} other route(s) could not be read fully (unread middleware, an unresolved handler or HEURISTIC middleware) and show no check: `
+        + `they may also require ${perm.name}; this list is not proof that the others do not`] : [])],
     next: rows.slice(0, 1).map((r) => call('route_authz', { route: r.id.replace(/^route:/, '') })),
   };
 }
@@ -874,6 +898,7 @@ function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>
   const noAuthz = routeAuthzMissing(g);
   // the changed code is on a route whose permission check nothing was extracted for: the risk cannot be called LOW
   const unassessed = routeIds.size > 0 && noAuthz;
+  let uncertain = false;
   for (const id of routeIds) {
     const route = g.byId.get(id);
     if (!route) continue;
@@ -883,10 +908,15 @@ function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>
     if (v.state === 'none') risk.push(...risks([nodeRow(route,
       { detail: `route has no permission check and no exemption${sib?.odd ? '; its siblings check one' : ''}` })], true));
     // without the capability nothing was extracted: say so once in the notes, never as a finding about the route
-    if (v.state === 'unknown' && !noAuthz) risk.push(...risks([nodeRow(route,
-      { band: 'unknown', detail: middlewareUnread(route) ? v.text : 'permission check decided at runtime; not provable; evidence in the route data' })], true));
+    // a check decided at runtime exists, so it is a risk; no check found in what could be read is not provable either way: UNKNOWN, never HIGH
+    if (v.state === 'unknown' && !noAuthz) {
+      const runtime = outEdges(g, id, ['requires_permission']).length > 0;
+      uncertain ||= !runtime;
+      risk.push(...risks([nodeRow(route, { band: 'unknown',
+        detail: runtime ? 'permission check decided at runtime; not provable; evidence in the route data' : v.text })], runtime));
+    }
   }
-  return { routeIds, authz, risk, unassessed };
+  return { routeIds, authz, risk, unassessed: unassessed || uncertain };
 }
 
 // Attributes the changed code reads or writes; a write to an attribute that is read elsewhere is a risk.

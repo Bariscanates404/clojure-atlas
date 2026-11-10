@@ -17,7 +17,7 @@ export interface Degradation {
 
 const SHOWN = 3;
 
-const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+export const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 interface Stats {
   syntax_errors?: { files?: unknown; names?: unknown };

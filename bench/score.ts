@@ -53,7 +53,7 @@ expected definition and nothing else. Expected items found: ${found} of ${expect
 
 **Absence questions: ${passes(absence)} of ${absence.length} pass.** The correct answer is that there is none. One passes only
 when the answer states that kind of absence and names nothing: *none* (the thing exists, nothing relates to it, the
-answer says zero), *not-found* (the codebase has no such thing, the answer says so), *capability-off* (the graph
+answer says zero), *not-found* (the codebase has no such thing, the answer says so), *used-undefined* (the name is used but no definition was found; the answer says it is probably made by a macro),  *capability-off* (the graph
 cannot answer, because the extractor for this kind of fact found nothing to extract from, and the answer says that
 instead of reading as plain absence).
 

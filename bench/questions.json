@@ -305,5 +305,19 @@
     "evidence": {
       "the routing table lists /, /user/delete/:id, /user/form, /user/form/:id, /user/list, /user/save, /reset and resources; no /admin": "src/usermanager/main.clj:125"
     }
+  },
+  {
+    "id": "a07",
+    "repo": "next-jdbc",
+    "question": "Which definitions call next.jdbc.types/as-other?",
+    "tool": "callers",
+    "args": {
+      "var": "next.jdbc.types/as-other"
+    },
+    "expected": [],
+    "absence": "used-undefined",
+    "evidence": {
+      "as-other is made by the all-types macro when it expands (no defn as-other in the source); the name is used at test/next/jdbc/sql_test.clj:290": "src/next/jdbc/types.clj:36"
+    }
   }
 ]

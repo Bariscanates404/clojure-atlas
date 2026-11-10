@@ -5,11 +5,11 @@ import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { isTestFile } from '../../shared/testfile.ts';
 import type { VarUse } from '../analysis.ts';
 import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
-import { CORE_NS, defId, groupBy, type Adapter, type Context, type Owner } from '../model.ts';
-import { entries, entry, isRoute, isRouteGroup, joinPath, keywordOf } from './route-data.ts';
-import { wrappingOf } from './ring-wrap.ts';
+import { CORE_NS, defId, groupBy, UNKNOWN_NS, type Adapter, type Context, type Owner } from '../model.ts';
+import { COMPOJURE, entries, entry, isRoute, isRouteGroup, joinPath, keywordOf } from './route-data.ts';
+import { addChecks, NO_AUTHZ, routeDataAuthz, type Authz, type Check, type Permission } from './route-authz.ts';
+import { wrappingOf, type Wrapper } from './ring-wrap.ts';
 
-const COMPOJURE = 'compojure.core';
 const COMPOJURE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'ANY']);
 const METHOD_KEYS = new Set([':get', ':post', ':put', ':delete', ':patch', ':head', ':options', ':any']);
 const CHAIN_KEYS = new Set([':middleware', ':interceptors']);
@@ -24,6 +24,8 @@ interface Link {
   line: number;
   // absent: the form itself names the definition; heuristic: it is an argument or one branch of what the route returns
   band?: 'heuristic';
+  // a project name the build saw used, never defined (a macro kondo cannot expand): def is its qualified name, no node stands for it
+  unresolved?: boolean;
 }
 
 interface Guard extends Link {
@@ -31,24 +33,6 @@ interface Guard extends Link {
   inheritedFrom?: string;
   // a library var: no project definition stands for it
   library?: boolean;
-}
-
-interface Permission {
-  // keyword, or the symbol text when the permission is decided at runtime
-  name: string;
-  dynamic: boolean;
-  check: number;
-  checks: number;
-  alternative: number;
-  alternatives: number;
-  allOf: number;
-  scope?: string;
-  line: number;
-}
-
-interface Authz {
-  permissions: Permission[];
-  exempt?: { reason: string; line: number };
 }
 
 export interface Route {
@@ -66,7 +50,6 @@ export interface Route {
   middlewareUnknown?: boolean;
 }
 
-const NO_AUTHZ: Authz = { permissions: [] };
 
 export const routeId = (r: Pick<Route, 'method' | 'path' | 'base' | 'mount'>) => `route:${r.method} ${r.path} @${r.base}${r.mount}`;
 const permissionId = (name: string) => `permission:${name}`;
@@ -84,143 +67,35 @@ function literalPath(f: Form | undefined): string | undefined {
 
 const chainForms = (m: Form): Form[] => entries(m).filter(([k]) => CHAIN_KEYS.has(keywordOf(k) ?? '')).map(([, v]) => v);
 
-// ---------- authz as .clojure-atlas.edn declares it ----------
-
-interface Located {
-  form: Form;
-  file: string;
-}
-
-// The value form of a project definition: (def x v), (defn f [params] body) gives its params and body.
-function definitionForm(ctx: Context, full: string): { file: string; params?: Form; value: Form } | undefined {
-  const d = ctx.defs.get(full);
-  const form = d && formAt(ctx.forms(d.file), d.row, d.col);
-  const xs = form ? kids(form) : [];
-  const params = xs.find((x, i) => i >= 2 && unwrap(x).t === 'vector');
-  const value = xs[xs.length - 1];
-  return d && value && xs.length >= 3 ? { file: d.file, ...(params && params !== value ? { params: unwrap(params) } : {}), value: unwrap(value) } : undefined;
-}
-
-// A symbol naming a constant var, (def p :edit), stands for its value.
-function constant(ctx: Context, at: Located): Located {
-  const u = unwrap(at.form);
-  const def = u.t === 'symbol' ? ctx.defAt(at.file, u.row, u.col) : undefined;
-  const d = def ? definitionForm(ctx, def) : undefined;
-  return d && !d.params && ['keyword', 'set', 'vector'].includes(d.value.t) ? { form: d.value, file: d.file } : at;
-}
-
-// A symbol naming a var whose value is a map literal stands for that map.
-function constantMap(ctx: Context, at: Located): Located {
-  const u = unwrap(at.form);
-  const def = u.t === 'symbol' ? ctx.defAt(at.file, u.row, u.col) : undefined;
-  const d = def ? definitionForm(ctx, def) : undefined;
-  return d && !d.params && d.value.t === 'map' ? { form: d.value, file: d.file } : at;
-}
-
-// :p one permission; #{:a :b} any of them; [:a :b] all of them; anything else is decided at runtime.
-function permissionsOf(ctx: Context, at: Located, check: number, scope: string | undefined): Permission[] {
-  const u = unwrap(constant(ctx, at).form);
-  const one = (x: Form, alternative: number, alternatives: number, allOf: number): Permission => {
-    const v = unwrap(x);
-    return { name: text(v) ?? `(runtime ${v.t})`, dynamic: v.t !== 'keyword', check, checks: check, alternative, alternatives, allOf,
-      ...(scope ? { scope } : {}), line: x.row };
-  };
-  if (u.t === 'set') return flatChildren(u).map((x, i, all) => one(x, i + 1, all.length, 1));
-  if (u.t === 'vector') return flatChildren(u).map((x, _i, all) => one(x, 1, 1, all.length));
-  return [one(u, 1, 1, 1)];
-}
-
-// An authz map, or (helper args) whose body is one: its parameters are bound to the call's arguments.
-function authzMap(ctx: Context, at: Located): { map: Form; bind: (f: Located) => Located } | undefined {
-  const c = constantMap(ctx, at);
-  const u = unwrap(c.form);
-  if (u.t === 'map') return { map: u, bind: (f) => ({ form: f.form, file: c.file }) };
-  const head = u.t === 'list' ? unwrap(u.children[0] ?? u) : undefined;
-  const def = head && head.t === 'symbol' ? ctx.defAt(at.file, head.row, head.col) : undefined;
-  const d = def ? definitionForm(ctx, def) : undefined;
-  if (!d || !d.params || d.value.t !== 'map' || u.t !== 'list') return undefined;
-  const args = new Map(flatChildren(d.params).map((p, i) => [text(unwrap(p)) ?? '', u.children[i + 1]]));
-  return {
-    map: d.value,
-    bind: (f) => {
-      const v = unwrap(f.form);
-      const arg = v.t === 'symbol' ? args.get(v.text) : undefined;
-      return arg ? { form: arg, file: at.file } : { form: f.form, file: d.file };
-    },
-  };
-}
-
-function routeDataAuthz(ctx: Context, file: string, data: Form | undefined): Authz | undefined {
-  const cfg = ctx.config.routeAuthz;
-  const value = cfg && data && entry(data, cfg.key);
-  if (!cfg || !value) return undefined;
-  // a vector of authz maps is a list of checks, all of which must pass
-  const items = unwrap(value).t === 'vector' ? flatChildren(unwrap(value)) : [value];
-  const permissions: Permission[] = [];
-  let exempt: Authz['exempt'];
-  for (const item of items) {
-    const m = authzMap(ctx, { form: item, file });
-    if (!m) continue;
-    // an exemption beside checks is kept with them: the MCP shows the checks and lists the exemption
-    const reason = cfg.exempt ? entry(m.map, cfg.exempt) : undefined;
-    if (reason) exempt = { reason: text(unwrap(reason)) ?? '?', line: value.row };
-    // the check itself, then the alternative map that also satisfies it
-    const check = permissions.reduce((n, p) => Math.max(n, p.check), 0) + 1;
-    const alt = cfg.alternative ? entry(m.map, cfg.alternative) : undefined;
-    const options = [m.map, ...(alt && unwrap(alt).t === 'map' ? [unwrap(alt)] : [])];
-    const found = options.map((o) => {
-      const perm = cfg.permission ? entry(o, cfg.permission) : undefined;
-      const scopeForm = cfg.scope ? entry(o, cfg.scope) : undefined;
-      const scope = scopeForm && m.bind({ form: scopeForm, file }).form;
-      return perm ? permissionsOf(ctx, m.bind({ form: perm, file }), check, scope && formText(scope)) : [];
-    }).filter((ps) => ps.length);
-    const single = found.length > 1 && found.every((ps) => ps.length === 1);
-    permissions.push(...(single ? found.map(([p], k) => ({ ...p, alternative: k + 1, alternatives: found.length })) : found.flat()));
-  }
-  // cited at the route's own authz entry: a constant or helper may live in another file
-  const checks = permissions.reduce((n, p) => Math.max(n, p.check), 0);
-  if (!permissions.length && !exempt) return undefined;
-  return { permissions: permissions.map((p) => ({ ...p, checks, line: value.row })), ...(exempt ? { exempt } : {}) };
-}
-
-// Short source-like text of a scope form, for the edge attribute.
-function formText(f: Form): string {
-  const u = unwrap(f);
-  if ('text' in u) return u.text;
-  return u.t === 'list' ? `(${u.children.map(formText).join(' ')})` : u.t;
-}
-
-// Each permission middleware in a chain is one more check that every request must pass.
-function addChecks(ctx: Context, file: string, authz: Authz, forms: readonly Form[]): Authz {
-  if (!forms.length) return authz;
-  const before = authz.permissions.reduce((m, p) => Math.max(m, p.check), 0);
-  const all = [...authz.permissions, ...forms.flatMap((f, i) => permissionsOf(ctx, { form: f, file }, before + i + 1, undefined))];
-  const checks = before + forms.length;
-  return { ...authz, permissions: all.map((p) => ({ ...p, checks })) };
-}
-
 // ---------- links ----------
 
 const demoted = (links: readonly Link[]): Link[] => links.map((l) => ({ ...l, band: 'heuristic' }));
 
 // The project definitions a handler form names: a symbol, or a call, whose own head is the handler and whose
-// arguments may be the handlers it wraps (HEURISTIC: an argument can as well be data).
-function handlerLinks(ctx: Context, file: string, f: Form | undefined): Link[] {
+// arguments may be the handlers it wraps (HEURISTIC: an argument can as well be data). A symbol or head that is
+// used but defined nowhere is kept as an unresolved link: its definition is probably made by a macro kondo cannot expand.
+function handlerLinks(ctx: Context, file: string, f: Form | undefined, argument = false): Link[] {
   const u = f && unwrap(f);
   if (!u) return [];
   const def = (x: Form) => (x.t === 'symbol' ? ctx.defAt(file, x.row, x.col) : undefined);
+  const unresolved = (x: Form): Link[] => {
+    const use = !argument && x.t === 'symbol' ? ctx.useAt(file, x.row, x.col) : undefined;
+    const ns = use && (use.to === UNKNOWN_NS ? use.from : ctx.projectNs.has(use.to) ? use.to : undefined);
+    return use && ns ? [{ def: `${ns}/${use.name}`, line: x.row, unresolved: true }] : [];
+  };
   if (u.t === 'symbol') {
     const d = def(u);
-    return d ? [{ def: d, line: u.row }] : [];
+    return d ? [{ def: d, line: u.row }] : unresolved(u);
   }
   if (u.t !== 'list') return [];
   const head = u.children[0] && def(u.children[0]);
-  return [...(head ? [{ def: head, line: u.row }] : []), ...demoted(u.children.slice(1).flatMap((x) => handlerLinks(ctx, file, x)))];
+  return [...(head ? [{ def: head, line: u.row }] : u.children[0] ? unresolved(unwrap(u.children[0])) : []),
+    ...demoted(u.children.slice(1).flatMap((x) => handlerLinks(ctx, file, x, true)))];
 }
 
 interface Chain {
   links: Link[];
-  permissions: Form[];
+  permissions: Check[];
 }
 
 // The elements of a middleware or interceptor vector.
@@ -240,7 +115,7 @@ function chainOf(ctx: Context, file: string, items: readonly Form[]): Chain {
     const def = head.t === 'symbol' ? ctx.defAt(file, head.row, head.col) : undefined;
     if (!def) continue;
     out.links.push({ def, line: head.row, ...(item.t === 'list' ? { band: 'heuristic' as const } : {}) });
-    if (ctx.config.permissionMiddleware.includes(def) && parts[1]) out.permissions.push(parts[1]);
+    if (ctx.config.permissionMiddleware.includes(def) && parts[1]) out.permissions.push({ form: parts[1], file });
   }
   return out;
 }
@@ -259,6 +134,15 @@ function chainElements(ctx: Context, file: string, f: Form): Form[] | null {
   const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
   return use && CORE_NS.test(use.to) && use.name === 'conj' ? f.children.slice(1) : null;
 }
+
+// ---------- middleware around the routing table ----------
+
+// Wrappers read around a route var or a router: each is a guard, as a guess (what it wraps is read from the code around it).
+const wrapperGuards = (wrappers: readonly Wrapper[]): Guard[] => wrappers.map((w): Guard => ({ def: w.def, file: w.file, line: w.line, band: 'heuristic',
+  level: 'wrapper', ...(w.library ? { library: true } : {}) }));
+
+// The permission arguments of the wrappers that are permission middleware: one more check each, as a guess.
+const wrapperChecks = (wrappers: readonly Wrapper[]): Check[] => wrappers.flatMap((w) => (w.permission ? [{ ...w.permission, guessed: true }] : []));
 
 // ---------- compojure ----------
 
@@ -280,7 +164,7 @@ function returnedCall(ctx: Context, file: string, f: Form): Link[] {
   if (u.t === 'symbol') return handlerLinks(ctx, file, u);
   if (u.t !== 'list' || !u.children.length) return [];
   const head = unwrap(u.children[0]);
-  if (head.t === 'symbol' && ctx.defAt(file, head.row, head.col)) return handlerLinks(ctx, file, u);
+  if (head.t === 'symbol' && handlerLinks(ctx, file, head).length) return handlerLinks(ctx, file, u);
   return demoted(returnedForms(text(unwrap(u.children[0])) ?? '', u.children.slice(1)).flatMap((x) => returnedCall(ctx, file, x)));
 }
 
@@ -330,10 +214,8 @@ function compojureRoutes(ctx: Context): Route[] {
     const base = ownerOf(u);
     const local = contextsAt(u.file, u.row, u.col);
     const { wrappers, unknown } = form ? wrapping(u.file, form) : { wrappers: [], unknown: true };
-    const guards = wrappers.map((w): Guard => ({ def: w.def, file: w.file, line: w.line, band: 'heuristic', level: 'wrapper',
-      ...(w.library ? { library: true } : {}) }));
     return mountsOf(base, []).map((mount): Route => ({ method, path, mount: mount + local, base, file: u.file, line: u.row, library: 'compojure', handlers,
-      guards, authz: NO_AUTHZ, ...(unknown ? { middlewareUnknown: true } : {}) }));
+      guards: wrapperGuards(wrappers), authz: addChecks(ctx, NO_AUTHZ, wrapperChecks(wrappers)), ...(unknown ? { middlewareUnknown: true } : {}) }));
   });
 }
 
@@ -357,11 +239,13 @@ interface Scope {
   // authz declared in route data: a child's declaration replaces its parent's
   authz: Authz;
   // permissions of permission middleware: every one up the tree applies
-  checks: Form[];
+  checks: Check[];
   base: string;
   library: string;
   // definitions being mounted, so a route function that includes itself stops
   stack: string[];
+  // what wraps the tree could not be read
+  unknown: boolean;
 }
 
 interface RouteFn {
@@ -426,7 +310,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     const xs = [...flatChildren(v), ...appended];
     const path = joinPath(scope.prefix, text(unwrap(xs[0])) ?? '');
     const emit = (method: string, handlers: Link[], guards: Guard[], authz: Authz) =>
-      out.push({ method, path, mount: '', base: scope.base, file, line: v.row, library: scope.library, handlers, guards, authz });
+      out.push({ method, path, mount: '', base: scope.base, file, line: v.row, library: scope.library, handlers, guards, authz,
+        ...(scope.unknown ? { middlewareUnknown: true } : {}) });
     const verb = xs[1] && keywordOf(xs[1]);
     if (verb && METHOD_KEYS.has(verb) && xs[2]) {
       // pedestal table route: [path :verb handler-or-interceptor-vector & options]
@@ -434,7 +319,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
       const items = chainElements(ctx, file, target);
       const chain = items ? interceptorChain(ctx, file, items) : { guards: [], handlers: handlerLinks(ctx, file, target) };
       emit(verb.slice(1).toUpperCase(), chain.handlers, [...scope.guards, ...chain.guards.map((l) => ({ ...l, level: 'route' }))],
-        addChecks(ctx, file, scope.authz, scope.checks));
+        addChecks(ctx, scope.authz, scope.checks));
       return;
     }
     const dataForm = xs.slice(1).find((x) => unwrap(x).t === 'map');
@@ -456,7 +341,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     const guards: Guard[] = [...scope.guards, ...own.flatMap((c) => c.links).map((l) => ({ ...l, level: 'route' }))];
     const authz = routeDataAuthz(ctx, file, data) ?? scope.authz;
     const checks = [...scope.checks, ...own.flatMap((c) => c.permissions)];
-    if (handler) emit('ANY', handlerLinks(ctx, file, handler), guards, addChecks(ctx, file, authz, checks));
+    if (handler) emit('ANY', handlerLinks(ctx, file, handler), guards, addChecks(ctx, authz, checks));
     for (const [key, val] of methods) {
       const u = unwrap(val);
       const m = u.t === 'map' ? u : undefined;
@@ -465,7 +350,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
       const inline = u.t === 'vector' ? interceptorChain(ctx, file, flatChildren(u)) : { guards: [],
         handlers: handlerLinks(ctx, file, m ? entry(m, ':handler') : val) };
       const methodGuards = [...chains.flatMap((c) => c.links), ...inline.guards].map((l) => ({ ...l, level: 'method' }));
-      const methodAuthz = addChecks(ctx, file, routeDataAuthz(ctx, file, m) ?? authz, [...checks, ...chains.flatMap((c) => c.permissions)]);
+      const methodAuthz = addChecks(ctx, routeDataAuthz(ctx, file, m) ?? authz, [...checks, ...chains.flatMap((c) => c.permissions)]);
       emit(key.slice(1).toUpperCase(), inline.handlers, [...guards, ...methodGuards], methodAuthz);
     }
     const inner: Scope = { ...scope, prefix: path, authz, checks, guards: guards.map((g) => ({ ...g, inheritedFrom: g.inheritedFrom ?? path })) };
@@ -489,28 +374,29 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     } else if (u.t === 'vector' || u.t === 'list' || u.t === 'cond') for (const x of flatChildren(u)) nested(x, file, scope);
   };
 
-  const scopeAt = (file: string, base: string,
-    guards: Guard[]): Scope => ({ prefix: '', guards, authz: NO_AUTHZ, checks: [], base, library: files.get(file) ?? '', stack: [] });
+  const scopeAt = (file: string, base: string, guards: Guard[], checks: Check[], unknown: boolean): Scope =>
+    ({ prefix: '', guards, authz: NO_AUTHZ, checks, base, library: files.get(file) ?? '', stack: [], unknown });
+  const wrapping = wrappingOf(ctx);
 
   // (router routes {:data {:middleware [...]}}): router data applies to every route below it
   // a router built in test code serves nothing
   for (const call of ctx.analysis.varUses.filter((u) => ROUTERS.test(`${u.to}/${u.name}`) && files.has(u.file) && !isTestFile(u.file))) {
     const form = formAt(ctx.forms(call.file), call.row, call.col);
     const [routesArg, opts] = form ? kids(form).slice(1) : [];
-    if (!routesArg) continue;
+    if (!form || !routesArg) continue;
     const data = opts && unwrap(opts).t === 'map' ? entry(unwrap(opts), ':data') : undefined;
-    const chains = data && unwrap(data).t === 'map' ? chainForms(unwrap(data)) : [];
-    const guards = chains.flatMap((c) => chainOf(ctx, call.file,
-      chainItems(c)).links).map((l) => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }));
+    const chains = (data && unwrap(data).t === 'map' ? chainForms(unwrap(data)) : []).map((c) => chainOf(ctx, call.file, chainItems(c)));
+    const around = wrapping(call.file, form);
+    const guards = [...wrapperGuards(around.wrappers).map((g) => ({ ...g, inheritedFrom: 'around the router' })), ...chains.flatMap((c) => c.links).map((l): Guard => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }))];
     const base = owner({ ...call, row: call.nameRow, col: call.nameCol }).replace(/^(definition|namespace):/, '');
-    nested(routesArg, call.file, scopeAt(call.file, base, guards));
+    nested(routesArg, call.file, scopeAt(call.file, base, guards, [...wrapperChecks(around.wrappers), ...chains.flatMap((c) => c.permissions)], around.unknown));
   }
   // route trees no router call reaches stand where they are written, in files that use a routing library
   // the ones another route function mounts come last: mounting them there marks them, so they stand alone only when nobody does
   const mountedByAnother = new Set([...fns].flatMap(([def, fn]) => fn.roots.flatMap((r) => mountsIn(ctx, fn.file, r, fns)).filter((m) => m !== def)));
   for (const [def, fn] of [...fns].sort(([a], [b]) => Number(mountedByAnother.has(a)) - Number(mountedByAnother.has(b)))) {
     if (mounted.has(def) || !files.has(fn.file) || isTestFile(fn.file)) continue;
-    for (const r of fn.roots) if (!visited.has(`${fn.file}:${r.row}:${r.col}`)) nested(r, fn.file, scopeAt(fn.file, def, []));
+    for (const r of fn.roots) if (!visited.has(`${fn.file}:${r.row}:${r.col}`)) nested(r, fn.file, scopeAt(fn.file, def, [], [], true));
   }
   return out;
 }
@@ -548,12 +434,14 @@ export const httpRoutes: Adapter = {
       const competing = new Set((sites.get(id) ?? []).map((x) => `${x.file}:${x.line}`)).size;
       const bandOf = (own: 'heuristic' | undefined) => (competing > 1 ? 'heuristic' : own ?? 'static_proven');
       const component = ctx.componentOf(r.file);
+      const unresolved = r.handlers.filter((h) => h.unresolved).map((h) => h.def);
       nodes.push({
         id, kind: 'route', name: `${r.method} ${r.mount}${r.path} @${r.base}`, file: r.file, line: r.line, ...(component ? { component } : {}),
         attrs: { method: r.method.toLowerCase(), path: r.path, full_path: `${r.mount}${r.path}`, base: r.base, mount: r.mount, library: r.library,
-          ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}) },
+          ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}),
+          ...(unresolved.length ? { unresolved_handler: unresolved.join(', ') } : {}) },
       });
-      for (const h of r.handlers) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file, line: h.line });
+      for (const h of r.handlers.filter((x) => !x.unresolved)) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file, line: h.line });
       for (const g of r.guards.filter((x) => x.library)) nodes.push({ id: libraryMiddlewareId(g.def), kind: 'library_middleware', name: g.def,
         file: g.file ?? r.file, line: g.line });
       r.guards.forEach((g, order) => edges.push({
@@ -568,7 +456,7 @@ export const httpRoutes: Adapter = {
           ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
         edges.push({
           from: id, to: permissionId(p.name), kind: 'requires_permission',
-          band: p.dynamic ? 'unknown' : found.includes(p) ? 'heuristic' : 'static_proven', file: r.file, line: p.line,
+          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file ?? r.file, line: p.line,
           attrs: { check: p.check, checks, alternative: p.alternative, alternatives: p.alternatives, all_of: p.allOf, ...(p.scope ? { tenant: p.scope } : {}) },
         });
       }

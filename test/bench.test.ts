@@ -65,6 +65,14 @@ describe('benchmark scoring', () => {
     assert.equal(score(absent('not-found'), said('0 direct caller(s)', true)).pass, false, 'a found definition is not a missing one');
   });
 
+  it('passes a used-undefined question only when the answer says the name is used and a macro probably defines it', () => {
+    const u = absent('used-undefined');
+    const used = { ...said('no definition matches "a/f"; used at x.clj:2 but no definition was found', false, ['a/f is used at x.clj:2 but no definition was found: probably defined by a macro clj-kondo cannot expand'], []), used: ['a/f'] };
+    assert.equal(score(u, used).pass, true);
+    assert.equal(score(u, said('no definition matches "a/f"', false, [], [])).pass, false, 'a plain no-match is the spelling answer');
+    assert.equal(score(u, { ...used, found: true }).pass, false);
+  });
+
   it('passes a capability-off question only when the capability is named as not available', () => {
     const off = absent('capability-off', 'events');
     assert.equal(score(off, said('no event or subscription matches ":e"', false, [], [])).pass, false, 'a bare no-match reads as plain absence');
