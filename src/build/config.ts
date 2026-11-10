@@ -59,7 +59,8 @@ export function ednValue(f: Form): Edn {
 
 const symbolMap = (v: Edn, key: string): Record<string, string> => {
   if (typeof v !== 'object' || Array.isArray(v)) return fail(`${key} must be a map of symbol to symbol`);
-  for (const [k, x] of Object.entries(v)) if (typeof x !== 'string' || !k.includes('/') || !x.includes('/')) fail(`${key} entry ${k} must map a qualified symbol to a qualified symbol`);
+  for (const [k, x] of Object.entries(v)) if (typeof x !== 'string' || !k.includes('/')
+    || !x.includes('/')) fail(`${key} entry ${k} must map a qualified symbol to a qualified symbol`);
   return v as Record<string, string>;
 };
 
@@ -88,13 +89,15 @@ export function parseConfig(text: string): ProjectConfig {
     else if (k === ':route-authz') {
       if (typeof v !== 'object' || Array.isArray(v)) fail(':route-authz must be a map');
       const m = v as Record<string, Edn>;
-      for (const x of Object.keys(m)) if (![':key', ':permission', ':exempt', ':scope', ':alternative'].includes(x)) fail(`:route-authz has an unknown key ${x}`);
+      for (const x of Object.keys(m)) if (![':key', ':permission', ':exempt', ':scope',
+        ':alternative'].includes(x)) fail(`:route-authz has an unknown key ${x}`);
       const key = keyword(m[':key'], ':route-authz :key') ?? fail(':route-authz needs :key');
       const permission = keyword(m[':permission'], ':route-authz :permission');
       const exempt = keyword(m[':exempt'], ':route-authz :exempt');
       const scope = keyword(m[':scope'], ':route-authz :scope');
       const alternative = keyword(m[':alternative'], ':route-authz :alternative');
-      config.routeAuthz = { key, ...(permission ? { permission } : {}), ...(exempt ? { exempt } : {}), ...(scope ? { scope } : {}), ...(alternative ? { alternative } : {}) };
+      config.routeAuthz = { key, ...(permission ? { permission } : {}), ...(exempt ? { exempt } : {}), ...(scope ? { scope } : {}),
+        ...(alternative ? { alternative } : {}) };
     } else fail(`unknown key ${k}`);
   }
   return config;

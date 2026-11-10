@@ -391,9 +391,11 @@ function routerCalls(ctx: Context, files: ReadonlyMap<string, string>, walker: W
     const data = opts && unwrap(opts).t === 'map' ? entry(unwrap(opts), ':data') : undefined;
     const chains = (data && unwrap(data).t === 'map' ? chainForms(unwrap(data)) : []).map((c) => chainOf(ctx, call.file, chainItems(c)));
     const around = wrapping(call.file, form);
-    const guards = [...wrapperGuards(around.wrappers).map((g) => ({ ...g, inheritedFrom: 'around the router' })), ...chains.flatMap((c) => c.links).map((l): Guard => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }))];
+    const guards = [...wrapperGuards(around.wrappers).map((g) => ({ ...g, inheritedFrom: 'around the router' })),
+      ...chains.flatMap((c) => c.links).map((l): Guard => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }))];
     const base = owner({ ...call, row: call.nameRow, col: call.nameCol }).replace(/^(definition|namespace):/, '');
-    walker.nested(routesArg, call.file, scopeAt(call.file, base, guards, [...wrapperChecks(around.wrappers), ...chains.flatMap((c) => c.permissions)], around.unknown));
+    walker.nested(routesArg, call.file,
+      scopeAt(call.file, base, guards, [...wrapperChecks(around.wrappers), ...chains.flatMap((c) => c.permissions)], around.unknown));
   }
 }
 
@@ -462,7 +464,8 @@ export const httpRoutes: Adapter = {
           ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}),
           ...(unresolved.length ? { unresolved_handler: unresolved.join(', ') } : {}) },
       });
-      for (const h of r.handlers.filter((x) => !x.unresolved)) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file, line: h.line });
+      for (const h of r.handlers.filter((x) => !x.unresolved)) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file,
+        line: h.line });
       for (const g of r.guards.filter((x) => x.library)) nodes.push({ id: libraryMiddlewareId(g.def), kind: 'library_middleware', name: g.def,
         file: g.file ?? r.file, line: g.line });
       r.guards.forEach((g, order) => edges.push({
@@ -482,8 +485,10 @@ export const httpRoutes: Adapter = {
         });
       }
       if (r.authz.exempt) {
-        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.authz.exempt.file, line: r.authz.exempt.line });
-        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.authz.exempt.file, line: r.authz.exempt.line,
+        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.authz.exempt.file,
+          line: r.authz.exempt.line });
+        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.authz.exempt.file,
+          line: r.authz.exempt.line,
           attrs: { label: r.authz.exempt.reason } });
       }
     }

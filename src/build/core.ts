@@ -131,7 +131,8 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     }
   }
 
-  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [], unresolvedSites: {}, dynamicResolve: { sites: 0, literal: 0 } };
+  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [], unresolvedSites: {},
+    dynamicResolve: { sites: 0, literal: 0 } };
   const unresolved = new Map<string, number>();
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);

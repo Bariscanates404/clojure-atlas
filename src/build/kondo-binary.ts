@@ -77,7 +77,8 @@ export async function locateKondo(host: KondoHost): Promise<Kondo> {
   const fromPath = (why: string): Kondo => {
     const found = host.resolve(exe);
     const version = found === null ? null : host.version(found);
-    if (found === null || version === null) throw new Error(`${why}, and there is no clj-kondo on PATH; install clj-kondo (https://github.com/clj-kondo/clj-kondo) and run again`);
+    if (found === null || version === null) throw new Error(`${why}, and there is no clj-kondo on PATH; install clj-kondo ` +
+      `(https://github.com/clj-kondo/clj-kondo) and run again`);
     host.warn(`${why}; using clj-kondo on PATH (${found}, ${version})`);
     return { command: found, version };
   };

@@ -163,7 +163,8 @@ function pageObjectsOf(r: Reader): PageObject[] {
 }
 
 // The page object member an expression names: through the class that declares the property, or a destructured binding.
-function memberResolver(r: Reader, pageObjects: readonly PageObject[]): { memberOf: (access: Node) => string | undefined; boundMember: (id: Node) => string | undefined } {
+function memberResolver(r: Reader,
+  pageObjects: readonly PageObject[]): { memberOf: (access: Node) => string | undefined; boundMember: (id: Node) => string | undefined } {
   const { ts, checker } = r;
   const classes = new Map(pageObjects.map((p) => [p.name, new Set(p.members.map((m) => m.name))]));
   // the class that declares a property, which for an inherited one is its base class; named by the declaration itself,

@@ -21,9 +21,11 @@ const isEntry = (f: Form): boolean => {
 };
 
 // (when cond entry): an entry that only exists under a condition
-const conditional = (f: Form): Form | undefined => (f.t === 'list' && f.children.length === 3 && textOf(unwrap(f.children[0])) === 'when' ? unwrap(f.children[2]) : undefined);
+const conditional = (f: Form): Form | undefined => (f.t === 'list' && f.children.length === 3 && textOf(unwrap(f.children[0])) === 'when'
+  ? unwrap(f.children[2]) : undefined);
 
-const isTable = (f: Form): boolean => f.t === 'vector' && flatChildren(f).length > 0 && flatChildren(f).every((x) => isEntry(unwrap(x)) || isEntry(conditional(unwrap(x)) ?? x));
+const isTable = (f: Form): boolean => f.t === 'vector' && flatChildren(f).length > 0
+  && flatChildren(f).every((x) => isEntry(unwrap(x)) || isEntry(conditional(unwrap(x)) ?? x));
 
 const clientRouteId = (path: string) => `client_route:${canonicalPath(path)}`;
 
@@ -44,7 +46,8 @@ function reititRoutes(ctx: Context, file: string, tablesOnly: boolean): ClientRo
     const data = xs.slice(1).map(unwrap).find((x) => x.t === 'map');
     const named = data && CLIENT_KEYS.some((k) => entry(data, k));
     const name = data && entry(data, ':name');
-    if (named) out.push({ path, file, line: v.row, ...(tablesOnly ? { table: true } : {}), ...(name && unwrap(name).t === 'keyword' ? { name: ctx.nameOf(file, unwrap(name)) } : {}) });
+    if (named) out.push({ path, file, line: v.row, ...(tablesOnly ? { table: true } : {}),
+      ...(name && unwrap(name).t === 'keyword' ? { name: ctx.nameOf(file, unwrap(name)) } : {}) });
     for (const x of xs.slice(1)) nested(unwrap(x), path);
   };
   const nested = (f: Form, prefix: string): void => {
@@ -82,7 +85,8 @@ export const clientRoutes: Adapter = {
     const tableFiles = ctx.analysis.nsUses.some(usesFrontendRouter)
       ? [...new Set(ctx.analysis.nsDefs.map((d) => d.file))].filter((f) => /\.clj[cs]$/.test(f) && !files.has(f) && !isTestFile(f))
       : [];
-    const found = [...[...files].flatMap((f) => reititRoutes(ctx, f, false)), ...tableFiles.flatMap((f) => reititRoutes(ctx, f, true)), ...secretaryRoutes(ctx)];
+    const found = [...[...files].flatMap((f) => reititRoutes(ctx, f, false)), ...tableFiles.flatMap((f) => reititRoutes(ctx, f, true)),
+      ...secretaryRoutes(ctx)];
     // routes whose paths differ only in parameter names (/a/:id, /a/:slug) are one node that lists every spelling and name
     const nodes: GraphNode[] = [...groupBy(found, (r) => clientRouteId(r.path))].map(([id, routes]) => {
       const [first] = routes;
@@ -94,7 +98,8 @@ export const clientRoutes: Adapter = {
       return {
         id, kind: 'client_route', name: canonicalPath(first.path), file: first.file, line: first.line,
         ...(component ? { component } : {}),
-        attrs: { path: first.path, ...(heuristic ? { band: 'heuristic' } : {}), ...(names.length === 1 ? { name: names[0] } : {}), ...(several ? { paths, ...(names.length > 1 ? { names } : {}) } : {}) },
+        attrs: { path: first.path, ...(heuristic ? { band: 'heuristic' } : {}), ...(names.length === 1 ? { name: names[0] } : {}),
+          ...(several ? { paths, ...(names.length > 1 ? { names } : {}) } : {}) },
       };
     });
     return { nodes, edges: [] };

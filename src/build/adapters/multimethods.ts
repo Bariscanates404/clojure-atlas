@@ -60,7 +60,8 @@ export const multimethods: Adapter = {
       });
       edges.push({ from: nsId(m.use.from), to: id, kind: 'defines', band: 'static_proven', file: m.span.file, line: m.span.row });
       if (ctx.defs.has(m.multi)) {
-        edges.push({ from: defId(m.multi), to: id, kind: 'may_dispatch_to', band: 'heuristic', file: m.span.file, line: m.span.row, attrs: { dispatch: m.dispatch } });
+        edges.push({ from: defId(m.multi), to: id, kind: 'may_dispatch_to', band: 'heuristic', file: m.span.file, line: m.span.row,
+          attrs: { dispatch: m.dispatch } });
       }
     }
     return { nodes, edges };

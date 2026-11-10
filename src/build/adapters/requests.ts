@@ -62,7 +62,8 @@ function helperUri(ctx: Context, def: string, args: readonly Uri[], stack: reado
   if (textOf(parts[0]) === 'apply' && textOf(parts[1]) === 'str') {
     const [lit, rest] = [parts[2], parts[3]];
     const isRest = names.length === 2 && names[0] === '&' && textOf(rest) === names[1] && parts.length === 4;
-    return isRest && lit?.t === 'string' && lit.text.startsWith('/') ? { path: lit.text + args.map((a) => a.path).join(''), literal: args.every((a) => a.literal) } : undefined;
+    return isRest && lit?.t === 'string' && lit.text.startsWith('/')
+      ? { path: lit.text + args.map((a) => a.path).join(''), literal: args.every((a) => a.literal) } : undefined;
   }
   if (names.some((n) => n === '&') || names.length !== args.length) return undefined;
   return uriOf(ctx, d.file, body, new Map(names.map((n, i) => [n, args[i]])), stack);
@@ -135,7 +136,8 @@ export const requests: Adapter = {
       for (const r of copies) {
         edges.push({
           from: id, to: routeId(r), kind: 'requests_route', band: q.literal && copies.length === 1 ? 'static_proven' : 'heuristic', file: q.file, line: q.row,
-          attrs: { copies: copies.length, reason: copies.length === 1 ? 'method and canonical path match one route' : `method and canonical path match ${copies.length} served copies` },
+          attrs: { copies: copies.length, reason: copies.length === 1 ? 'method and canonical path match one route'
+            : `method and canonical path match ${copies.length} served copies` },
         });
       }
     }

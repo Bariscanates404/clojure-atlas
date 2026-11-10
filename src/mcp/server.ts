@@ -35,7 +35,8 @@ interface ToolDef {
 }
 
 const str = (a: Args, k: string): string => (typeof a[k] === 'string' ? (a[k] as string) : '');
-const strList = (a: Args, k: string): string[] => (typeof a[k] === 'string' ? [a[k] as string] : Array.isArray(a[k]) ? (a[k] as unknown[]).filter((x): x is string => typeof x === 'string') : []);
+const strList = (a: Args, k: string): string[] => (typeof a[k] === 'string' ? [a[k] as string] : Array.isArray(a[k])
+  ? (a[k] as unknown[]).filter((x): x is string => typeof x === 'string') : []);
 
 // A cached base graph is valid for the file stamp it was read at: a graph rewritten in place is read again. The cache
 // keeps the few most recently used graphs, the oldest is dropped (a Map iterates in insertion order).
@@ -84,33 +85,44 @@ export const TOOLS: ToolDef[] = [
     name: 'callers',
     description: 'Direct callers of a definition (ns/name or definition: id): sites that call it, each with file:line and band, counted per component.',
     required: ['var'],
-    props: { var: { type: 'string' }, include_references: { type: 'boolean', description: 'also list value uses, callbacks (partial, comp, map ...), registered handlers (re-frame reg-*, add-watch), macro expansions, dispatch candidates and rebindings' } },
+    props: { var: { type: 'string' },
+      include_references: { type: 'boolean',
+      description: 'also list value uses, callbacks (partial, comp, map ...), registered handlers (re-frame reg-*, add-watch), macro expansions, dispatch ' +
+      'candidates and rebindings' } },
     run: (g, a) => callers(g, str(a, 'var'), { includeReferences: a.include_references === true }),
   },
   {
     name: 'blast_radius',
-    description: 'Potential impact over known dependency relations: transitive callers and other dependents (value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings) of a definition, walked until no new one appears (or up to an explicit depth). Starts with the total, deepest depth, counts per depth and per component and the entry points reached; depth 1-2 rows are listed, deeper rows are paged with section="deeper".',
+    description: 'Potential impact over known dependency relations: transitive callers and other dependents (value uses, callbacks, registered handlers, ' +
+      'macro expansions, dispatch candidates, rebindings) of a definition, walked until no new one appears (or up to an explicit depth). Starts with the ' +
+      'total, deepest depth, counts per depth and per component and the entry points reached; depth 1-2 rows are listed, deeper rows are paged with ' +
+      'section="deeper".',
     required: ['var'],
     props: { var: { type: 'string' }, depth: { type: 'number', description: 'cap the walk at this depth (min 1); omit to walk to the end' } },
     run: (g, a) => blastRadius(g, str(a, 'var'), typeof a.depth === 'number' ? a.depth : undefined),
   },
   {
     name: 'route_authz',
-    description: 'Authorization of a backend route (path such as /api/articles/:slug, "POST /api/articles", or a route: id): served copies with base and mount, handler, middleware chain in order, permissions (all/any structure) or the exempt reason.',
+    description: 'Authorization of a backend route (path such as /api/articles/:slug, "POST /api/articles", or a route: id): served copies with base and ' +
+      'mount, handler, middleware chain in order, permissions (all/any structure) or the exempt reason.',
     required: ['route'],
     props: { route: { type: 'string' } },
     run: (g, a) => routeAuthz(g, str(a, 'route')),
   },
   {
     name: 'permission_routes',
-    description: 'Every route copy that checks a permission (the keyword as declared, e.g. in .clojure-atlas.edn), saying whether it is required alone or one of alternatives.',
+    description: 'Every route copy that checks a permission (the keyword as declared, e.g. in .clojure-atlas.edn), saying whether it is required alone or ' +
+      'one ' +
+      'of alternatives.',
     required: ['permission'],
     props: { permission: { type: 'string' } },
     run: (g, a) => permissionRoutes(g, str(a, 'permission')),
   },
   {
     name: 'attribute_usage',
-    description: 'Proven readers and writers of a persisted data attribute (:order/bid), plus references whose role is unproven as UNKNOWN rows ranked by how much they look like a write or a read.',
+    description: 'Proven readers and writers of a persisted data attribute (:order/bid), plus references whose role is unproven as UNKNOWN rows ranked by ' +
+      'how ' +
+      'much they look like a write or a read.',
     required: ['attr'],
     props: { attr: { type: 'string' } },
     run: (g, a) => attributeUsage(g, str(a, 'attr')),
@@ -124,21 +136,25 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'tests_covering',
-    description: 'Browser tests reaching a file, definition, selector (a CSS class or data-testid a page object uses) or route through selectors, page objects or requests.',
+    description: 'Browser tests reaching a file, definition, selector (a CSS class or data-testid a page object uses) or route through selectors, page ' +
+      'objects or requests.',
     required: ['target'],
     props: { target: { type: 'string', description: 'repo-relative file, ns/name, selector or route path' } },
     run: (g, a) => testsCovering(g, str(a, 'target')),
   },
   {
     name: 'tests_for',
-    description: 'Unit tests (test definitions calling it directly or transitively, with depth and band) and browser tests (through rendered selectors and handled routes) for a definition, data attribute, event or subscription; limits stated.',
+    description: 'Unit tests (test definitions calling it directly or transitively, with depth and band) and browser tests (through rendered selectors and ' +
+      'handled routes) for a definition, data attribute, event or subscription; limits stated.',
     required: ['symbol'],
     props: { symbol: { type: 'string' }, depth: { type: 'number', description: '1..3, default 3' } },
     run: (g, a) => testsFor(g, str(a, 'symbol'), typeof a.depth === 'number' ? a.depth : 3),
   },
   {
     name: 'signature_impact',
-    description: 'Arities and parameters of a function (destructured map keys, & {:keys} keyword args) and, per caller grouped by component, the arity used and the keys passed; flags arities no definition has, destructured keys no caller passes, passed keys the function never reads; apply/partial uses as UNKNOWN. Diff mode: base_graph (a code-graph of the base commit) or added_keys / removed_keys / arities lists the callers the change affects.',
+    description: 'Arities and parameters of a function (destructured map keys, & {:keys} keyword args) and, per caller grouped by component, the arity used ' +
+      'and the keys passed; flags arities no definition has, destructured keys no caller passes, passed keys the function never reads; apply/partial uses as ' +
+      'UNKNOWN. Diff mode: base_graph (a code-graph of the base commit) or added_keys / removed_keys / arities lists the callers the change affects.',
     required: ['fn'],
     props: {
       fn: { type: 'string', description: 'ns/name or definition: id' },
@@ -158,21 +174,27 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'key_flow',
-    description: 'Producers (map literal keys, assoc/assoc-in/update, Datomic tx) and consumers (keyword as fn, get/get-in, destructuring, pull patterns, queries, select-keys) of one map key such as :scope or :user/email, grouped by component, tests apart; flags a key consumed but never produced (or the reverse) with similar keys; other uses as UNKNOWN.',
+    description: 'Producers (map literal keys, assoc/assoc-in/update, Datomic tx) and consumers (keyword as fn, get/get-in, destructuring, pull patterns, ' +
+      'queries, select-keys) of one map key such as :scope or :user/email, grouped by component, tests apart; flags a key consumed but never produced (or ' +
+        'the ' +
+      'reverse) with similar keys; other uses as UNKNOWN.',
     required: ['key'],
     props: { key: { type: 'string', description: 'keyword, e.g. :articlesCount' } },
     run: (g, a) => keyFlow(g, str(a, 'key')),
   },
   {
     name: 'key_siblings',
-    description: 'For literal tables of 3+ map rows (path tables, config vectors): rows lacking a key that most sibling rows or a path sibling have, minus absences shared by rows of the same kind; rows that are not map literals are UNKNOWN.',
+    description: 'For literal tables of 3+ map rows (path tables, config vectors): rows lacking a key that most sibling rows or a path sibling have, minus ' +
+      'absences shared by rows of the same kind; rows that are not map literals are UNKNOWN.',
     required: ['target'],
     props: { target: { type: 'string', description: 'repo-relative file, file:line inside a table, a key_table id, or the var holding the table' } },
     run: (g, a) => keySiblings(g, str(a, 'target')),
   },
   {
     name: 'context_for_change',
-    description: 'One call per review: risk notes, changed symbols, callers outside the diff, route authz with siblings, attributes read or written, tests to run and tests to add, for changed files or hunks.',
+    description: 'One call per review: risk notes, changed symbols, callers outside the diff, route authz with siblings, attributes read or written, tests ' +
+      'to ' +
+      'run and tests to add, for changed files or hunks.',
     required: ['changes'],
     props: { changes: { type: 'array', items: { type: 'string' }, description: 'repo-relative "file", "file:12" or "file:10-20,30-41" entries' } },
     run: (g, a, opts) => contextForChange(g, strList(a, 'changes'), { ...(opts.repoDir !== undefined ? { repoDir: opts.repoDir } : {}) }),
@@ -204,7 +226,8 @@ export function graphInfo(g: Graph, base: string | undefined, opts: ServerOption
     `graph ${s.repo_name ?? '?'} @ ${s.ref ?? '?'} sha ${s.sha} built ${s.built_at ?? '?'}: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges`,
     ...(s.snapshot ? [`snapshot ${s.snapshot}: ${s.dirty_files ?? 0} uncommitted file(s), analyzer ${s.analyzer ?? '?'}`] : []),
     ...(s.config_hash ? [`config ${s.config_hash.slice(0, 12)} from ${(s.config_sources ?? []).join(', ') || 'no project config files'}`] : []),
-    ...g.doc.capabilities.map((c) => `  ${c.name}: ${c.status}${c.edges !== undefined ? `, ${c.edges} edges` : ''}${c.bands ? ` ${JSON.stringify(c.bands)}` : ''}${c.note ? ` (${c.note})` : ''}`),
+    ...g.doc.capabilities.map((c) => `  ${c.name}: ` +
+      `${c.status}${c.edges !== undefined ? `, ${c.edges} edges` : ''}${c.bands ? ` ${JSON.stringify(c.bands)}` : ''}${c.note ? ` (${c.note})` : ''}`),
   ];
   return lines.join('\n');
 }
@@ -232,7 +255,8 @@ export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions
   const header = [st.header, degradedText].filter(Boolean).join('\n') || null;
   const groupBy = ['component', 'file', 'none'].includes(String(args.group_by)) ? (args.group_by as GroupBy) : undefined;
   const ro = renderOptionsOf(args);
-  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }), { stale: st.stale, notice: st.header, ...(degradedText ? { degraded: degradedText } : {}) }), isError };
+  if (ro.format === 'json') return { text: withSource(render(res, { ...ro, groupBy }),
+    { stale: st.stale, notice: st.header, ...(degradedText ? { degraded: degradedText } : {}) }), isError };
   return { text: render(res, { ...ro, groupBy, header }), isError };
 }
 

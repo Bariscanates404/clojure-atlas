@@ -54,7 +54,8 @@ function useOf(ctx: Context, file: string, f: Form | undefined): VarUse | undefi
   return use && use.to !== UNKNOWN_NS ? use : undefined;
 }
 
-const wrapper = (ctx: Context, use: VarUse, file: string, line: number, arg?: Form): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)),
+const wrapper = (ctx: Context, use: VarUse, file: string, line: number,
+  arg?: Form): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)),
   ...(arg && ctx.config.permissionMiddleware.includes(fullName(use)) ? { permission: { form: arg, file } } : {}) });
 
 function headName(ctx: Context, file: string, f: Form): string {

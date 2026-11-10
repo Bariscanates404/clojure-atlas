@@ -52,7 +52,8 @@ function txAttributes(name: (f: Form) => string, f: Form): Form[] {
   if (u.t === 'vector' || u.t === 'list') {
     const xs = flatChildren(u);
     if (xs[0] && isKeyword(xs[0]) && TX_OPS.test(name(unwrap(xs[0])))) {
-      return [...(xs[2] && isKeyword(xs[2]) && ATTRIBUTE_OPS.test(name(unwrap(xs[0]))) ? [unwrap(xs[2])] : []), ...xs.slice(1).flatMap((x) => (unwrap(x).t === 'map' ? txAttributes(name, x) : []))];
+      return [...(xs[2] && isKeyword(xs[2]) && ATTRIBUTE_OPS.test(name(unwrap(xs[0]))) ? [unwrap(xs[2])] : []),
+        ...xs.slice(1).flatMap((x) => (unwrap(x).t === 'map' ? txAttributes(name, x) : []))];
     }
     return xs.flatMap((x) => txAttributes(name, x));
   }
@@ -98,7 +99,8 @@ function readAttributes(f: Form): Form[] {
     const pattern = dataPatternAttribute(xs);
     if (pattern) return pattern;
   }
-  if (u.t === 'vector' && xs.length && !xs.some(isLogicVar) && xs.every((x) => ['keyword', 'map', 'symbol', 'list', 'vector'].includes(unwrap(x).t)) && xs.some((x) => isKeyword(x) || unwrap(x).t === 'list') && !xs.some((x) => /^:(find|where|in|keys)$/.test((unwrap(x) as { text?: string }).text ?? ''))) {
+  if (u.t === 'vector' && xs.length && !xs.some(isLogicVar) && xs.every((x) => ['keyword', 'map', 'symbol', 'list', 'vector'].includes(unwrap(x).t))
+    && xs.some((x) => isKeyword(x) || unwrap(x).t === 'list') && !xs.some((x) => /^:(find|where|in|keys)$/.test((unwrap(x) as { text?: string }).text ?? ''))) {
     return xs.flatMap((x) => {
       const y = unwrap(x);
       if (y.t === 'keyword') return [y];
@@ -198,9 +200,11 @@ export const dataAttributes: Adapter = {
       const name = nameIn(call.file);
       const write = WRITES.has(call.name);
       const args = kids(form).slice(1);
-      const found = write ? args.flatMap((a) => txAttributes(name, txData(name, a))) : [...args.flatMap(readAttributes), ...positionalAttributes(call.name, args)];
+      const found = write ? args.flatMap((a) => txAttributes(name, txData(name, a)))
+        : [...args.flatMap(readAttributes), ...positionalAttributes(call.name, args)];
       for (const f of found) {
-        add({ name: name(f), kind: write ? 'writes' : 'reads', band: 'static_proven', file: call.file, row: f.row, col: f.col, from: call.from, ...(call.fromVar ? { fromVar: call.fromVar } : {}), context: `@${call.to}/${call.name}` });
+        add({ name: name(f), kind: write ? 'writes' : 'reads', band: 'static_proven', file: call.file, row: f.row, col: f.col, from: call.from,
+          ...(call.fromVar ? { fromVar: call.fromVar } : {}), context: `@${call.to}/${call.name}` });
       }
     }
     const kwAt = new Map(ctx.analysis.keywords.map((k) => [`${k.file}:${k.row}:${k.col}`, k]));
@@ -210,7 +214,8 @@ export const dataAttributes: Adapter = {
         if (!isQueryLiteral(f)) continue;
         for (const k of readAttributes(f)) {
           const fromVar = kwAt.get(`${file}:${k.row}:${k.col}`)?.fromVar;
-          add({ name: name(k), kind: 'reads', band: 'heuristic', file, row: k.row, col: k.col, from: ns, ...(fromVar ? { fromVar } : {}), context: 'query literal' });
+          add({ name: name(k), kind: 'reads', band: 'heuristic', file, row: k.row, col: k.col, from: ns, ...(fromVar ? { fromVar } : {}),
+            context: 'query literal' });
         }
       }
     }
@@ -223,13 +228,15 @@ export const dataAttributes: Adapter = {
       const name = nameIn(file);
       if (p.t === 'list' && xs[0] && xs[0].row === row && xs[0].col === col) return 'non-write-position (keyword as function)';
       if ((p.t === 'vector' || p.t === 'list') && xs[0] && isKeyword(xs[0]) && TX_OPS.test(name(unwrap(xs[0])))) return name(unwrap(xs[0]));
-      if (p.t === 'map' && xs.some((x, k) => k % 2 === 0 && isKeyword(x) && /^:(db\/id|xt\/id|xtdb\.api\/id|crux\.db\/id)$/.test(name(unwrap(x))))) return ':db/id-map';
+      if (p.t === 'map' && xs.some((x, k) => k % 2 === 0 && isKeyword(x)
+        && /^:(db\/id|xt\/id|xtdb\.api\/id|crux\.db\/id)$/.test(name(unwrap(x))))) return ':db/id-map';
       return 'reference';
     };
     for (const k of ctx.analysis.keywords) {
       const name = forwardName(keywordName(k));
       if (!k.ns || !known.has(name)) continue;
-      add({ name, kind: 'references', band: 'unknown', file: k.file, row: k.row, col: k.col, from: k.from, ...(k.fromVar ? { fromVar: k.fromVar } : {}), context: contextOf(k.file, k.row, k.col) });
+      add({ name, kind: 'references', band: 'unknown', file: k.file, row: k.row, col: k.col, from: k.from, ...(k.fromVar ? { fromVar: k.fromVar } : {}),
+        context: contextOf(k.file, k.row, k.col) });
     }
 
     const nodes: GraphNode[] = [];
@@ -244,11 +251,13 @@ export const dataAttributes: Adapter = {
       if (!at) continue;
       const kind = d?.kind ?? 'data_attribute';
       const component = ctx.componentOf(d ? d.file : (at as Use).file);
-      nodes.push({ id: attributeId(kind, name), kind, name, file: d ? d.file : (at as Use).file, line: d ? d.line : (at as Use).row, ...(component ? { component } : {}), attrs: { schema: !!d } });
+      nodes.push({ id: attributeId(kind, name), kind, name, file: d ? d.file : (at as Use).file, line: d ? d.line : (at as Use).row,
+        ...(component ? { component } : {}), attrs: { schema: !!d } });
     }
     const kindOf = new Map(nodes.map((n) => [n.name, n.kind]));
     const edges: GraphEdge[] = uses.map((u) => ({
-      from: owner(u), to: attributeId(kindOf.get(u.name) ?? 'data_attribute', u.name), kind: u.kind, band: u.band, file: u.file, line: u.row, attrs: { context: u.context },
+      from: owner(u), to: attributeId(kindOf.get(u.name) ?? 'data_attribute', u.name), kind: u.kind, band: u.band, file: u.file, line: u.row,
+        attrs: { context: u.context },
     }));
     return { nodes, edges };
   },

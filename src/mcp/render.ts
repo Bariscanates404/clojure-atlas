@@ -19,7 +19,8 @@ export interface RenderOptions {
 
 // The tool arguments every answer honours, shared by the servers' input schemas.
 export const PAGING_PROPS = {
-  response_format: { type: 'string', enum: ['concise', 'detailed', 'json'], description: 'concise (default): verdict, counts, top rows; detailed: adds details for the top rows and a legend; json: the structured result' },
+  response_format: { type: 'string', enum: ['concise', 'detailed', 'json'],
+    description: 'concise (default): verdict, counts, top rows; detailed: adds details for the top rows and a legend; json: the structured result' },
   limit: { type: 'number', description: 'rows per section (default 10 concise, 25 detailed, max 500)' },
   offset: { type: 'number', description: 'skip this many rows per section (paging; truncated sections print the next offset)' },
   section: { type: 'string', description: 'only sections whose name contains this text' },
@@ -154,7 +155,8 @@ function treeOrder(rows: Row[]): { row: Row; trail: Row[] }[] {
 }
 
 const EDGE_WORDS: Record<string, string> = {
-  calls: 'called by', references: 'referenced by', passes_callback: 'passed as a callback by', registers_handler: 'registered as a handler by', expands_via: 'expanded by',
+  calls: 'called by', references: 'referenced by', passes_callback: 'passed as a callback by', registers_handler: 'registered as a handler by',
+    expands_via: 'expanded by',
   may_dispatch_to: 'may be dispatched to by', rebinds: 'rebound by',
 };
 const edgeWord = (r: Row) => EDGE_WORDS[r.kind ?? ''] ?? `${r.kind ?? 'linked'} by`;
@@ -269,7 +271,8 @@ function frame(res: QueryResult, o: RenderOptions, sections: Section[]): { head:
   for (const n of res.notes) head.push(`note: ${quoted(n)}`);
   if (o.section && !sections.length) head.push(`no section matches ${JSON.stringify(o.section)}; sections: ${res.sections.map(shortName).join(', ')}`);
   const tail: string[] = [];
-  if (!res.found && !res.sections.length && !res.badArgument && !res.unparsed && !res.used) tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
+  if (!res.found && !res.sections.length && !res.badArgument && !res.unparsed
+    && !res.used) tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
   if (res.next.length) tail.push(`next: ${res.next.slice(0, 3).join('  ')}`);
   return { head, tail };
 }
@@ -284,7 +287,8 @@ const LADDER: { level: Level; step: string }[] = [
 // JSON honours section=, offset= and limit= like the text formats, and fits max_tokens (default: the detailed
 // budget) by halving the rows per section; `truncated` and each section's `total` say what was left out.
 function renderJson(res: QueryResult, opts: RenderOptions): string {
-  const budget = (opts.maxTokens !== undefined && Number.isFinite(opts.maxTokens) && opts.maxTokens > 0 ? opts.maxTokens : DEFAULT_MAX_TOKENS.detailed) * CHARS_PER_TOKEN;
+  const budget = (opts.maxTokens !== undefined && Number.isFinite(opts.maxTokens) && opts.maxTokens > 0 ? opts.maxTokens
+    : DEFAULT_MAX_TOKENS.detailed) * CHARS_PER_TOKEN;
   const offset = Math.max(0, Math.floor(Number.isFinite(opts.offset) ? (opts.offset ?? 0) : 0));
   const paged = opts.limit !== undefined || offset > 0;
   const sections = res.sections.filter((s) => sectionMatches(s, opts.section));

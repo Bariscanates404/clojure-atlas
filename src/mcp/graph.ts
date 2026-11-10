@@ -96,7 +96,9 @@ export function parseDocument(raw: unknown, origin = 'graph'): GraphDocument {
   const o = raw as Record<string, unknown>;
   check(o.format === FORMAT, `${origin}: format is ${JSON.stringify(o.format)}, expected "${FORMAT}"`);
   check(typeof o.version === 'number', `${origin}: no numeric version field`);
-  check(SUPPORTED_VERSIONS.includes(o.version as number), `${origin}: version ${String(o.version)} is not supported (this reader knows versions ${SUPPORTED_VERSIONS.join(' and ')}); rebuild the graph with a matching exporter`);
+  check(SUPPORTED_VERSIONS.includes(o.version as number),
+    `${origin}: version ${String(o.version)} is not supported (this reader knows versions ${SUPPORTED_VERSIONS.join(' and ')}); rebuild the graph with a ` +
+      `matching exporter`);
   check(isObject(o.source) && typeof (o.source as Record<string, unknown>).sha === 'string', `${origin}: source.sha missing`);
   check(Array.isArray(o.nodes), `${origin}: nodes is not an array`);
   check(Array.isArray(o.edges), `${origin}: edges is not an array`);
@@ -112,7 +114,8 @@ export function parseDocument(raw: unknown, origin = 'graph'): GraphDocument {
     check(!ids.has(node.id as string), `${origin}: nodes[${i}] repeats id ${JSON.stringify(node.id)}`);
     ids.add(node.id as string);
     check(node.file === undefined || typeof node.file === 'string', `${origin}: nodes[${i}] has a non-string file`);
-    check(node.roles === undefined || (Array.isArray(node.roles) && node.roles.every((r) => typeof r === 'string')), `${origin}: nodes[${i}] has roles that are not a list of strings`);
+    check(node.roles === undefined || (Array.isArray(node.roles) && node.roles.every((r) => typeof r === 'string')),
+      `${origin}: nodes[${i}] has roles that are not a list of strings`);
     check(node.attrs === undefined || isObject(node.attrs), `${origin}: nodes[${i}] has attrs that are not an object`);
     check(isLine(node.line) && isLine(node.end_line), `${origin}: nodes[${i}] has a line or end_line that is not a whole number`);
   });
@@ -175,7 +178,8 @@ export function loadGraph(path: string, limits = { file: MAX_GRAPH_BYTES, inflat
     try {
       text = gunzipSync(bytes, { maxOutputLength: limits.inflated });
     } catch (err) {
-      throw new GraphFormatError(`${path}: gzip data not readable or over the ${limits.inflated}-byte limit (${(err as NodeJS.ErrnoException).code ?? 'error'})`);
+      throw new GraphFormatError(`${path}: gzip data not readable or over the ${limits.inflated}-byte limit ` +
+        `(${(err as NodeJS.ErrnoException).code ?? 'error'})`);
     }
   }
   return graphFromJson(text.toString('utf8'), path);

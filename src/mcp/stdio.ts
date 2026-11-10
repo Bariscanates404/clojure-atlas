@@ -87,7 +87,8 @@ export function stdioServer<C>(def: McpServerDef<C>): StdioServer<C> {
     if (typeof msg !== 'object' || msg === null || Array.isArray(msg)) return fail(null, -32600, 'invalid request');
     const req = msg as JsonRpcRequest;
     const isNotification = req.id === undefined;
-    if (!isNotification && req.id !== null && typeof req.id !== 'string' && typeof req.id !== 'number') return fail(null, -32600, 'invalid request: id must be a string, a number or null');
+    if (!isNotification && req.id !== null && typeof req.id !== 'string' && typeof req.id !== 'number') return fail(null, -32600,
+      'invalid request: id must be a string, a number or null');
     if (req.jsonrpc !== '2.0') return isNotification ? null : fail(req.id, -32600, 'invalid request: jsonrpc must be "2.0"');
     if (typeof req.method !== 'string') return isNotification ? null : fail(req.id, -32600, 'invalid request: no method');
     // JSON-RPC: a notification (no id) is never answered, whatever its method

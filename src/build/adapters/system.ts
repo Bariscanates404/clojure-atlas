@@ -127,14 +127,16 @@ function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep
 
 function systemNode(ctx: Context, k: Key, undeclared = false): GraphNode {
   const component = ctx.componentOf(k.file);
-  return { id: systemKeyId(k.name), kind: 'system_key', name: k.name, file: k.file, line: k.line, ...(component ? { component } : {}), attrs: { library: k.library, ...(undeclared ? { undeclared: true } : {}) } };
+  return { id: systemKeyId(k.name), kind: 'system_key', name: k.name, file: k.file, line: k.line, ...(component ? { component } : {}),
+    attrs: { library: k.library, ...(undeclared ? { undeclared: true } : {}) } };
 }
 
 export const systemKeys: Adapter = {
   name: 'system',
   edgeKinds: ['registers', 'depends_on'],
   detect: (ctx) => {
-    const libs = new Set(ctx.analysis.nsUses.flatMap((u) => (u.to === IG ? ['integrant'] : /^mount\./.test(u.to) ? ['mount'] : u.to === COMPONENT ? ['component'] : [])));
+    const libs = new Set(ctx.analysis.nsUses.flatMap((u) => (u.to === IG ? ['integrant'] : /^mount\./.test(u.to) ? ['mount'] : u.to === COMPONENT
+      ? ['component'] : [])));
     return libs.size ? [...libs].sort().join(', ') : null;
   },
   run: (ctx) => {
@@ -142,7 +144,8 @@ export const systemKeys: Adapter = {
     const edges: GraphEdge[] = [];
     for (const m of methods(ctx).filter((x) => IG_METHODS.test(x.multi) && isKeywordKey(x.dispatch))) {
       keys.push({ name: m.dispatch, file: m.span.file, line: m.span.row, library: 'integrant' });
-      edges.push({ from: systemKeyId(m.dispatch), to: m.id, kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row, attrs: { via: m.multi.split('/')[1] } });
+      edges.push({ from: systemKeyId(m.dispatch), to: m.id, kind: 'registers', band: 'static_proven', file: m.span.file, line: m.span.row,
+        attrs: { via: m.multi.split('/')[1] } });
     }
     const igFiles = new Set(ctx.analysis.nsUses.filter((u) => u.to === IG).map((u) => u.file));
     const deps: Dep[] = [];
@@ -169,7 +172,8 @@ export const systemKeys: Adapter = {
     const comp = componentSystems(ctx);
     keys.push(...comp.keys);
     deps.push(...comp.deps);
-    for (const s of comp.starts) edges.push({ from: systemKeyId(s.from), to: defId(s.to), kind: 'registers', band: 'static_proven', file: s.file, line: s.line, attrs: { via: 'system-map' } });
+    for (const s of comp.starts) edges.push({ from: systemKeyId(s.from), to: defId(s.to), kind: 'registers', band: 'static_proven', file: s.file, line: s.line,
+      attrs: { via: 'system-map' } });
     const declared = new Set(keys.map((k) => k.name));
     const libraryOf = new Map(keys.map((k) => [k.name, k.library]));
     const partsOf = (name: string) => (name.startsWith('[') ? name.slice(1, -1).split(' ') : [name]);
@@ -182,8 +186,10 @@ export const systemKeys: Adapter = {
     const undeclared = new Map<string, Key>();
     for (const d of deps) {
       const matches = targetsOf(d.to);
-      if (!matches.length && !undeclared.has(d.to)) undeclared.set(d.to, { name: d.to, file: d.file, line: d.line, library: libraryOf.get(d.from) ?? 'integrant' });
-      for (const to of matches.length ? matches : [d.to]) edges.push({ from: systemKeyId(d.from), to: systemKeyId(to), kind: 'depends_on', band: 'static_proven', file: d.file, line: d.line });
+      if (!matches.length && !undeclared.has(d.to)) undeclared.set(d.to,
+        { name: d.to, file: d.file, line: d.line, library: libraryOf.get(d.from) ?? 'integrant' });
+      for (const to of matches.length ? matches
+        : [d.to]) edges.push({ from: systemKeyId(d.from), to: systemKeyId(to), kind: 'depends_on', band: 'static_proven', file: d.file, line: d.line });
     }
     const nodes: GraphNode[] = [
       ...keys.map((k) => systemNode(ctx, k)),

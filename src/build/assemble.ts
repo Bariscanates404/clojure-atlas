@@ -71,7 +71,8 @@ function signaturesOf(edges: readonly GraphEdge[]): Capability {
 // An edge has a line, not a column: two call sites on one line are told apart by what they carry (arity, arguments).
 const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}\0${JSON.stringify(e.attrs ?? {})}`;
 
-export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: Omit<BuildStats['files'], 'skipped_large_edn'>): AtlasDocument {
+export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: Omit<BuildStats['files'],
+  'skipped_large_edn'>): AtlasDocument {
   const detected = new Map(adapters.map((a) => [a.name, a.detect(ctx)]));
   const active = adapters.filter((a) => detected.get(a.name) !== null);
   const owner = makeOwner(ctx, active.flatMap((a) => a.containers?.(ctx) ?? []));
@@ -133,7 +134,8 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     edges: [...edges.values()].sort((a, b) => compareText(edgeKey(a), edgeKey(b))),
     stats: {
       files: {
-        ...files, skipped_large_edn: files.skipped_large_names.filter((f) => EDN_FILE.test(f)).length, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
+        ...files, skipped_large_edn: files.skipped_large_names.filter((f) => EDN_FILE.test(f)).length,
+          skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
         unread_names: files.unread_names.slice(0, MAX_NAMED_FILES), timed_out_names: files.timed_out_names.slice(0, MAX_NAMED_FILES),
       },
       syntax_errors: {

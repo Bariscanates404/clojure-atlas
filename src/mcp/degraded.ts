@@ -31,7 +31,8 @@ export const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x
 interface Stats {
   syntax_errors?: { files?: unknown; names?: unknown; recovered?: unknown; recovered_names?: unknown };
   dropped_edges?: unknown;
-  files?: { skipped_large?: unknown; skipped_large_names?: unknown; skipped_large_edn?: unknown; unread_why?: unknown; timed_out?: unknown; timed_out_names?: unknown; unread?: unknown; unread_names?: unknown };
+  files?: { skipped_large?: unknown; skipped_large_names?: unknown; skipped_large_edn?: unknown; unread_why?: unknown; timed_out?: unknown;
+    timed_out_names?: unknown; unread?: unknown; unread_names?: unknown };
   duplicate_namespaces?: unknown;
 }
 
@@ -51,7 +52,8 @@ export function degradation(doc: GraphDocument): Degradation | null {
   const timedOut = counted(stats?.files?.timed_out, stats?.files?.timed_out_names);
   const unread = counted(stats?.files?.unread, stats?.files?.unread_names);
   const why = stats?.files?.unread_why;
-  const unreadWhy = Object.fromEntries(Object.entries(why && typeof why === 'object' ? why : {}).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
+  const unreadWhy = Object.fromEntries(Object.entries(why && typeof why === 'object' ? why : {}).filter(([, v]) => typeof v === 'string')) as Record<string,
+    string>;
   const duplicates = Array.isArray(stats?.duplicate_namespaces)
     ? stats.duplicate_namespaces.flatMap((d: unknown) => (typeof (d as { ns?: unknown })?.ns === 'string' ? [(d as { ns: string }).ns] : []))
     : [];
@@ -80,7 +82,9 @@ function unreadParts(d: Degradation): string[] {
   const rest = d.unread.names.filter((n) => !UNREAD_REASONS.some(([r]) => d.unreadWhy[n] === r));
   const left = d.unread.files - counted;
   if (left > 0) {
-    out.push(`${left} tracked Clojure file(s) were not analyzed, as git tracks them but the file walk did not read them, whether they sit in a hidden path, node_modules or a build folder, are symbolic links, or are deleted in the working tree${rest.length ? ` (${listed(rest, left)})` : ''}, so their definitions and calls are missing`);
+    out.push(`${left} tracked Clojure file(s) were not analyzed, as git tracks them but the file walk did not read them, whether they sit in a hidden path, ` +
+      `node_modules or a build folder, are symbolic links, or are deleted in the working ` +
+      `tree${rest.length ? ` (${listed(rest, left)})` : ''}, so their definitions and calls are missing`);
   }
   return out;
 }
@@ -92,7 +96,8 @@ export function degradedLine(d: Degradation): string {
     parts.push(`${d.files} file(s) could not be parsed${d.names.length ? ` (${listed(d.names, d.files)})` : ''}, so their definitions and calls are missing`);
   }
   if (d.recovered.files) {
-    parts.push(`${d.recovered.files} file(s) have syntax errors but were analyzed${d.recovered.names.length ? ` (${listed(d.recovered.names, d.recovered.files)})` : ''}; some forms in them may be missing`);
+    parts.push(`${d.recovered.files} file(s) have syntax errors but were ` +
+      `analyzed${d.recovered.names.length ? ` (${listed(d.recovered.names, d.recovered.files)})` : ''}; some forms in them may be missing`);
   }
   const sourceLarge = d.large.names.filter((n) => !EDN_FILE.test(n));
   const ednLarge = d.large.names.filter((n) => EDN_FILE.test(n));
@@ -105,7 +110,8 @@ export function degradedLine(d: Degradation): string {
     parts.push(`${d.large.edn} .edn file(s) over 2 MB were skipped${shown}, so the data, keys and config they hold are missing`);
   }
   if (d.timedOut.files) {
-    parts.push(`${d.timedOut.files} file(s) were not analyzed because clj-kondo did not finish on them (${listed(d.timedOut.names, d.timedOut.files)}), so their definitions and calls are missing`);
+    parts.push(`${d.timedOut.files} file(s) were not analyzed because clj-kondo did not finish on them (${listed(d.timedOut.names, d.timedOut.files)}), so ` +
+      `their definitions and calls are missing`);
   }
   parts.push(...unreadParts(d));
   if (d.duplicates.length) {

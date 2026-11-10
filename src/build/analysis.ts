@@ -203,7 +203,8 @@ export function normalize(raw: Raw): Analysis {
         };
       }),
     (x) => key(x.file, x.row, x.col),
-    (p, q) => ({ ...q, ...p, ...(p.reg ?? q.reg ? { reg: p.reg ?? q.reg } : {}), ...(p.reFrame || q.reFrame ? { reFrame: { ...q.reFrame, ...p.reFrame } } : {}) }),
+    (p, q) => ({ ...q, ...p, ...(p.reg ?? q.reg ? { reg: p.reg ?? q.reg } : {}),
+      ...(p.reFrame || q.reFrame ? { reFrame: { ...q.reFrame, ...p.reFrame } } : {}) }),
   );
   const protocolImpls = dedupe(
     list(a['protocol-impls']).map((r) => ({

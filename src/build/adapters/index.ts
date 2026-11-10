@@ -12,4 +12,5 @@ import { clientRoutes } from './client-routes.ts';
 import { requests } from './requests.ts';
 import { browserTests, selectors } from './playwright.ts';
 
-export const ADAPTERS: readonly Adapter[] = [multimethods, implementations, reFrame, httpRoutes, dataAttributes, systemKeys, schemas, mapKeys, keyTables, clientRoutes, requests, selectors, browserTests];
+export const ADAPTERS: readonly Adapter[] = [multimethods, implementations, reFrame, httpRoutes, dataAttributes, systemKeys, schemas, mapKeys, keyTables,
+  clientRoutes, requests, selectors, browserTests];

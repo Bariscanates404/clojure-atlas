@@ -80,7 +80,8 @@ function readsOf(body: readonly Form[], sym: string, name: Name): { reads: strin
       const head = parent.t === 'list' ? unwrap(parent.children[0] ?? parent) : undefined;
       const h = head ? textOf(head) : undefined;
       if (head?.t === 'keyword' && index === 1) reads.add(name(head));
-      else if (h === 'get' && index === 1 && parent.t === 'list' && unwrap(parent.children[2] ?? parent).t === 'keyword') reads.add(name(unwrap(parent.children[2])));
+      else if (h === 'get' && index === 1 && parent.t === 'list'
+        && unwrap(parent.children[2] ?? parent).t === 'keyword') reads.add(name(unwrap(parent.children[2])));
       else if (h === 'get-in' && index === 1 && parent.t === 'list' && unwrap(parent.children[2] ?? parent).t === 'vector') {
         const first = flatChildren(unwrap(parent.children[2]))[0];
         if (first && unwrap(first).t === 'keyword') reads.add(name(unwrap(first)));
@@ -123,7 +124,8 @@ function readsOf(body: readonly Form[], sym: string, name: Name): { reads: strin
 function withReads(p: Param, alias: string | undefined, body: readonly Form[], name: Name, partial = false): Param {
   if (!alias) return p.kind === 'map' || p.kind === 'kwargs' ? { ...p, reads_complete: !partial } : p;
   const r = readsOf(body, alias, name);
-  return { ...p, ...(r.reads.length ? { reads: r.reads } : {}), reads_complete: !r.escapes.length && !partial, ...(r.escapes.length ? { escapes: r.escapes } : {}) };
+  return { ...p, ...(r.reads.length ? { reads: r.reads } : {}), reads_complete: !r.escapes.length && !partial,
+    ...(r.escapes.length ? { escapes: r.escapes } : {}) };
 }
 
 function arity(params: Form, body: readonly Form[], name: Name): Arity {
@@ -166,7 +168,8 @@ const fixed = (a: Arity) => a.params.filter((p) => p.kind !== 'rest' && p.kind !
 
 // What a call passes: literal map arguments with their keys, symbols as locals, and keyword args when the callee
 // takes them. Only when the written arguments are the call's arguments (not threaded, not applied).
-export function callArgs(call: Form, arityCount: number, callee: Arity[] | null, name: Name): { args?: CallArg[]; kwargs?: { keys: string[]; band: 'static_proven' | 'unknown' } } {
+export function callArgs(call: Form, arityCount: number, callee: Arity[] | null,
+  name: Name): { args?: CallArg[]; kwargs?: { keys: string[]; band: 'static_proven' | 'unknown' } } {
   const written = kids(call).slice(1);
   if (call.t !== 'list' || written.length !== arityCount) return {};
   const args: CallArg[] = [];
@@ -181,7 +184,8 @@ export function callArgs(call: Form, arityCount: number, callee: Arity[] | null,
   const kwArity = callee?.find((a) => a.params.some((p) => p.kind === 'kwargs'));
   const kw = kwArity && arityCount >= fixed(kwArity) ? written.slice(fixed(kwArity)) : undefined;
   const kwargs = kw && kw.length
-    ? { keys: kw.filter((_, j) => j % 2 === 0).map(unwrap).filter((k) => k.t === 'keyword').map(name), band: kw.every((x, j) => j % 2 === 1 || unwrap(x).t === 'keyword') ? 'static_proven' as const : 'unknown' as const }
+    ? { keys: kw.filter((_, j) => j % 2 === 0).map(unwrap).filter((k) => k.t === 'keyword').map(name),
+      band: kw.every((x, j) => j % 2 === 1 || unwrap(x).t === 'keyword') ? 'static_proven' as const : 'unknown' as const }
     : undefined;
   return { ...(args.length ? { args } : {}), ...(kwargs ? { kwargs } : {}) };
 }

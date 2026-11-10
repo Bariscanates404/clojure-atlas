@@ -46,7 +46,8 @@ export function requireRelativePaths(json: Record<string, unknown>, from: string
       const f = r?.filename;
       if (typeof f !== 'string') continue;
       if (path.posix.isAbsolute(f) || path.win32.isAbsolute(f)) {
-        throw new Error(`clj-kondo reported the absolute path ${f} for files from ${from}; atlas needs paths relative to the repository (is :output :canonical-paths forced on somewhere?)`);
+        throw new Error(`clj-kondo reported the absolute path ${f} for files from ${from}; atlas needs paths relative to the repository (is :output ` +
+          `:canonical-paths forced on somewhere?)`);
       }
       if (f.startsWith('./')) r.filename = f.slice(2);
     }
@@ -100,7 +101,8 @@ export function analysisJson(text: string): Record<string, unknown> | null {
 
 function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>, timeoutMs: number, parallel = true): Promise<Analysis> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, ['--repro', '--cache', 'false', ...(parallel ? ['--parallel'] : []), '--config', config(lintAs), '--lint', ...files.map(asArgument)], {
+    const child = spawn(cmd,
+      ['--repro', '--cache', 'false', ...(parallel ? ['--parallel'] : []), '--config', config(lintAs), '--lint', ...files.map(asArgument)], {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -163,7 +165,8 @@ const RETRY_FLOOR_MS = 5000;
 // waits its share of the batch's timeout (never less than RETRY_FLOOR_MS), so the waits along the path to one bad
 // file add up to about one more timeout of the batch.
 async function retrySerial(
-  cmd: string, root: string, files: string[], lintAs: Record<string, string>, batchTimeout: number, batchSize: number, out: { done: Analysis[]; left: string[] },
+  cmd: string, root: string, files: string[], lintAs: Record<string, string>, batchTimeout: number, batchSize: number,
+    out: { done: Analysis[]; left: string[] },
 ): Promise<void> {
   const wait = Math.max(Math.min(batchTimeout, RETRY_FLOOR_MS), Math.round((batchTimeout * files.length) / batchSize));
   try {
@@ -171,7 +174,8 @@ async function retrySerial(
   } catch (e) {
     if (!(e instanceof TimedOut)) throw e;
     if (files.length === 1) {
-      process.stderr.write(`clojure-atlas: clj-kondo did not finish within ${Math.round(wait / 1000)} s on ${files[0]}, also without --parallel ${STUCK_HINT}; the file is left out\n`);
+      process.stderr.write(`clojure-atlas: clj-kondo did not finish within ${Math.round(wait / 1000)} s on ${files[0]}, also without --parallel ` +
+        `${STUCK_HINT}; the file is left out\n`);
       out.left.push(files[0]);
       return;
     }

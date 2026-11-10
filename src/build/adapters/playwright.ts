@@ -22,7 +22,8 @@ function rendered(f: Form): Selector[] {
   return entries(f).flatMap(([k, v]): Selector[] => {
     const key = keywordOf(k);
     const u = unwrap(v);
-    const strings = u.t === 'string' ? [u.text] : u.t === 'vector' ? flatChildren(u).map(unwrap).filter((x) => x.t === 'string').map((x) => textOf(x) ?? '') : [];
+    const strings = u.t === 'string' ? [u.text] : u.t === 'vector' ? flatChildren(u).map(unwrap).filter((x) => x.t === 'string').map((x) => textOf(x) ?? '')
+      : [];
     if (key === ':class' || key === ':className') return strings.flatMap((s) => s.split(/\s+/)).filter(Boolean).map((value) => ({ kind: 'class', value }));
     if (key === ':data-testid' && u.t === 'string') return [{ kind: 'testid', value: u.text }];
     return [];
@@ -33,7 +34,8 @@ function pomSelectors(ctx: Context): Set<string> {
   return new Set(ctx.playwright.projects.flatMap((p) => p.pageObjects.flatMap((o) => o.members.flatMap((m) => m.selectors.map(selectorKey)))));
 }
 
-const detect = (ctx: Context) => (ctx.playwright.projects.length ? `Playwright with TypeScript ${ctx.playwright.projects.map((p) => p.typescript).join(', ')}` : null);
+const detect = (ctx: Context) => (ctx.playwright.projects.length ? `Playwright with TypeScript ${ctx.playwright.projects.map((p) => p.typescript).join(', ')}`
+  : null);
 const unavailable = (ctx: Context) => (ctx.playwright.skipped.length ? ctx.playwright.skipped.join('; ') : null);
 
 export const selectors: Adapter = {
@@ -47,10 +49,12 @@ export const selectors: Adapter = {
     const used = pomSelectors(ctx);
     for (const p of ctx.playwright.projects) {
       for (const o of p.pageObjects) {
-        nodes.push({ id: `page_object:${o.name}`, kind: 'page_object', name: o.name, file: o.file, line: o.line, attrs: { members: o.members.length, ...(o.base ? { base: o.base } : {}) } });
+        nodes.push({ id: `page_object:${o.name}`, kind: 'page_object', name: o.name, file: o.file, line: o.line,
+          attrs: { members: o.members.length, ...(o.base ? { base: o.base } : {}) } });
         for (const m of o.members) {
           const id = memberId(`${o.name}.${m.name}`);
-          nodes.push({ id, kind: 'page_object_member', name: `${o.name}.${m.name}`, file: o.file, line: m.line, end_line: m.endLine, attrs: { class: o.name, selectors: m.selectors.length } });
+          nodes.push({ id, kind: 'page_object_member', name: `${o.name}.${m.name}`, file: o.file, line: m.line, end_line: m.endLine,
+            attrs: { class: o.name, selectors: m.selectors.length } });
           for (const s of m.selectors) {
             nodes.push({ id: selectorId(s), kind: 'selector', name: selectorKey(s) });
             edges.push({ from: id, to: selectorId(s), kind: 'uses_selector', band: 'static_proven', file: o.file, line: m.line });
@@ -63,7 +67,8 @@ export const selectors: Adapter = {
       for (const f of walk(ctx.forms(d.file))) {
         for (const s of rendered(f)) {
           if (!used.has(selectorKey(s))) continue;
-          edges.push({ from: owner({ file: d.file, row: f.row, col: f.col, from: d.name }), to: selectorId(s), kind: 'renders', band: 'static_proven', file: d.file, line: f.row });
+          edges.push({ from: owner({ file: d.file, row: f.row, col: f.col, from: d.name }), to: selectorId(s), kind: 'renders', band: 'static_proven',
+            file: d.file, line: f.row });
         }
       }
     }

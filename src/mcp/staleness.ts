@@ -104,7 +104,8 @@ function stalenessToBase(g: Graph, base: string | undefined, opts: StalenessOpti
     return {
       stale: true,
       distance,
-      header: `STALE: graph built at ${shortSha(sha)} is ${distance} commits behind base ${shortSha(base)} (threshold ${max}). Cited lines may have moved since.`,
+      header: `STALE: graph built at ${shortSha(sha)} is ${distance} commits behind base ${shortSha(base)} (threshold ${max}). Cited lines may have moved ` +
+        `since.`,
     };
   }
   return { stale: false, distance, header: `graph ${shortSha(sha)} is ${distance} commit(s) behind base ${shortSha(base)} (within threshold ${max})` };

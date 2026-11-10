@@ -159,7 +159,8 @@ function tables(ctx: Context, owner: Owner, file: string, from: string): GraphNo
         attrs: {
           shape: u.t, form_line: top.row, ...(varName ? { var: varName } : {}),
           rows: maps.map((m) => row(ctx, file, unwrap(m))),
-          ...(u.t === 'vector' && maps.length < items.length ? { other_rows: items.filter((x) => unwrap(x).t !== 'map').map((x) => ({ line: x.row, shape: unwrap(x).t })) } : {}),
+          ...(u.t === 'vector' && maps.length < items.length
+            ? { other_rows: items.filter((x) => unwrap(x).t !== 'map').map((x) => ({ line: x.row, shape: unwrap(x).t })) } : {}),
         },
       });
     }
@@ -180,7 +181,8 @@ export const mapKeys: Adapter = {
       const sites = classify(ctx, k);
       if (!sites.length) other.set(name, (other.get(name) ?? 0) + 1);
       for (const s of sites) {
-        edges.push({ from: owner(k), to: keyId(name), kind: s.role, band: s.threaded ? 'heuristic' : 'static_proven', file: k.file, line: k.row, attrs: { via: s.via } });
+        edges.push({ from: owner(k), to: keyId(name), kind: s.role, band: s.threaded ? 'heuristic' : 'static_proven', file: k.file, line: k.row,
+          attrs: { via: s.via } });
       }
     }
     const used = new Set(edges.map((e) => e.to));

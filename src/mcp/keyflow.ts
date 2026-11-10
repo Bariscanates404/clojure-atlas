@@ -187,7 +187,8 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
       for (const k of usedAsValue || !proven.length ? [] : (p.keys ?? [])) {
         if (p.defaults?.includes(k) || proven.some((x) => x.passed?.keys.includes(k))) continue;
         out.neverPassed.push({
-          label: `${shortName(fn)} destructures ${k} (param ${i}${arities.length > 1 ? `, arity ${fixedCount(a)}${a.variadic ? '+' : ''}` : ''}) but no caller passes it`,
+          label: `${shortName(fn)} destructures ${k} (param ` +
+            `${i}${arities.length > 1 ? `, arity ${fixedCount(a)}${a.variadic ? '+' : ''}` : ''}) but no caller passes it`,
           id: `${fn.id}#${i}${k}`,
           finding: 'never-passed',
           key: k,
@@ -195,7 +196,8 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
           line: fn.line ?? null,
           band: unknownN ? 'heuristic' : proven.reduce<Band>((b, x) => weakest(b, x.passed?.band ?? 'unknown'), 'static_proven'),
           ...(fn.component ? { component: fn.component } : {}),
-          detail: `0 of ${proven.length} caller(s) with a known argument pass it${unknownN ? `; ${unknownN} caller(s) pass an argument whose keys are not provable` : ''}; no :or default`,
+          detail: `0 of ${proven.length} caller(s) with a known argument pass ` +
+            `it${unknownN ? `; ${unknownN} caller(s) pass an argument whose keys are not provable` : ''}; no :or default`,
         });
       }
       if (proven.length && p.reads_complete === false) {
@@ -230,7 +232,8 @@ function requiredKeys(as: ArityDesc[]): Set<string> {
   return new Set(as.flatMap((a) => a.params.flatMap((p) => (p.keys ?? []).filter((k) => !p.defaults?.includes(k)))));
 }
 
-function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: ArityDesc[] | null, change: SignatureChange, calls: CallSite[]): { rows: Row[]; summary: string[] } {
+function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: ArityDesc[] | null, change: SignatureChange,
+  calls: CallSite[]): { rows: Row[]; summary: string[] } {
   const rows: Row[] = [];
   const summary: string[] = [];
   let added = (change.addedKeys ?? []).map(normKey);
@@ -264,12 +267,14 @@ function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: Arit
       if (p.kind !== 'map' && p.kind !== 'kwargs') return;
       const passed = passedAt(c, arity, i);
       if (!passed) {
-        if (added.length) at({ band: 'unknown', label: `${c.caller} may not pass ${added.join(' ')}`, reason: `argument ${i} is not a literal map; its keys are not provable` });
+        if (added.length) at({ band: 'unknown', label: `${c.caller} may not pass ${added.join(' ')}`,
+          reason: `argument ${i} is not a literal map; its keys are not provable` });
         return;
       }
       const missing = added.filter((k) => !passed.keys.includes(k));
       const still = removed.filter((k) => passed.keys.includes(k));
-      if (missing.length) at({ band: passed.band, label: `${c.caller} does not pass ${missing.join(' ')}`, detail: `argument ${i} passes ${keyList(passed.keys)}` });
+      if (missing.length) at({ band: passed.band, label: `${c.caller} does not pass ${missing.join(' ')}`,
+        detail: `argument ${i} passes ${keyList(passed.keys)}` });
       if (still.length) at({ band: passed.band, label: `${c.caller} still passes ${still.join(' ')}`, detail: `${target} no longer reads it` });
     });
   }
@@ -334,8 +339,10 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     const baseNode = opts.base ? (opts.base.byId.get(fn.id) ?? resolve(opts.base, ['definition'], fn.name)[0]) : undefined;
     if (opts.base && !baseNode) notes.push(`${fn.name} is not in the base graph: a new function, every caller is new`);
     const a = affectedByChange(g, fn, arities, baseNode ? signatureOf(baseNode) : null, change, calls);
-    sections.push({ name: 'affected by the change', short: 'affected', rows: a.rows, ordered: true, searched: 'callers whose arity disappears, that do not pass a new key, or still pass a removed one' });
-    verdict.push(`${a.rows.filter((r) => r.band !== 'unknown').length} caller(s) affected by the change${a.summary.length ? ` (${a.summary.join('; ')})` : ''}`);
+    sections.push({ name: 'affected by the change', short: 'affected', rows: a.rows, ordered: true,
+      searched: 'callers whose arity disappears, that do not pass a new key, or still pass a removed one' });
+    verdict.push(`${a.rows.filter((r) => r.band !== 'unknown').length} caller(s) affected by the ` +
+      `change${a.summary.length ? ` (${a.summary.join('; ')})` : ''}`);
   }
   const findings = [...f.arityMissing, ...f.neverPassed, ...f.unread];
   sections.push(...gated(g, ['signatures'], [
@@ -348,11 +355,13 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
   const comps = new Set(callerSection.map((r) => r.component ?? '(no component)'));
   const blind = callerRows.filter((r) => r.band === 'unknown').length;
   const unknownTotal = callerSection.filter((r) => r.band === 'unknown').length;
-  const unknownParts = [...(valueRows.length ? [`${valueRows.length} via apply/partial/value`] : []), ...(blind ? [`${blind} with arguments not recorded`] : [])];
+  const unknownParts = [...(valueRows.length ? [`${valueRows.length} via apply/partial/value`] : []),
+    ...(blind ? [`${blind} with arguments not recorded`] : [])];
   verdict.push(
     `${callerSection.length} caller(s) in ${comps.size} component(s)${unknownTotal ? `, ${unknownTotal} UNKNOWN (${unknownParts.join(', ')})` : ''}`,
     `arities ${arities.map((a) => (a.variadic ? `${fixedCount(a)}+` : String(fixedCount(a)))).join(', ')}`,
-    findings.length ? `${findings.length} finding(s): ${f.arityMissing.length} arity not defined, ${f.neverPassed.length} key never passed, ${f.unread.length} unread key passed` : 'no finding',
+    findings.length ? `${findings.length} finding(s): ${f.arityMissing.length} arity not defined, ${f.neverPassed.length} key never passed, ` +
+      `${f.unread.length} unread key passed` : 'no finding',
   );
   const neverKey = f.neverPassed[0]?.key;
   const crossCaller = calls.find((c) => g.byId.get(c.edge.from)?.component !== fn.component);
@@ -452,22 +461,27 @@ export function keyFlow(g: Graph, query: string): QueryResult {
     : !cons.length && prod.length
       ? 'produced but never read through a literal key outside tests: read dynamically, outside the repo, or dead'
       : '';
-  if (other) notes.push(`UNKNOWN: ${other} other use(s) of ${key.name} as a value or an argument — not provable as produce or consume; evidence: textual occurrences of ${key.name}`);
+  if (other) notes.push(`UNKNOWN: ${other} other use(s) of ${key.name} as a value or an argument — not provable as produce or consume; evidence: textual ` +
+    `occurrences of ${key.name}`);
   if (!notes.some((n) => /dynamic key access/.test(n))) notes.push(DYNAMIC_NOTE);
   if (!key.name.slice(1).includes('/')) {
     notes.push(`${key.name} is unqualified: every map using that name is joined here`);
     const qualified = sameLocalName(g, localName(key.name)).filter((n) => n !== key).map((n) => n.name).sort(compareText);
-    if (qualified.length) notes.push(`other keys with the local name ${localName(key.name)}: ${qualified.slice(0, 5).join(', ')}${qualified.length > 5 ? ` +${qualified.length - 5} more` : ''}; query one by its qualified name`);
+    if (qualified.length) notes.push(`other keys with the local name ${localName(key.name)}: ` +
+      `${qualified.slice(0, 5).join(', ')}${qualified.length > 5 ? ` +${qualified.length - 5} more` : ''}; query one by its qualified name`);
   }
   const near = signal ? similarKeys(g, key.name, 3) : [];
   if (near.length) notes.push(`similar keys: ${near.map((n) => `${n.name} (${roleCount(g, n.id)})`).join(', ')}`);
   const table = (g.byKind.get('key_table') ?? []).find((t) => tableRows(t).some((r) => r.keys.includes(key.name)));
   return {
     name: 'key_flow', query, title, found: true, matches: [key.id],
-    verdict: `${prod.length} producer(s), ${cons.length} consumer(s)${rem.length ? `, ${rem.length} remover(s)` : ''} in ${comps.size} component(s); ${tests.length} site(s) in tests${signal ? `; ${signal}` : ''}`,
+    verdict: `${prod.length} producer(s), ${cons.length} ` +
+      `consumer(s)${rem.length ? `, ${rem.length} remover(s)` : ''} in ${comps.size} component(s); ` +
+      `${tests.length} site(s) in tests${signal ? `; ${signal}` : ''}`,
     sections: gated(g, ['key_flow'], [
       { name: 'producers', rows: prod, searched: 'map-literal keys, assoc / assoc-in / update paths, hash-map, [:db/add e k v]' },
-      { name: 'consumers', rows: cons, searched: 'keyword as fn, get / get-in / contains? / find / select-keys, destructuring, pull patterns, datalog queries' },
+      { name: 'consumers', rows: cons,
+        searched: 'keyword as fn, get / get-in / contains? / find / select-keys, destructuring, pull patterns, datalog queries' },
       ...(rem.length ? [{ name: 'removed by', short: 'removed', rows: rem }] : []),
       { name: 'in tests', short: 'tests', rows: tests },
     ]),
@@ -633,7 +647,8 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
   const notes = capabilityNotes(g, ['key_tables']);
   const tables = resolveTables(g, target).sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
   if (!tables.length) {
-    return notFound(g, 'key_siblings', target, title, 'literal table (3+ map rows)', ['key_tables'], 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
+    return notFound(g, 'key_siblings', target, title, 'literal table (3+ map rows)', ['key_tables'],
+      'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
   }
   const files = [...new Set(tables.map((t) => t.file ?? ''))];
   if (files.length > 1) {
@@ -690,22 +705,27 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
     const top = [...freq].sort((x, y) => y[1] - x[1] || compareText(x[0], y[0])).slice(0, 6).map(([k, n]) => `${k} ${n}/${rows.length}`);
     tableOut.push(nodeRow(t, { detail: `${rows.length} map rows; ${top.join(', ')}${freq.size > 6 ? ', ...' : ''}` }));
     for (const o of otherRows(t)) {
-      unknown.push({ label: `${t.name}: row is a ${o.shape}, not a map literal`, id: `${t.id}@${o.line}`, file: t.file ?? null, line: o.line, band: 'unknown', ...(t.component ? { component: t.component } : {}), reason: 'its keys are not provable' });
+      unknown.push({ label: `${t.name}: row is a ${o.shape}, not a map literal`, id: `${t.id}@${o.line}`, file: t.file ?? null, line: o.line, band: 'unknown',
+        ...(t.component ? { component: t.component } : {}), reason: 'its keys are not provable' });
     }
   }
   opts.onWeak?.(weak);
-  if (weak) notes.push(`${weak} row(s) not shown: the key they lack is absent in ${Math.round((opts.maxAbsent ?? 0) * 100)}%+ of sibling rows, no sibling pattern`);
+  if (weak) notes.push(`${weak} row(s) not shown: the key they lack is absent in ${Math.round((opts.maxAbsent ?? 0) * 100)}%+ of sibling rows, no sibling ` +
+    `pattern`);
   if (explained.length) {
     const ex = explained[0];
     notes.push(`${explained.length} absence(s) explained by same-kind rows, e.g. ${ex.table.name} row ${rowLabel(ex.row)} lacks ${ex.key}: ${ex.why}`);
   }
   const firstKey = findings[0]?.key;
-  const holder = tables.find((t) => findings[0]?.id.startsWith(`${t.id}@`) && typeof t.attrs?.var === 'string') ?? tables.find((t) => typeof t.attrs?.var === 'string');
+  const holder = tables.find((t) => findings[0]?.id.startsWith(`${t.id}@`) && typeof t.attrs?.var === 'string')
+    ?? tables.find((t) => typeof t.attrs?.var === 'string');
   return {
     name: 'key_siblings', query: target, title, found: true, matches: tables.map((t) => t.id),
-    verdict: `${findings.length} row(s) lack a key their siblings have, in ${tables.length} table(s) with ${rowCount} map rows${unknown.length ? `; ${unknown.length} row(s) not provable (UNKNOWN)` : ''}`,
+    verdict: `${findings.length} row(s) lack a key their siblings have, in ${tables.length} table(s) with ${rowCount} map ` +
+      `rows${unknown.length ? `; ${unknown.length} row(s) not provable (UNKNOWN)` : ''}`,
     sections: [
-      { name: 'findings', rows: findings, ordered: true, searched: `rows missing a key that ${Math.round(MAJORITY * 100)}%+ of siblings or a path sibling have, minus absences shared by same-kind rows` },
+      { name: 'findings', rows: findings, ordered: true,
+        searched: `rows missing a key that ${Math.round(MAJORITY * 100)}%+ of siblings or a path sibling have, minus absences shared by same-kind rows` },
       { name: 'tables', rows: tableOut, ordered: true },
       ...(unknown.length ? [{ name: 'rows not provable', short: 'unprovable', rows: unknown }] : []),
     ],

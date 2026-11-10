@@ -119,7 +119,8 @@ export const MACRO_HINT = 'probably defined by a macro clj-kondo cannot expand; 
 function usedUndefined(g: Graph, query: string): [string, string[]][] {
   const recorded = (g.doc as { stats?: { usages?: { unresolvedSites?: Record<string, unknown> } } }).stats?.usages?.unresolvedSites ?? {};
   const q = query.replace(/^definition:/, '');
-  return Object.entries(recorded).flatMap(([name, sites]): [string, string[]][] => (name === q || (!q.includes('/') && name.endsWith(`/${q}`)) ? [[name, strings(sites)]] : []));
+  return Object.entries(recorded).flatMap(([name, sites]): [string, string[]][] => (name === q || (!q.includes('/') && name.endsWith(`/${q}`))
+    ? [[name, strings(sites)]] : []));
 }
 
 // Not found is only as strong as the capabilities that could have produced a match: their state is always named.
@@ -133,17 +134,21 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
   const used = what === 'definition' ? usedUndefined(g, query) : [];
   const at = (sites: string[]) => sites.join(', ');
   const cause = unparsed.length ? 'its definition is probably in the file named below'
-    : recovered.length ? `probably a form clj-kondo could not read in the file with syntax errors named below, or a ${MACRO_HINT.replace(/^probably defined by a /, '')}`
+    : recovered.length ? `probably a form clj-kondo could not read in the file with syntax errors named below, or a ` +
+      `${MACRO_HINT.replace(/^probably defined by a /, '')}`
     : MACRO_HINT;
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
-    verdict: `no ${what} matches ${JSON.stringify(query)}${used.length ? `; used at ${used.map(([, s]) => at(s)).join('; ')} but no definition was found` : ''}`,
+    verdict: `no ${what} matches ` +
+      `${JSON.stringify(query)}${used.length ? `; used at ${used.map(([, s]) => at(s)).join('; ')} but no definition was found` : ''}`,
     notes: [
       ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${cause}`),
       ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
-      ...(recovered.length ? [`${query} may live in ${recovered.join(', ')}, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible`] : []),
+      ...(recovered.length ? [`${query} may live in ${recovered.join(', ')}, which has syntax errors; some forms may be missing, so besides a spelling ` +
+        `problem a form kondo could not read is possible`] : []),
       ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
-      ...(timedOut.length ? [`${query} probably lives in ${timedOut.join(', ')}, which was not analyzed because clj-kondo did not finish on it${NOT_SPELLING}`] : []),
+      ...(timedOut.length ? [`${query} probably lives in ${timedOut.join(', ')}, which was not analyzed because clj-kondo did not finish on it${NOT_SPELLING}`]
+        : []),
       ...(unread.length ? [`${query} probably lives in ${unread.join(', ')}, which git tracks but the build did not analyze${NOT_SPELLING}`] : []),
       ...capabilityNotes(g, caps), ...(note ? [note] : []),
     ],
@@ -187,7 +192,8 @@ export function dynamicResolveNote(g: Graph): string[] {
   const seen = (g.doc as { stats?: { usages?: { dynamicResolve?: { sites?: unknown; literal?: unknown } } } }).stats?.usages?.dynamicResolve;
   const sites = typeof seen?.sites === 'number' ? seen.sites : 0;
   const literal = typeof seen?.literal === 'number' ? seen.literal : 0;
-  return sites ? [`dynamic resolution (requiring-resolve, resolve, ns-resolve) is used at ${sites} site(s), ${literal} naming a project var by a literal symbol `
+  return sites ? [`dynamic resolution (requiring-resolve, resolve, ns-resolve) is used at ${sites} site(s), ${literal} naming a project var by a literal ` +
+    `symbol `
     + '(HEURISTIC references); a symbol built at runtime is not followed, so a caller reached that way is not listed'] : [];
 }
 

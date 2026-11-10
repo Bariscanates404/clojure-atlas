@@ -1003,7 +1003,8 @@ function coverageNotes(g: Graph, changes: Change[], changed: GraphNode[], added:
 function badSpecs(specs: string[]): QueryResult {
   const bad = specs.filter((x) => !validSpec(x)).map((x) => JSON.stringify(x)).join(', ');
   const verdict = `not a change spec: ${bad}; expected ${CHANGE_FORMAT}`;
-  return { name: 'context_for_change', query: specs.join(' '), title: 'context for change', found: false, verdict, matches: [], sections: [], notes: [verdict], next: [], badArgument: true };
+  return { name: 'context_for_change', query: specs.join(' '), title: 'context for change', found: false, verdict, matches: [], sections: [], notes: [verdict],
+    next: [], badArgument: true };
 }
 
 export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions = {}): QueryResult {
@@ -1027,7 +1028,8 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const cover = coverageNotes(g, changes.filter((c) => !missing.includes(c)), changed, new Set(opts.added ?? []));
   const coverage = cover.uncovered ? ` (${cover.uncovered} of ${changes.length} file(s) not covered)` : '';
   // nothing matched, or a contributing capability absent for a changed route, means nothing was assessed: UNKNOWN, never LOW
-  const level = found.some((x) => x.high) ? 'HIGH' : unassessed ? 'UNKNOWN' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length || missing.length ? 'UNKNOWN' : 'LOW';
+  const level = found.some((x) => x.high) ? 'HIGH' : unassessed ? 'UNKNOWN' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length || missing.length
+    ? 'UNKNOWN' : 'LOW';
   const notes = [
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
