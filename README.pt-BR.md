@@ -30,8 +30,7 @@ npx clojure-atlas init
 `build` escreve `.clojure-atlas/graph.json.gz`. No repo do integrant ele imprime:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
-clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` mostra o `.mcp.json` do projeto que escreveria e só o escreve com `--yes`:
@@ -95,7 +94,9 @@ usage:
 - `build` analisa `dir` (padrão `.`) e escreve o grafo.
 - `mcp` serve um grafo. Com `--repo`, as respostas começam com uma linha `STALE` quando a árvore de trabalho não é
   aquela a partir da qual o grafo foi construído, ou quando o commit que o agente passa como `base` está a mais de
-  `--max-distance` commits de distância (padrão 20).
+  `--max-distance` commits além do commit do grafo (padrão 20), ou o commit do grafo está à frente de `base` ou divergiu
+  dele. A verificação da árvore de trabalho é repetida no máximo a cada 3 segundos, então uma edição aparece a partir
+  da primeira chamada depois disso.
 - `coverage` imprime a linha de cobertura de um grafo e seus nomes não resolvidos mais frequentes.
 - `init` adiciona o servidor ao `.mcp.json` do projeto.
 
@@ -103,7 +104,6 @@ Reconstrua o grafo depois de mudar o código. Um grafo servido não se atualiza 
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 A configuração `.clj-kondo` do próprio projeto é respeitada. Um `.clojure-atlas.edn` opcional na raiz do projeto acrescenta o que
@@ -113,7 +113,7 @@ autorização de rotas `:route-authz`, `:permission-middleware` e `:permission-f
 ## Ferramentas
 
 Cada exemplo abaixo é saída real de `clojure-atlas mcp` sobre um grafo de [examples/](examples/), cortada apenas
-onde indicado. Alguns desses grafos descartaram algumas arestas na construção, então suas respostas começam com uma
+onde indicado. O mount define quatro namespaces em mais de um arquivo, então suas respostas começam com uma
 linha `DEGRADED` (veja a próxima seção). `[S]`, `[H]` e `[?]` são as bandas, explicadas na próxima seção.
 
 ### graph_info
@@ -122,14 +122,13 @@ Qual commit o grafo descreve e o que cada adaptador encontrou, com a contagem de
 do integrant sabe?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
   multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
   events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 61 edges {"static_proven":61} (switched on by integrant)
+  system: available, 69 edges {"static_proven":69} (switched on by integrant)
   route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
   [... trimmed ...]
 ```
@@ -139,7 +138,6 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 Chamadores diretos de uma definição. Pergunta: quem chama `integrant.core/dependent-keys`?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -161,7 +159,6 @@ compojure nomeando `routes`) é uma referência HEURISTIC, não uma chamada.
 Dependentes transitivos de uma definição. Pergunta: o que uma mudança em `integrant.core/ref?` pode alcançar?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -183,7 +180,6 @@ deeper (25 S25)
 Aridades, chaves desestruturadas e o que cada chamador passa. Pergunta: como `integrant.core/init` é chamado?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
@@ -241,7 +237,7 @@ nos dados de rota do reitit e do pedestal (`:middleware`, `:interceptors`) é li
 Toda rota que verifica uma permissão. Pergunta: quais rotas do mount exigem `:admin`?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -254,7 +250,7 @@ Leitores e escritores comprovados de um atributo de Datomic, datascript ou XTDB.
 app de exemplo do mount?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -269,11 +265,11 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 
 ### event_flow
 
-Dispatchers e handler de um evento re-frame, ou handler, entradas e assinantes de uma subscription. Pergunta: quem faz
+Dispatchers e handler de um evento re-frame, ou handler, entradas e assinantes de uma subscription. Um dispatch cujo
+evento não é uma keyword literal é listado como UNKNOWN. Pergunta: quem faz
 dispatch de `:delete-todo` no todomvc do re-frame?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -309,12 +305,13 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 
 ### tests_covering
 
-Testes de navegador (page objects e testes do Playwright, lidos com o TypeScript do próprio projeto) que alcançam um arquivo,
+Testes de navegador (page objects e testes do Playwright, lidos com o TypeScript 5 quando ele está instalado ao lado do clojure-atlas como o peer opcional `typescript`; nunca a
+cópia do repositório analisado) que alcançam um arquivo,
 uma definição, um seletor ou uma rota. Nenhum dos repos de exemplo os tem, e a resposta diz isso. Pergunta: quais testes de
 navegador alcançam `mount.core/start`?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -346,7 +343,6 @@ Linhas de uma tabela literal de mapas que não têm uma chave que a maioria das 
 tabela em `test/re_frame/subs/alpha_test.cljs` do re-frame está sem uma chave?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -363,7 +359,7 @@ A ausência da chave é comprovada; se a linha deveria tê-la fica a critério d
 ### context_for_change
 
 Uma chamada por revisão: símbolos alterados, chamadores fora do diff, rotas, atributos, testes a rodar e testes a adicionar.
-Pergunta: o que uma mudança nas linhas 60-80 do store de artigos do polylith-realworld afeta?
+Quando uma rota alterada não tem autorização extraída, o risco é UNKNOWN, não LOW. Pergunta: o que uma mudança nas linhas 60-80 do store de artigos do polylith-realworld afeta?
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -413,12 +409,14 @@ Uma resposta vazia nunca é uma lista vazia simples. Ela toma uma destas formas:
   `not extracted (route_authz is absent)`, nunca como "none". Uma cadeia de middleware que não pode ser lida aparece como
   `not extracted (UNKNOWN)`.
 
-Quando o próprio grafo está incompleto, o log de build, o graph_info e toda resposta começam com uma linha `DEGRADED`: um
-arquivo que o clj-kondo não conseguiu analisar, ou arestas descartadas porque uma ponta não era um nó. Um nome que
-provavelmente está em um arquivo não analisado é reportado como tal. Do biff, onde um arquivo não pode ser analisado:
+Quando o próprio grafo está incompleto, o log de build, o graph_info e toda resposta começam com uma linha `DEGRADED`. Ela
+nomeia os arquivos que o clj-kondo não conseguiu analisar, os arquivos-fonte acima de 2 MB que foram pulados, os
+namespaces definidos em mais de um arquivo (seus usos são HEURISTIC, via `duplicate-namespace`) e as arestas
+descartadas porque uma ponta não era um nó. Um nome que provavelmente está em um arquivo não analisado ou pulado é
+reportado como tal. Do biff, onde um arquivo não pode ser analisado e um namespace é definido duas vezes:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
 note: use a fully qualified name (ns/name)
@@ -483,8 +481,19 @@ perguntas foram adicionadas depois, para a cadeia de middleware do compojure (q1
 - Offline, ou atrás de um proxy: coloque o `clj-kondo` no seu PATH. O `fetch` do Node ignora `HTTPS_PROXY`, então o download
   falha atrás de um proxy, e o clojure-atlas passa a usar o clj-kondo do PATH. Um download com sha256 errado é
   recusado, nunca executado.
+- Opcional: TypeScript 5 (`npm i -D typescript@5` ao lado do clojure-atlas) para ler page objects e testes do Playwright.
+  É uma dependência peer opcional. Sem ele, essa leitura fica desligada, e o graph_info e as respostas de testes de
+  navegador dizem o motivo para cada projeto Playwright encontrado.
 - Plataformas com binário do clj-kondo fixado: macOS arm64, macOS x64, Linux x64, Linux arm64, Windows x64. Qualquer outra
   plataforma precisa do clj-kondo no PATH. Esta versão foi desenvolvida e medida em macOS arm64. O Windows não foi testado.
+
+## Segurança
+
+O build lê arquivos. Ele executa apenas o clj-kondo (o binário fixado, ou o do PATH) e `git ls-files`, e nunca executa
+código do repositório analisado com Node, uma JVM ou um shell. O TypeScript é carregado da própria instalação do
+clojure-atlas, nunca do repositório analisado. O clj-kondo aplica a configuração `.clj-kondo` do projeto; os hooks
+declarados nela são interpretados pelo próprio clj-kondo, como em qualquer editor que roda o clj-kondo. O servidor MCP
+apenas lê o arquivo do grafo e, com `--repo`, executa comandos git somente de leitura.
 
 ## Por que TypeScript?
 
@@ -502,12 +511,16 @@ TypeScript você mesmo.
 - **Partes heurísticas**: despacho de multimethods e protocolos (`may_dispatch_to`), alguns handlers do compojure
   (mostrados como `heuristic match`), cadeias de middleware do compojure e do Ring, chamadas a fábricas de middleware,
   tabelas de rotas de frontend do reitit em namespaces que não requerem reitit (lidas quando `reitit.frontend` é usado em
-  qualquer lugar do projeto), vars nomeados em corpos de macro com syntax-quote, posições de chaves encadeadas, literais
-  de consulta fora de uma chamada de transact ou query, achados do key_siblings.
+  qualquer lugar do projeto), vars nomeados em corpos de macro com syntax-quote, usos dentro de uma macro do projeto que o clj-kondo não consegue
+  expandir (via `unexpanded-macro`), usos de um namespace definido em mais de um arquivo (via `duplicate-namespace`),
+  posições de chaves encadeadas, literais de consulta fora de uma chamada de transact ou query, achados do key_siblings.
+- **Macros do projeto**: o clj-kondo só expande uma macro quando a configuração `.clj-kondo` do projeto lhe dá um
+  `:lint-as` ou um hook (ou o `.clojure-atlas.edn` a nomeia em `:lint-as`). Adicione um e reconstrua, e os usos dentro
+  dela voltam a ser STATIC_PROVEN.
 - **Middleware cujo envolvimento não pode ser lido** é reportado como `middleware: not extracted (UNKNOWN)`, não como
   "none".
-- **Arquivos não analisáveis**: suas definições e chamadas faltam no grafo. Toda resposta então começa com uma linha
-  `DEGRADED` que os nomeia.
+- **Arquivos não analisáveis e arquivos acima de 2 MB**: suas definições e chamadas faltam no grafo. Toda resposta
+  então começa com uma linha `DEGRADED` que os nomeia.
 - **Autorização de rotas** precisa do `.clojure-atlas.edn`. Sem ele, o route_authz diz "not provable" e
   o permission_routes informa a capacidade como ausente.
 - **Ainda não suportado**: rotas bidi, compojure-api, rotas de mapa verbosas do pedestal, registros do malli, sistemas integrant

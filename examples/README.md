@@ -30,9 +30,9 @@ git clone https://github.com/tolitius/mount /tmp/mount && git -C /tmp/mount chec
 git clone https://github.com/day8/re-frame /tmp/re-frame && git -C /tmp/re-frame checkout 1a1bf1df6570b17a148ebce70d500ec2da393cdc && npx clojure-atlas build /tmp/re-frame -o examples/re-frame.json.gz
 ```
 
-A rebuilt graph has the same nodes and edges; only the build time stamp differs. integrant, mount and re-frame
-drop a few edges at build time (8, 1 and 2) because one end is not a node, so their answers start with a
-`DEGRADED` line.
+A rebuilt graph has the same nodes and edges; only the build time stamp differs. mount defines four namespaces in
+more than one file (its example apps), so calls into them are HEURISTIC and its answers start with a `DEGRADED`
+line.
 
 ## Transcripts
 
@@ -43,7 +43,6 @@ Real server output over these graphs, trimmed where marked.
 `callers {"var": "integrant.core/dependent-keys"}`
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -62,7 +61,6 @@ grep hits that mix calls, docstrings and keywords.
 `callers {"var": "integrant.core/stop"}`
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/stop — no definition matches "integrant.core/stop"
 note: use a fully qualified name (ns/name)
 searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name
@@ -218,7 +216,7 @@ def. The chain is HEURISTIC, so the agent opens the cited lines before relying o
 `attribute_usage {"attr": ":order/bid"}`
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -237,7 +235,7 @@ not keyword matches.
 `callers {"var": "mount.core/unpound"}`
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS mount.core/unpound — 0 direct caller(s) in 0 component(s)
 definition (1)
   1. mount.core/unpound  src/mount/core.cljc:43 [S]
@@ -253,7 +251,6 @@ agent can tell the two apart.
 `event_flow {"name": ":todos"}`
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :todos — :todos: 1 handler(s), 1 input subscription(s), 5 subscriber(s)
 counts: handler=1 [S1]  handler reads subscriptions=1 [S1]  subscribed by=5 [S5]
 note: events: switched on by re-frame.core
@@ -277,7 +274,6 @@ subscribers, including the `:<-` chains, before changing the shape of `:todos`.
 `key_siblings {"target": "test/re_frame/subs/alpha_test.cljs"}`
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code

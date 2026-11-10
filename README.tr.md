@@ -30,8 +30,7 @@ npx clojure-atlas init
 `build`, `.clojure-atlas/graph.json.gz` dosyasını yazar. integrant deposunda şunu yazdırır:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
-clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init`, yazacağı proje `.mcp.json` dosyasını gösterir ve yalnızca `--yes` ile yazar:
@@ -94,7 +93,9 @@ usage:
 
 - `build`, `dir` dizinini (varsayılan `.`) analiz eder ve grafı yazar.
 - `mcp`, bir grafı sunar. `--repo` verildiğinde, çalışma ağacı grafın oluşturulduğu ağaç değilse ya da ajanın `base`
-  olarak verdiği commit `--max-distance` commit'ten daha uzaksa (varsayılan 20), yanıtlar bir `STALE` satırı ile başlar.
+  olarak verdiği commit grafın commit'inin `--max-distance` commit'ten daha gerisindeyse (varsayılan 20) ya da grafın
+  commit'i `base`'in ilerisindeyse veya ondan ayrışmışsa, yanıtlar bir `STALE` satırı ile başlar. Çalışma ağacı denetimi
+  en fazla her 3 saniyede bir tekrarlanır, bu yüzden bir düzenleme o andan sonraki ilk çağrıdan itibaren görünür.
 - `coverage`, bir grafın coverage satırını ve en sık çözülemeyen adlarını yazdırır.
 - `init`, sunucuyu projenin `.mcp.json` dosyasına ekler.
 
@@ -102,7 +103,6 @@ Kodu değiştirdikten sonra grafı yeniden oluşturun. Sunulan graf kendini gün
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 Projenin kendi `.clj-kondo` yapılandırması dikkate alınır. Proje kökündeki isteğe bağlı `.clojure-atlas.edn`, genel
@@ -112,7 +112,7 @@ anahtarları olan `:route-authz`, `:permission-middleware` ve `:permission-fns`.
 ## Araçlar
 
 Aşağıdaki her örnek, [examples/](examples/) içindeki bir graf üzerinde `clojure-atlas mcp` çıktısıdır. Yalnızca
-işaretlenen yerlerde kısaltılmıştır. Bu graflardan bazıları build sırasında birkaç edge'i düşürdü, bu yüzden yanıtları
+işaretlenen yerlerde kısaltılmıştır. mount, dört namespace'i birden fazla dosyada tanımlar, bu yüzden yanıtları
 bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]` band'lerdir ve sonraki bölümde açıklanır.
 
 ### graph_info
@@ -120,14 +120,13 @@ bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]
 Grafın hangi commit'i anlattığı, her adaptörün ne bulduğu ve band sayıları. Soru: integrant grafı neleri biliyor?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
   multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
   events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 61 edges {"static_proven":61} (switched on by integrant)
+  system: available, 69 edges {"static_proven":69} (switched on by integrant)
   route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
   [... trimmed ...]
 ```
@@ -137,7 +136,6 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 Bir tanımın doğrudan çağıranları. Soru: `integrant.core/dependent-keys` fonksiyonunu kim çağırıyor?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -159,7 +157,6 @@ dispatch adaylarını ve rebinding'leri de listeler. Syntax-quote'lu bir makro g
 Bir tanımın geçişli bağımlıları. Soru: `integrant.core/ref?` üzerindeki bir değişiklik nelere ulaşabilir?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -181,7 +178,6 @@ deeper (25 S25)
 Arity'ler, destructure edilen anahtarlar ve her çağıranın ne verdiği. Soru: `integrant.core/init` nasıl çağrılıyor?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
@@ -240,7 +236,7 @@ pedestal route verisindeki middleware (`:middleware`, `:interceptors`) route'un 
 Bir izni kontrol eden her route. Soru: mount içinde hangi route'lar `:admin` ister?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -253,7 +249,7 @@ Bir Datomic, datascript veya XTDB niteliğinin kanıtlanmış okuyucuları ve ya
 `:order/bid` niteliğini kim yazıyor?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -269,10 +265,10 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 ### event_flow
 
 Bir re-frame event'inin dispatch edenleri ve handler'ı ya da bir subscription'ın handler'ı, girdileri ve aboneleri.
+Event'i değişmez bir keyword olmayan bir dispatch UNKNOWN olarak listelenir.
 Soru: re-frame'in todomvc örneğinde `:delete-todo` event'ini kim dispatch ediyor?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -308,12 +304,13 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 
 ### tests_covering
 
-Bir dosyaya, tanıma, selector'a ya da route'a ulaşan browser testleri (Playwright page object'leri ve testleri, projenin
-kendi TypeScript'i ile okunur). Örnek depoların hiçbirinde bunlar yoktur ve yanıt bunu söyler. Soru: hangi browser
+Bir dosyaya, tanıma, selector'a ya da route'a ulaşan browser testleri (Playwright page object'leri ve testleri, clojure-atlas'ın
+yanına isteğe bağlı peer `typescript` olarak kuruluysa TypeScript 5 ile okunur; analiz edilen deponun kopyası asla
+kullanılmaz). Örnek depoların hiçbirinde bunlar yoktur ve yanıt bunu söyler. Soru: hangi browser
 testleri `mount.core/start` fonksiyonuna ulaşıyor?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -345,7 +342,6 @@ Literal bir map tablosunun, kardeş satırların çoğunda bulunan bir anahtarı
 `test/re_frame/subs/alpha_test.cljs` tablosunda anahtarı eksik bir satır var mı?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -362,7 +358,7 @@ Eksik anahtar kanıtlanmıştır. Satırda olması gerekip gerekmediği okuyucuy
 ### context_for_change
 
 Her review için tek çağrı: değişen semboller, diff dışındaki çağıranlar, route'lar, nitelikler, çalıştırılacak testler
-ve eklenecek testler. Soru: polylith-realworld'ün article store dosyasının 60-80. satırlarındaki bir değişiklik neye
+ve eklenecek testler. Değişen bir route'un çıkarılmış yetkilendirmesi yoksa risk LOW değil UNKNOWN'dur. Soru: polylith-realworld'ün article store dosyasının 60-80. satırlarındaki bir değişiklik neye
 dokunuyor?
 
 ```
@@ -412,12 +408,14 @@ Boş bir yanıt hiçbir zaman çıplak bir boş liste değildir. Şu biçimlerde
   `not extracted (route_authz is absent)` yazar, asla "none" yazmaz. Okunamayan bir middleware zinciri `not extracted (UNKNOWN)`
   yazar.
 
-Grafın kendisi eksik olduğunda, build günlüğü, graph_info ve her yanıt bir `DEGRADED` satırı ile başlar: clj-kondo'nun
-ayrıştıramadığı bir dosya ya da bir ucu node olmadığı için düşürülen edge'ler. Büyük olasılıkla ayrıştırılamayan bir
-dosyada duran bir ad bu şekilde bildirilir. Bir dosyanın ayrıştırılamadığı biff'ten:
+Grafın kendisi eksik olduğunda, build günlüğü, graph_info ve her yanıt bir `DEGRADED` satırı ile başlar. Satır,
+clj-kondo'nun ayrıştıramadığı dosyaları, atlanan 2 MB'tan büyük kaynak dosyalarını, birden fazla dosyada tanımlanan
+namespace'leri (bunların kullanımları `duplicate-namespace` üzerinden HEURISTIC'tir) ve bir ucu node olmadığı için
+düşürülen edge'leri adlandırır. Büyük olasılıkla ayrıştırılamayan ya da atlanan bir dosyada duran bir ad bu şekilde
+bildirilir. Bir dosyanın ayrıştırılamadığı ve bir namespace'in iki kez tanımlandığı biff'ten:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
 note: use a fully qualified name (ns/name)
@@ -484,9 +482,20 @@ frontend route'u (q14).
 - Çevrimdışıyken ya da bir proxy arkasında: `clj-kondo`'yu PATH'e koyun. Node'un `fetch`'i `HTTPS_PROXY` değerini yok
   sayar, bu yüzden indirme proxy arkasında başarısız olur ve clojure-atlas PATH üzerindeki clj-kondo'yu kullanır.
   Yanlış sha256'lı bir indirme reddedilir, hiçbir zaman çalıştırılmaz.
+- İsteğe bağlı: Playwright page object'lerini ve testlerini okumak için TypeScript 5 (clojure-atlas'ın yanında
+  `npm i -D typescript@5`). İsteğe bağlı bir peer bağımlılıktır. Olmadan bu okuma kapalıdır ve graph_info ile browser
+  test yanıtları bulunan her Playwright projesi için nedenini söyler.
 - Sabitlenmiş clj-kondo ikili dosyası olan platformlar: macOS arm64, macOS x64, Linux x64, Linux arm64, Windows x64.
   Diğer her platform için PATH üzerinde clj-kondo gerekir. Bu sürüm macOS arm64 üzerinde geliştirildi ve ölçüldü.
   Windows test edilmedi.
+
+## Güvenlik
+
+Build dosyaları okur. Yalnızca clj-kondo'yu (sabitlenmiş ikili dosyayı ya da PATH üzerindekini) ve `git ls-files`
+komutunu çalıştırır; analiz edilen deponun kodunu Node, JVM ya da shell ile asla çalıştırmaz. TypeScript, analiz edilen
+depodan değil, clojure-atlas'ın kendi kurulumundan yüklenir. clj-kondo, projenin `.clj-kondo` config'ini uygular; orada
+bildirilen hook'ları clj-kondo'nun kendisi yorumlar, clj-kondo çalıştıran her editörde olduğu gibi. MCP sunucusu yalnızca
+graf dosyasını okur ve `--repo` ile salt okunur git komutları çalıştırır.
 
 ## Neden TypeScript?
 
@@ -504,10 +513,15 @@ TypeScript'i kendiniz yazabilirsiniz.
 - **Heuristic kısımlar**: multimethod ve protocol dispatch (`may_dispatch_to`), bazı compojure handler'ları
   (`heuristic match` olarak gösterilir), compojure ve Ring middleware zincirleri, middleware factory çağrıları, reitit
   gerektirmeyen namespace'lerdeki reitit frontend route tabloları (projede herhangi bir yerde `reitit.frontend`
-  kullanılıyorsa okunur), syntax-quote'lu makro gövdelerinde adı geçen var'lar, threaded anahtar slotları, transact ya da
-  query çağrısı dışındaki query literal'leri, key_siblings bulguları.
+  kullanılıyorsa okunur), syntax-quote'lu makro gövdelerinde adı geçen var'lar, clj-kondo'nun açamadığı bir proje makrosunun içindeki
+  kullanımlar (`unexpanded-macro` üzerinden), birden fazla dosyada tanımlanan bir namespace'in kullanımları
+  (`duplicate-namespace` üzerinden), threaded anahtar slotları, transact ya da query çağrısı dışındaki query
+  literal'leri, key_siblings bulguları.
+- **Proje makroları**: clj-kondo bir makroyu yalnızca projenin `.clj-kondo` config'i ona bir `:lint-as` ya da hook
+  verdiğinde açar (ya da `.clojure-atlas.edn` onu `:lint-as` altında adlandırır). Birini ekleyip yeniden build
+  ederseniz, içindeki kullanımlar yine STATIC_PROVEN olur.
 - **Sarmalanması okunamayan middleware** `middleware: not extracted (UNKNOWN)` olarak bildirilir, "none" olarak değil.
-- **Ayrıştırılamayan dosyalar**: tanımları ve çağrıları graftan eksik kalır. Her yanıt bu durumda onları adlandıran bir
+- **Ayrıştırılamayan dosyalar ve 2 MB'tan büyük dosyalar**: tanımları ve çağrıları graftan eksik kalır. Her yanıt bu durumda onları adlandıran bir
   `DEGRADED` satırı ile başlar.
 - **Route yetkilendirmesi** `.clojure-atlas.edn` gerektirir. Bu dosya olmadan route_authz "not provable" der ve
   permission_routes capability'yi absent olarak bildirir.

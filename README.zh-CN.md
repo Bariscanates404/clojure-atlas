@@ -30,8 +30,7 @@ npx clojure-atlas init
 `build` 会写出 `.clojure-atlas/graph.json.gz`。在 integrant 仓库上的输出如下：
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
-clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` 会显示它将要写入的项目 `.mcp.json`，只有加上 `--yes` 才会真正写入：
@@ -94,8 +93,9 @@ usage:
 
 - `build` 分析 `dir`（默认 `.`）并写出图。
 - `mcp` 提供图服务。指定 `--repo` 后，当工作树与构建图时的工作树不一致，
-  或代理作为 `base` 传入的提交与当前相距超过 `--max-distance` 个提交（默认 20）时，
-  回答会以一行 `STALE` 开头。
+  或代理作为 `base` 传入的提交领先图的提交超过 `--max-distance` 个提交（默认 20），
+  或图的提交领先于 `base`，或与 `base` 已经分叉时，回答会以一行 `STALE` 开头。
+  工作树检查最多每 3 秒重复一次，因此编辑会在此之后的第一次调用中体现出来。
 - `coverage` 打印图的 coverage 行，以及出现最频繁的未解析名称。
 - `init` 把服务器添加到项目的 `.mcp.json`。
 
@@ -103,7 +103,6 @@ usage:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 项目自己的 `.clj-kondo` 配置会被采用。项目根目录下可选的 `.clojure-atlas.edn` 用于补充通用适配器无法猜到的信息：
@@ -113,7 +112,7 @@ DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing a
 ## 工具
 
 下面的每个示例都是 `clojure-atlas mcp` 在 [examples/](examples/) 中某个图上的真实输出，
-只在标注处做了截断。其中一些图在构建时丢弃了少量边，因此它们的回答以一行 `DEGRADED` 开头（见下一节）。
+只在标注处做了截断。mount 在多个文件中定义了四个命名空间，因此它的回答以一行 `DEGRADED` 开头（见下一节）。
 `[S]`、`[H]` 和 `[?]` 是 band，将在下一节说明。
 
 ### graph_info
@@ -121,14 +120,13 @@ DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing a
 图描述的是哪个提交，每个适配器找到了什么，并附各 band 的数量。问题：integrant 的图知道什么？
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
   multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
   events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 61 edges {"static_proven":61} (switched on by integrant)
+  system: available, 69 edges {"static_proven":69} (switched on by integrant)
   route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
   [... trimmed ...]
 ```
@@ -138,7 +136,6 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 某个定义的直接调用者。问题：谁调用 `integrant.core/dependent-keys`？
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -160,7 +157,6 @@ HEURISTIC 引用，而不是调用。
 某个定义的传递依赖方。问题：修改 `integrant.core/ref?` 会影响到哪里？
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -182,7 +178,6 @@ deeper (25 S25)
 参数个数（arity）、解构的键，以及每个调用者传入的内容。问题：`integrant.core/init` 是如何被调用的？
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
@@ -240,7 +235,7 @@ compojure 和 Ring 的中间件（`->`、`->>`、嵌套调用、`wrap-routes`）
 所有检查某项权限的路由。问题：mount 中哪些路由要求 `:admin`？
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -252,7 +247,7 @@ searched: names, ids and kind-prefixed ids; check the spelling or pass the fully
 某个 Datomic、datascript 或 XTDB 属性的已证明读取方和写入方。问题：在 mount 的示例应用中谁写入 `:order/bid`？
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -267,10 +262,9 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 
 ### event_flow
 
-re-frame 事件的分发方和处理器，或订阅的处理器、输入和订阅方。问题：在 re-frame 的 todomvc 中谁分发 `:delete-todo`？
+re-frame 事件的分发方和处理器，或订阅的处理器、输入和订阅方。事件不是字面量关键字的分发会被列为 UNKNOWN。问题：在 re-frame 的 todomvc 中谁分发 `:delete-todo`？
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -306,11 +300,11 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 
 ### tests_covering
 
-到达某个文件、定义、选择器或路由的浏览器测试（Playwright 的页面对象和测试，用项目自己的 TypeScript 读取）。
+到达某个文件、定义、选择器或路由的浏览器测试（Playwright 的页面对象和测试，当 TypeScript 5 作为可选的 peer 依赖 `typescript` 安装在 clojure-atlas 旁边时用它读取；绝不使用被分析仓库自带的副本）。
 示例仓库都没有这类测试，回答中也会这样说明。问题：哪些浏览器测试会到达 `mount.core/start`？
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -341,7 +335,6 @@ in tests: none
 `test/re_frame/subs/alpha_test.cljs` 表中是否有行缺少某个键？
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -358,7 +351,7 @@ next: key_flow(key=":re-frame/lifecycle")  callers(var="re-frame.subs.alpha-test
 ### context_for_change
 
 每次评审只需一次调用：变更的符号、diff 之外的调用者、路由、属性、需要运行的测试和需要补充的测试。
-问题：修改 polylith-realworld 中 article store 的第 60-80 行会涉及什么？
+当变更的路由没有提取到授权时，风险是 UNKNOWN，而不是 LOW。问题：修改 polylith-realworld 中 article store 的第 60-80 行会涉及什么？
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -405,11 +398,13 @@ tests to add: none (searched: changed definitions with no static test)
   `capability route_authz is absent: an empty answer is not proof of absence`。依赖它的部分会显示为
   `not extracted (route_authz is absent)`，绝不会是 “none”。无法读取的中间件链显示为 `not extracted (UNKNOWN)`。
 
-当图本身不完整时，构建日志、graph_info 和每个回答都以一行 `DEGRADED` 开头：可能是 clj-kondo 无法解析的文件，也可能是因
-一端不是节点而被丢弃的边。很可能位于未解析文件中的名字会被如此说明。下面是 biff 的例子，其中有一个文件无法解析：
+当图本身不完整时，构建日志、graph_info 和每个回答都以一行 `DEGRADED` 开头。它会列出 clj-kondo 无法解析的文件、
+被跳过的超过 2 MB 的源文件、在多个文件中定义的命名空间（对它们的使用是 HEURISTIC，通过 `duplicate-namespace`），
+以及因一端不是节点而被丢弃的边。很可能位于未解析或被跳过文件中的名字会被如此说明。
+下面是 biff 的例子，其中有一个文件无法解析，还有一个命名空间被定义了两次：
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
 note: use a fully qualified name (ns/name)
@@ -477,8 +472,17 @@ compojure 中间件链（q13）和 reitit 前端路由（q14）。
 - 离线或处于代理之后：请把 `clj-kondo` 放到 PATH 中。Node 的 `fetch` 会忽略 `HTTPS_PROXY`，
   所以在代理之后下载会失败，此时 clojure-atlas 会使用 PATH 上的 clj-kondo。sha256 不匹配的下载会被拒绝，
   绝不会运行。
+- 可选：TypeScript 5（在 clojure-atlas 旁执行 `npm i -D typescript@5`），用于读取 Playwright 页面对象和测试。
+  它是可选的 peer 依赖。没有它，这种读取会关闭，graph_info 和浏览器测试的回答会针对找到的每个 Playwright 项目说明原因。
 - 有固定 clj-kondo 二进制文件的平台：macOS arm64、macOS x64、Linux x64、Linux arm64、Windows x64。
   其他平台需要把 clj-kondo 放到 PATH 中。本版本在 macOS arm64 上开发和度量。Windows 未经测试。
+
+## 安全
+
+构建只读取文件。它只运行 clj-kondo（固定的二进制文件，或 PATH 上的那个）和 `git ls-files`，
+绝不会用 Node、JVM 或 shell 运行被分析仓库的代码。TypeScript 从 clojure-atlas 自己的安装中加载，
+绝不从被分析的仓库中加载。clj-kondo 会应用项目的 `.clj-kondo` 配置；其中声明的 hook 由 clj-kondo 自己解释，
+与任何运行 clj-kondo 的编辑器一样。MCP 服务器只读取图文件，指定 `--repo` 时运行只读的 git 命令。
 
 ## 为什么用 TypeScript？
 
@@ -493,10 +497,13 @@ clj-kondo 完成；clojure-atlas 读取它的输出和源码形式，并构建�
   只以动态方式读写的 map 键不会被追踪。通过多方法、`resolve`/`apply` 或 HTTP fixture 到达代码的测试不计入。
 - **启发式部分**：多方法和协议的分派（`may_dispatch_to`）、部分 compojure 处理器（显示为 `heuristic match`）、
   compojure 和 Ring 的中间件链、中间件工厂调用、未 require reitit 的命名空间中的 reitit 前端路由表（只要项目中任何地方
-  使用了 `reitit.frontend` 就会读取）、在 syntax-quote 宏体中被点名的 var、线程化的键槽位、transact 或 query 调用之外的
+  使用了 `reitit.frontend` 就会读取）、在 syntax-quote 宏体中被点名的 var、clj-kondo 无法展开的项目宏内部的使用（通过 `unexpanded-macro`）、
+在多个文件中定义的命名空间的使用（通过 `duplicate-namespace`）、线程化的键槽位、transact 或 query 调用之外的
   查询字面量、key_siblings 的 finding。
+- **项目宏**：只有当项目的 `.clj-kondo` 配置为某个宏提供了 `:lint-as` 或 hook（或 `.clojure-atlas.edn` 在 `:lint-as` 下点名了它）时，
+  clj-kondo 才会展开它。添加其中之一并重新构建，其内部的使用就会重新成为 STATIC_PROVEN。
 - **包装无法读取的中间件**会报告为 `middleware: not extracted (UNKNOWN)`，而不是 “none”。
-- **无法解析的文件**：它们的定义和调用不在图中。此时每个回答都以一行 `DEGRADED` 开头，并列出这些文件。
+- **无法解析的文件和超过 2 MB 的文件**：它们的定义和调用不在图中。此时每个回答都以一行 `DEGRADED` 开头，并列出这些文件。
 - **路由授权**需要 `.clojure-atlas.edn`。没有它时，route_authz 回答 “not provable”，
   permission_routes 报告该 capability 为 absent。
 - **尚不支持**：bidi 路由、compojure-api、pedestal 的 verbose map 路由、malli 注册表、

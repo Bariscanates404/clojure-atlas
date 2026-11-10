@@ -30,8 +30,7 @@ npx clojure-atlas init
 `build` は `.clojure-atlas/graph.json.gz` を書き出します。integrant リポジトリでは次のように出力されます。
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
-clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` は書き込む予定のプロジェクトの `.mcp.json` を表示します。実際に書き込むのは `--yes` を付けたときだけです。
@@ -94,8 +93,9 @@ usage:
 
 - `build` は `dir` (デフォルトは `.`) を解析し、グラフを書き出します。
 - `mcp` はグラフを提供します。`--repo` を指定すると、作業ツリーがグラフの作成元と異なる場合、
-  またはエージェントが `base` として渡したコミットが `--max-distance` コミット (デフォルトは 20) より
-  離れている場合に、回答が `STALE` 行で始まります。
+  またはエージェントが `base` として渡したコミットが、グラフのコミットから `--max-distance` コミット (デフォルトは 20) より
+  先に進んでいる場合、あるいはグラフのコミットが `base` より先にある場合や `base` から分岐している場合に、回答が `STALE` 行で始まります。
+  作業ツリーのチェックは最大でも 3 秒に 1 回だけ繰り返されるため、編集はその後の最初の呼び出しから反映されます。
 - `coverage` はグラフの coverage 行と、未解決の名前のうち出現回数の多いものを表示します。
 - `init` はサーバーをプロジェクトの `.mcp.json` に追加します。
 
@@ -103,7 +103,6 @@ usage:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 プロジェクト自身の `.clj-kondo` 設定は尊重されます。プロジェクトルートに任意で `.clojure-atlas.edn` を置くと、
@@ -113,7 +112,7 @@ DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing a
 ## ツール
 
 以下の例はすべて、[examples/](examples/) にあるグラフに対する `clojure-atlas mcp` の実際の出力です。
-省略した箇所にだけ印を付けています。これらのグラフの一部はビルド時にいくつかのエッジが落ちたため、回答は `DEGRADED` 行で
+省略した箇所にだけ印を付けています。mount は 4 つの namespace を複数のファイルに分けて定義しているため、その回答は `DEGRADED` 行で
 始まります (次のセクションを参照)。`[S]`、`[H]`、`[?]` は band で、次のセクションで説明します。
 
 ### graph_info
@@ -121,14 +120,13 @@ DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing a
 グラフがどのコミットを表すか、各アダプタが何を見つけたかを、band ごとの件数付きで返します。質問: integrant のグラフは何を知っているか。
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
   multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
   events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 61 edges {"static_proven":61} (switched on by integrant)
+  system: available, 69 edges {"static_proven":69} (switched on by integrant)
   route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
   [... trimmed ...]
 ```
@@ -138,7 +136,6 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 定義の直接の呼び出し元です。質問: `integrant.core/dependent-keys` を呼ぶのは誰か。
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -160,7 +157,6 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 定義の推移的な依存元です。質問: `integrant.core/ref?` を変更すると何に影響するか。
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -182,7 +178,6 @@ deeper (25 S25)
 アリティ、分割代入されるキー、各呼び出し元が渡す値です。質問: `integrant.core/init` はどのように呼ばれているか。
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
@@ -240,7 +235,7 @@ reitit と pedestal のルートデータ内のミドルウェア (`:middleware`
 権限をチェックするすべてのルートです。質問: mount のどのルートが `:admin` を要求するか。
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -252,7 +247,7 @@ searched: names, ids and kind-prefixed ids; check the spelling or pass the fully
 Datomic、datascript、XTDB の属性について、証明済みの読み手と書き手です。質問: mount のサンプルアプリで `:order/bid` を書くのは誰か。
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -267,10 +262,9 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 
 ### event_flow
 
-re-frame イベントのディスパッチ元とハンドラ、またはサブスクリプションのハンドラ、入力、購読元です。質問: re-frame の todomvc で `:delete-todo` をディスパッチするのは誰か。
+re-frame イベントのディスパッチ元とハンドラ、またはサブスクリプションのハンドラ、入力、購読元です。イベントがリテラルのキーワードではないディスパッチは UNKNOWN として一覧に出ます。質問: re-frame の todomvc で `:delete-todo` をディスパッチするのは誰か。
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -305,11 +299,11 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 
 ### tests_covering
 
-ファイル、定義、セレクタ、ルートに到達するブラウザテストです (Playwright のページオブジェクトとテスト。プロジェクト自身の TypeScript で読み取ります)。
+ファイル、定義、セレクタ、ルートに到達するブラウザテストです (Playwright のページオブジェクトとテスト。オプションのピア依存 `typescript` として clojure-atlas の隣にインストールされている場合に TypeScript 5 で読み取ります。解析対象リポジトリのコピーは使いません)。
 サンプルのリポジトリにはどれもブラウザテストがなく、回答もそう伝えます。質問: `mount.core/start` に到達するブラウザテストはどれか。
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -339,7 +333,6 @@ in tests: none
 リテラルのマップテーブルで、ほとんどの兄弟行が持つキーを欠いている行です。質問: re-frame の `test/re_frame/subs/alpha_test.cljs` のテーブルに、キーが欠けた行はあるか。
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -356,7 +349,7 @@ next: key_flow(key=":re-frame/lifecycle")  callers(var="re-frame.subs.alpha-test
 ### context_for_change
 
 レビューごとに 1 回の呼び出しで、変更されたシンボル、diff 外の呼び出し元、ルート、属性、実行すべきテスト、追加すべきテストを返します。
-質問: polylith-realworld の article ストアの 60-80 行目を変更すると何に影響するか。
+変更されたルートに抽出された認可がない場合、リスクは LOW ではなく UNKNOWN になります。質問: polylith-realworld の article ストアの 60-80 行目を変更すると何に影響するか。
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -404,12 +397,14 @@ tests to add: none (searched: changed definitions with no static test)
   `not extracted (route_authz is absent)` と表示され、「none」にはなりません。読み取れないミドルウェアチェーンは
   `not extracted (UNKNOWN)` と表示されます。
 
-グラフ自体が不完全なとき、ビルドログ、graph_info、すべての回答は `DEGRADED` 行で始まります。clj-kondo が解析できなかった
-ファイルや、端が node でなかったために落ちたエッジがその対象です。解析されなかったファイルに存在すると思われる名前は、
-そのように報告されます。1 つのファイルを解析できなかった biff の例です。
+グラフ自体が不完全なとき、ビルドログ、graph_info、すべての回答は `DEGRADED` 行で始まります。この行には、clj-kondo が解析できなかった
+ファイル、スキップされた 2 MB を超えるソースファイル、複数のファイルで定義されている namespace (その使用は
+`duplicate-namespace` により HEURISTIC になります)、端が node でなかったために落ちたエッジが挙がります。
+解析されなかった、またはスキップされたファイルに存在すると思われる名前は、そのように報告されます。
+1 つのファイルを解析できず、1 つの namespace が二重に定義されている biff の例です。
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
 note: use a fully qualified name (ns/name)
@@ -478,9 +473,20 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 - オフラインの場合やプロキシの内側では、`clj-kondo` を PATH に置いてください。Node の `fetch` は `HTTPS_PROXY` を無視するため、
   プロキシの内側ではダウンロードが失敗し、clojure-atlas は PATH 上の clj-kondo を使います。sha256 が一致しない
   ダウンロードは拒否され、実行されません。
+- オプション: Playwright のページオブジェクトとテストを読み取るための TypeScript 5 (clojure-atlas の隣で `npm i -D typescript@5`)。
+  オプションのピア依存です。なければ、その読み取りは無効になり、graph_info とブラウザテストの回答が、見つかった
+  Playwright プロジェクトごとにその理由を伝えます。
 - 固定された clj-kondo バイナリがあるプラットフォーム: macOS arm64、macOS x64、Linux x64、Linux arm64、Windows x64。
   それ以外のプラットフォームでは、clj-kondo を PATH に置く必要があります。このリリースは macOS arm64 で開発と測定を行いました。
   Windows は未検証です。
+
+## セキュリティ
+
+ビルドはファイルを読み取ります。実行するのは clj-kondo (固定されたバイナリ、または PATH 上のもの) と `git ls-files` だけで、
+解析対象リポジトリのコードを Node、JVM、シェルで実行することはありません。TypeScript は clojure-atlas 自身の
+インストールから読み込まれ、解析対象リポジトリからは読み込まれません。clj-kondo はプロジェクトの `.clj-kondo` 設定を適用します。
+そこで宣言された hook は、clj-kondo を実行するどのエディタとも同じように、clj-kondo 自身が解釈します。MCP サーバーは
+グラフファイルを読み取るだけで、`--repo` を指定した場合は読み取り専用の git コマンドを実行します。
 
 ## なぜ TypeScript なのか
 
@@ -498,9 +504,13 @@ clj-kondo が行います。clojure-atlas はその出力とソースの形を�
   (`heuristic match` と表示)、compojure と Ring のミドルウェアチェーン、ミドルウェアファクトリの呼び出し、
   reitit を require していない namespace にある reitit のフロントエンドルート表 (プロジェクト内のどこかで
   `reitit.frontend` が使われていれば読み取ります)、syntax-quote されたマクロ本体で名前が挙がった var、
-  スレッドされたキースロット、transact や query の呼び出し外にあるクエリリテラル、key_siblings の finding。
+  clj-kondo が展開できないプロジェクトのマクロ内の使用 (`unexpanded-macro` 経由)、複数のファイルで定義された namespace の使用
+  (`duplicate-namespace` 経由)、スレッドされたキースロット、transact や query の呼び出し外にあるクエリリテラル、key_siblings の finding。
+- **プロジェクトのマクロ**: clj-kondo がマクロを展開するのは、プロジェクトの `.clj-kondo` 設定がそのマクロに `:lint-as` または
+  hook を与えている場合 (または `.clojure-atlas.edn` が `:lint-as` の下にその名前を挙げている場合) だけです。
+  どちらかを追加して再構築すれば、その内部の使用は再び STATIC_PROVEN になります。
 - **ラップを読み取れないミドルウェア**は、「none」ではなく `middleware: not extracted (UNKNOWN)` と報告されます。
-- **解析できないファイル**: その定義と呼び出しはグラフに含まれません。その場合、すべての回答は、それらを挙げる
+- **解析できないファイルと 2 MB を超えるファイル**: その定義と呼び出しはグラフに含まれません。その場合、すべての回答は、それらを挙げる
   `DEGRADED` 行で始まります。
 - **ルート認可**には `.clojure-atlas.edn` が必要です。ない場合、route_authz は "not provable" と答え、
   permission_routes はその capability を absent と報告します。

@@ -28,8 +28,7 @@ npx clojure-atlas init
 `build` writes `.clojure-atlas/graph.json.gz`. On the integrant repo it prints:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
-clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` shows the project `.mcp.json` it would write and writes it only with `--yes`:
@@ -102,7 +101,6 @@ Rebuild the graph after you change code. A served graph does not update itself:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 The project's own `.clj-kondo` config is honored. An optional `.clojure-atlas.edn` in the project root adds what
@@ -112,8 +110,8 @@ keys `:route-authz`, `:permission-middleware` and `:permission-fns`.
 ## Tools
 
 Every example below is real output of `clojure-atlas mcp` over a graph in [examples/](examples/), trimmed only
-where marked. Some of these graphs dropped a few edges at build time, so their answers start with a `DEGRADED`
-line (see the next section). `[S]`, `[H]` and `[?]` are the bands, explained in the next section.
+where marked. mount defines four namespaces in more than one file, so its answers start with a `DEGRADED` line
+(see the next section). `[S]`, `[H]` and `[?]` are the bands, explained in the next section.
 
 ### graph_info
 
@@ -121,14 +119,13 @@ Which commit the graph describes, what each adapter found, with band counts. Que
 graph know?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
   multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
   events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 61 edges {"static_proven":61} (switched on by integrant)
+  system: available, 69 edges {"static_proven":69} (switched on by integrant)
   route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
   [... trimmed ...]
 ```
@@ -138,7 +135,6 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 Direct callers of a definition. Question: who calls `integrant.core/dependent-keys`?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -160,7 +156,6 @@ dispatch candidates and rebindings. A var named inside a syntax-quoted macro bod
 Transitive dependents of a definition. Question: what can a change to `integrant.core/ref?` reach?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -182,7 +177,6 @@ deeper (25 S25)
 Arities, destructured keys and what each caller passes. Question: how is `integrant.core/init` called?
 
 ```
-DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
@@ -241,7 +235,7 @@ and pedestal route data (`:middleware`, `:interceptors`) is read from the route 
 Every route that checks a permission. Question: which routes in mount require `:admin`?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -254,7 +248,7 @@ Proven readers and writers of a Datomic, datascript or XTDB attribute. Question:
 example app?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -269,11 +263,10 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 
 ### event_flow
 
-Dispatchers and handler of a re-frame event, or handler, inputs and subscribers of a subscription. Question: who
-dispatches `:delete-todo` in re-frame's todomvc?
+Dispatchers and handler of a re-frame event, or handler, inputs and subscribers of a subscription. A dispatch whose
+event is not a literal keyword is listed as UNKNOWN. Question: who dispatches `:delete-todo` in re-frame's todomvc?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -314,7 +307,7 @@ the optional peer `typescript`; never the analyzed repo's copy) that reach a fil
 tests reach `mount.core/start`?
 
 ```
-DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -346,7 +339,6 @@ Rows of a literal map table that lack a key most sibling rows have. Question: is
 `test/re_frame/subs/alpha_test.cljs` table missing a key?
 
 ```
-DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -363,7 +355,7 @@ The missing key is proven; whether the row should have it is left to the reader.
 ### context_for_change
 
 One call per review: changed symbols, callers outside the diff, routes, attributes, tests to run and tests to add.
-Question: what does a change to lines 60-80 of polylith-realworld's article store touch?
+When a changed route has no extracted authorization, the risk is UNKNOWN, not LOW. Question: what does a change to lines 60-80 of polylith-realworld's article store touch?
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -413,12 +405,14 @@ An empty answer is never a bare empty list. It takes one of these forms:
   that depends on it reads `not extracted (route_authz is absent)`, never "none". A middleware chain that cannot be
   read reads `not extracted (UNKNOWN)`.
 
-When the graph itself is incomplete, the build log, graph_info and every answer start with a `DEGRADED` line: a
-file clj-kondo could not parse, or edges dropped because one end was not a node. A name that probably lives in an
-unparsed file is reported as such. From biff, where one file cannot be parsed:
+When the graph itself is incomplete, the build log, graph_info and every answer start with a `DEGRADED` line. It
+names files clj-kondo could not parse, source files over 2 MB that were skipped, namespaces defined in more than
+one file (usages of them are HEURISTIC, via `duplicate-namespace`), and edges dropped because one end was not a
+node. A name that probably lives in an unparsed or skipped file is reported as such. From biff, where one file
+cannot be parsed and one namespace is defined twice:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
 note: use a fully qualified name (ns/name)
@@ -481,8 +475,19 @@ was. Two questions were added later, for the compojure middleware chain (q13) an
 - Offline, or behind a proxy: put `clj-kondo` on your PATH. Node's `fetch` ignores `HTTPS_PROXY`, so the download
   fails behind a proxy, and clojure-atlas then uses the clj-kondo on PATH. A download with a wrong sha256 is
   refused, never run.
+- Optional: TypeScript 5 (`npm i -D typescript@5` beside clojure-atlas) to read Playwright page objects and tests.
+  It is an optional peer dependency. Without it, that reading is off, and graph_info and the browser test answers
+  say why for each Playwright project found.
 - Platforms with a pinned clj-kondo binary: macOS arm64, macOS x64, Linux x64, Linux arm64, Windows x64. Any other
   platform needs clj-kondo on PATH. This release was developed and measured on macOS arm64. Windows is untested.
+
+## Security
+
+The build reads files. It runs only clj-kondo (the pinned binary, or the one on PATH) and `git ls-files`, and it
+never runs code of the analyzed repository with Node, a JVM or a shell. TypeScript is loaded from clojure-atlas's own
+install, never from the analyzed repository. clj-kondo applies the project's `.clj-kondo` config; hooks declared
+there are interpreted by clj-kondo itself, as in any editor that runs clj-kondo. The MCP server only reads the graph
+file and, with `--repo`, runs read-only git commands.
 
 ## Why TypeScript?
 
@@ -500,12 +505,16 @@ TypeScript yourself.
 - **Heuristic parts**: multimethod and protocol dispatch (`may_dispatch_to`), some compojure handlers (shown as
   `heuristic match`), compojure and Ring middleware chains, middleware factory calls, reitit frontend route tables
   in namespaces that do not require reitit (read when `reitit.frontend` is used anywhere in the project), vars
-  named in syntax-quoted macro bodies, threaded key slots, query literals outside a transact or query call,
-  key_siblings findings.
+  named in syntax-quoted macro bodies, usages inside a project macro clj-kondo cannot expand (via
+  `unexpanded-macro`), usages of a namespace defined in more than one file (via `duplicate-namespace`), threaded
+  key slots, query literals outside a transact or query call, key_siblings findings.
+- **Project macros**: clj-kondo expands a macro only when the project's `.clj-kondo` config gives it a `:lint-as`
+  or a hook (or `.clojure-atlas.edn` names it under `:lint-as`). Add one and rebuild, and the usages inside it are
+  STATIC_PROVEN again.
 - **Middleware whose wrapping cannot be read** is reported as `middleware: not extracted (UNKNOWN)`, not as
   "none".
-- **Unparsable files**: their definitions and calls are missing from the graph. Every answer then starts with a
-  `DEGRADED` line naming them.
+- **Unparsable files and files over 2 MB**: their definitions and calls are missing from the graph. Every answer
+  then starts with a `DEGRADED` line naming them.
 - **Route authorization** needs `.clojure-atlas.edn`. Without it, route_authz says "not provable" and
   permission_routes reports the capability as absent.
 - **Not supported yet**: bidi routes, compojure-api, pedestal verbose map routes, malli registries, integrant
