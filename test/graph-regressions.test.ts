@@ -129,3 +129,23 @@ describe('a bad argument does not end with the spelling hint', () => {
     assert.match(render(blastRadius(new GraphBuilder().build(), 'core/zzz')), /check the spelling/);
   });
 });
+
+describe('a changed handler on a route whose authz was never extracted is not risk LOW', () => {
+  const build = (authz: 'absent' | 'available') => {
+    const b = new GraphBuilder();
+    Object.assign(b.caps.find((c) => c.name === 'route_authz') ?? {}, { status: authz });
+    const f = b.def('core/danger', 'components/core', { file: CORE, line: 9, end_line: 12 });
+    b.edge(b.route('POST', '/danger'), 'routes_to', f);
+    return contextForChange(b.build(), [`${CORE}:9-12`]);
+  };
+
+  it('is UNKNOWN while the route authz capability is absent', () => {
+    const res = build('absent');
+    assert.match(res.verdict, /risk UNKNOWN$/);
+    assert.ok(res.notes.some((n) => /route_authz/.test(n)));
+  });
+
+  it('stays what the route says once the capability is there', () => {
+    assert.match(build('available').verdict, /risk HIGH$/);
+  });
+});

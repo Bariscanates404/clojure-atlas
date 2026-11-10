@@ -9,7 +9,7 @@ import { buildGraph, DEFAULT_GRAPH, writeGraph } from './build/index.ts';
 import { coverageRow, coverageTable, pct } from './coverage.ts';
 import { GraphFormatError, loadGraph, type Graph } from './mcp/graph.ts';
 import { serveStdio } from './mcp/server.ts';
-import { analyzerFor, snapshotOf } from './snapshot.ts';
+import { analyzerFor, cachedSnapshot, SNAPSHOT_TTL_MS, snapshotOf } from './snapshot.ts';
 import { VERSION } from './version.ts';
 import { shortSha } from './shared/sha.ts';
 
@@ -78,16 +78,22 @@ export function withMcpEntry(existing: string | undefined): string {
     } catch (err) {
       throw new Error(`.mcp.json is not valid JSON (${(err as Error).message}); fix it or move it aside, then run init again`);
     }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('.mcp.json is not a JSON object; fix it or move it aside, then run init again');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('.mcp.json is not a JSON object; fix it or move it aside, then run init again');
+    }
     doc = parsed;
   }
   const servers = doc.mcpServers;
-  if (servers !== undefined && (!servers || typeof servers !== 'object' || Array.isArray(servers))) throw new Error('.mcp.json: "mcpServers" is not an object; fix it, then run init again');
+  if (servers !== undefined && (!servers || typeof servers !== 'object' || Array.isArray(servers))) {
+    throw new Error('.mcp.json: "mcpServers" is not an object; fix it, then run init again');
+  }
   return `${JSON.stringify({ ...doc, mcpServers: { ...(servers ?? {}), 'clojure-atlas': MCP_ENTRY } }, null, 2)}\n`;
 }
 
 function requireGraph(file: string): string {
-  if (!existsSync(file)) throw new Error(`no graph at ${file}; run \`clojure-atlas build\` first, or name one with ${file === DEFAULT_GRAPH ? '--graph' : 'the graph argument'}`);
+  if (!existsSync(file)) {
+    throw new Error(`no graph at ${file}; run \`clojure-atlas build\` first, or name one with ${file === DEFAULT_GRAPH ? '--graph' : 'the graph argument'}`);
+  }
   return file;
 }
 
@@ -139,7 +145,7 @@ async function main(argv: string[]): Promise<void> {
     const analyzer = analyzerFor(g.doc.source.analyzer);
     serveStdio(g, {
       repoDir: repo, maxDistance: c.maxDistance, graphDir: path.dirname(c.graph),
-      ...(repo ? { snapshot: () => snapshotOf(repo, analyzer) } : {}),
+      ...(repo ? { snapshot: cachedSnapshot(() => snapshotOf(repo, analyzer), SNAPSHOT_TTL_MS) } : {}),
     });
   } else if (c.cmd === 'coverage') {
     const doc = readDocument(c.graph);

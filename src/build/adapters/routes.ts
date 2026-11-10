@@ -19,6 +19,8 @@ const libraryOf = (ns: string) => (ns === COMPOJURE ? 'compojure' : ns.startsWit
 
 interface Link {
   def: string;
+  // absent: the route's own file
+  file?: string;
   line: number;
   // absent: the form itself names the definition; heuristic: it is an argument or one branch of what the route returns
   band?: 'heuristic';
@@ -120,7 +122,8 @@ function permissionsOf(ctx: Context, at: Located, check: number, scope: string |
   const u = unwrap(constant(ctx, at).form);
   const one = (x: Form, alternative: number, alternatives: number, allOf: number): Permission => {
     const v = unwrap(x);
-    return { name: text(v) ?? `(runtime ${v.t})`, dynamic: v.t !== 'keyword', check, checks: check, alternative, alternatives, allOf, ...(scope ? { scope } : {}), line: x.row };
+    return { name: text(v) ?? `(runtime ${v.t})`, dynamic: v.t !== 'keyword', check, checks: check, alternative, alternatives, allOf,
+      ...(scope ? { scope } : {}), line: x.row };
   };
   if (u.t === 'set') return flatChildren(u).map((x, i, all) => one(x, i + 1, all.length, 1));
   if (u.t === 'vector') return flatChildren(u).map((x, _i, all) => one(x, 1, 1, all.length));
@@ -327,8 +330,10 @@ function compojureRoutes(ctx: Context): Route[] {
     const base = ownerOf(u);
     const local = contextsAt(u.file, u.row, u.col);
     const { wrappers, unknown } = form ? wrapping(u.file, form) : { wrappers: [], unknown: true };
-    const guards = wrappers.map((w): Guard => ({ def: w.def, line: w.line, band: 'heuristic', level: 'wrapper', ...(w.library ? { library: true } : {}) }));
-    return mountsOf(base, []).map((mount): Route => ({ method, path, mount: mount + local, base, file: u.file, line: u.row, library: 'compojure', handlers, guards, authz: NO_AUTHZ, ...(unknown ? { middlewareUnknown: true } : {}) }));
+    const guards = wrappers.map((w): Guard => ({ def: w.def, file: w.file, line: w.line, band: 'heuristic', level: 'wrapper',
+      ...(w.library ? { library: true } : {}) }));
+    return mountsOf(base, []).map((mount): Route => ({ method, path, mount: mount + local, base, file: u.file, line: u.row, library: 'compojure', handlers,
+      guards, authz: NO_AUTHZ, ...(unknown ? { middlewareUnknown: true } : {}) }));
   });
 }
 
@@ -428,7 +433,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
       const target = unwrap(xs[2]);
       const items = chainElements(ctx, file, target);
       const chain = items ? interceptorChain(ctx, file, items) : { guards: [], handlers: handlerLinks(ctx, file, target) };
-      emit(verb.slice(1).toUpperCase(), chain.handlers, [...scope.guards, ...chain.guards.map((l) => ({ ...l, level: 'route' }))], addChecks(ctx, file, scope.authz, scope.checks));
+      emit(verb.slice(1).toUpperCase(), chain.handlers, [...scope.guards, ...chain.guards.map((l) => ({ ...l, level: 'route' }))],
+        addChecks(ctx, file, scope.authz, scope.checks));
       return;
     }
     const dataForm = xs.slice(1).find((x) => unwrap(x).t === 'map');
@@ -456,7 +462,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
       const m = u.t === 'map' ? u : undefined;
       const chains = m ? chainForms(m).map((c) => chainOf(ctx, file, chainItems(c))) : [];
       // pedestal: {:get [route-name interceptor ... handler]}
-      const inline = u.t === 'vector' ? interceptorChain(ctx, file, flatChildren(u)) : { guards: [], handlers: handlerLinks(ctx, file, m ? entry(m, ':handler') : val) };
+      const inline = u.t === 'vector' ? interceptorChain(ctx, file, flatChildren(u)) : { guards: [],
+        handlers: handlerLinks(ctx, file, m ? entry(m, ':handler') : val) };
       const methodGuards = [...chains.flatMap((c) => c.links), ...inline.guards].map((l) => ({ ...l, level: 'method' }));
       const methodAuthz = addChecks(ctx, file, routeDataAuthz(ctx, file, m) ?? authz, [...checks, ...chains.flatMap((c) => c.permissions)]);
       emit(key.slice(1).toUpperCase(), inline.handlers, [...guards, ...methodGuards], methodAuthz);
@@ -482,7 +489,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     } else if (u.t === 'vector' || u.t === 'list' || u.t === 'cond') for (const x of flatChildren(u)) nested(x, file, scope);
   };
 
-  const scopeAt = (file: string, base: string, guards: Guard[]): Scope => ({ prefix: '', guards, authz: NO_AUTHZ, checks: [], base, library: files.get(file) ?? '', stack: [] });
+  const scopeAt = (file: string, base: string,
+    guards: Guard[]): Scope => ({ prefix: '', guards, authz: NO_AUTHZ, checks: [], base, library: files.get(file) ?? '', stack: [] });
 
   // (router routes {:data {:middleware [...]}}): router data applies to every route below it
   // a router built in test code serves nothing
@@ -492,7 +500,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     if (!routesArg) continue;
     const data = opts && unwrap(opts).t === 'map' ? entry(unwrap(opts), ':data') : undefined;
     const chains = data && unwrap(data).t === 'map' ? chainForms(unwrap(data)) : [];
-    const guards = chains.flatMap((c) => chainOf(ctx, call.file, chainItems(c)).links).map((l) => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }));
+    const guards = chains.flatMap((c) => chainOf(ctx, call.file,
+      chainItems(c)).links).map((l) => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }));
     const base = owner({ ...call, row: call.nameRow, col: call.nameCol }).replace(/^(definition|namespace):/, '');
     nested(routesArg, call.file, scopeAt(call.file, base, guards));
   }
@@ -508,7 +517,8 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
 
 // A handler that calls a declared permission fn with a keyword checks that permission (HEURISTIC, one level deep).
 function handlerPermissions(ctx: Context): (handlers: readonly Link[], check: number) => Permission[] {
-  const calls = groupBy(ctx.analysis.varUses.filter((u) => u.fromVar && ctx.config.permissionFns.includes(`${u.to}/${u.name}`)), (u) => `${u.from}/${u.fromVar}`);
+  const calls = groupBy(ctx.analysis.varUses.filter((u) => u.fromVar && ctx.config.permissionFns.includes(`${u.to}/${u.name}`)),
+    (u) => `${u.from}/${u.fromVar}`);
   return (handlers, check) => handlers.flatMap((h) => (calls.get(h.def) ?? []).flatMap((u) => {
     const call = formAt(ctx.forms(u.file), u.row, u.col);
     return (call ? kids(call).slice(1).map(unwrap) : [])
@@ -540,19 +550,22 @@ export const httpRoutes: Adapter = {
       const component = ctx.componentOf(r.file);
       nodes.push({
         id, kind: 'route', name: `${r.method} ${r.mount}${r.path} @${r.base}`, file: r.file, line: r.line, ...(component ? { component } : {}),
-        attrs: { method: r.method.toLowerCase(), path: r.path, full_path: `${r.mount}${r.path}`, base: r.base, mount: r.mount, library: r.library, ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}) },
+        attrs: { method: r.method.toLowerCase(), path: r.path, full_path: `${r.mount}${r.path}`, base: r.base, mount: r.mount, library: r.library,
+          ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}) },
       });
       for (const h of r.handlers) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file, line: h.line });
-      for (const g of r.guards.filter((x) => x.library)) nodes.push({ id: libraryMiddlewareId(g.def), kind: 'library_middleware', name: g.def, file: r.file, line: g.line });
+      for (const g of r.guards.filter((x) => x.library)) nodes.push({ id: libraryMiddlewareId(g.def), kind: 'library_middleware', name: g.def,
+        file: g.file ?? r.file, line: g.line });
       r.guards.forEach((g, order) => edges.push({
-        from: id, to: g.library ? libraryMiddlewareId(g.def) : defId(g.def), kind: 'guarded_by', band: bandOf(g.band), file: r.file, line: g.line,
+        from: id, to: g.library ? libraryMiddlewareId(g.def) : defId(g.def), kind: 'guarded_by', band: bandOf(g.band), file: g.file ?? r.file, line: g.line,
         attrs: { order, level: g.level, ...(g.inheritedFrom ? { inherited_from: g.inheritedFrom } : {}) },
       }));
       const declared = r.authz.permissions;
       const found = inHandlers(r.handlers, declared.reduce((m, p) => Math.max(m, p.check), 0) + 1);
       const checks = Math.max(0, ...[...declared, ...found].map((x) => x.check), ...declared.map((x) => x.checks));
       for (const p of [...declared, ...found]) {
-        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: r.file, line: p.line, ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
+        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: r.file, line: p.line,
+          ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
         edges.push({
           from: id, to: permissionId(p.name), kind: 'requires_permission',
           band: p.dynamic ? 'unknown' : found.includes(p) ? 'heuristic' : 'static_proven', file: r.file, line: p.line,
@@ -561,7 +574,8 @@ export const httpRoutes: Adapter = {
       }
       if (r.authz.exempt) {
         nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.file, line: r.authz.exempt.line });
-        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.file, line: r.authz.exempt.line, attrs: { label: r.authz.exempt.reason } });
+        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.file, line: r.authz.exempt.line,
+          attrs: { label: r.authz.exempt.reason } });
       }
     }
     return { nodes, edges };

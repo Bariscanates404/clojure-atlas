@@ -92,7 +92,8 @@ usage:
 - `build` analyzes `dir` (default `.`) and writes the graph.
 - `mcp` serves a graph. With `--repo`, answers start with a `STALE` line when the working tree is not the one the
   graph was built from, or when the commit the agent passes as `base` is more than `--max-distance` commits
-  away (default 20).
+  past the graph's commit (default 20), or the graph's commit is ahead of `base` or diverged from it. The working-tree check
+  is repeated at most every 3 seconds, so an edit shows from the first call after that.
 - `coverage` prints the coverage row of a graph and its most frequent unresolved names.
 - `init` adds the server to the project `.mcp.json`.
 
@@ -278,8 +279,8 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 
 ### tests_covering
 
-Browser tests (Playwright page objects and tests, read with the project's own TypeScript) that reach a file,
-definition, selector or route. None of the example repos has them, and the answer says so. Question: which browser
+Browser tests (Playwright page objects and tests, read with TypeScript 5 when it is installed beside clojure-atlas as
+the optional peer `typescript`; never the analyzed repo's copy) that reach a file, definition, selector or route. None of the example repos has them, and the answer says so. Question: which browser
 tests reach `mount.core/start`?
 
 ```

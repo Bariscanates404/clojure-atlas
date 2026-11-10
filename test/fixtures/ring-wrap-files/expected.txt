@@ -1,0 +1,32 @@
+node definition:app.main/app [definition] src/app/main.clj:9 {"defined_by":"clojure.core/def"}
+node definition:app.main/wrap-auth [definition] src/app/main.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"h","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:app.routes/api [definition] src/app/routes.clj:8 {"defined_by":"compojure.core/defroutes"}
+node definition:app.routes/delete-all [definition] src/app/routes.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"r","reads_complete":true}],"variadic":false}]}}
+node definition:app.routes/users [definition] src/app/routes.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"r","reads_complete":true}],"variadic":false}]}}
+node key::status [key] undefined:undefined
+node library_middleware:ring.middleware.params/wrap-params [library_middleware] src/app/main.clj:12
+node namespace:app.main [namespace] src/app/main.clj:1
+node namespace:app.routes [namespace] src/app/routes.clj:1
+node route:GET /users @app.routes/api [route] src/app/routes.clj:9 {"method":"get","path":"/users","full_path":"/users","base":"app.routes/api","mount":"","library":"compojure"}
+node route:POST /danger @app.routes/api [route] src/app/routes.clj:10 {"method":"post","path":"/danger","full_path":"/danger","base":"app.routes/api","mount":"","library":"compojure"}
+edge definition:app.main/app -calls-> definition:app.main/wrap-auth static_proven src/app/main.clj:11 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.main/app -references-> definition:app.routes/api static_proven src/app/main.clj:10
+edge definition:app.routes/api -passes_callback-> definition:app.routes/delete-all static_proven src/app/routes.clj:10 {"via":"POST"}
+edge definition:app.routes/api -passes_callback-> definition:app.routes/users static_proven src/app/routes.clj:9 {"via":"GET"}
+edge definition:app.routes/delete-all -produces_key-> key::status static_proven src/app/routes.clj:6 {"via":"map-literal"}
+edge definition:app.routes/users -produces_key-> key::status static_proven src/app/routes.clj:4 {"via":"map-literal"}
+edge namespace:app.main -defines-> definition:app.main/app static_proven src/app/main.clj:9
+edge namespace:app.main -defines-> definition:app.main/wrap-auth static_proven src/app/main.clj:7
+edge namespace:app.main -requires-> namespace:app.routes static_proven src/app/main.clj:2
+edge namespace:app.routes -defines-> definition:app.routes/api static_proven src/app/routes.clj:8
+edge namespace:app.routes -defines-> definition:app.routes/delete-all static_proven src/app/routes.clj:6
+edge namespace:app.routes -defines-> definition:app.routes/users static_proven src/app/routes.clj:4
+edge route:GET /users @app.routes/api -guarded_by-> definition:app.main/wrap-auth heuristic src/app/main.clj:11 {"order":1,"level":"wrapper"}
+edge route:GET /users @app.routes/api -guarded_by-> library_middleware:ring.middleware.params/wrap-params heuristic src/app/main.clj:12 {"order":0,"level":"wrapper"}
+edge route:GET /users @app.routes/api -routes_to-> definition:app.routes/users static_proven src/app/routes.clj:9
+edge route:POST /danger @app.routes/api -guarded_by-> definition:app.main/wrap-auth heuristic src/app/main.clj:11 {"order":1,"level":"wrapper"}
+edge route:POST /danger @app.routes/api -guarded_by-> library_middleware:ring.middleware.params/wrap-params heuristic src/app/main.clj:12 {"order":0,"level":"wrapper"}
+edge route:POST /danger @app.routes/api -routes_to-> definition:app.routes/delete-all static_proven src/app/routes.clj:10
+usages resolved=4 unresolved=0 unknown=0 not-vars=0 external=12
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure:6 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:2 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=2 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

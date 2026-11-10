@@ -56,7 +56,8 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
     const called = new Set(rows.map((r) => r.id));
     const referencing = new Set(inEdges(g, target.id, DEPENDENCY_KINDS).map((e) => e.from).filter((from) => !called.has(from)));
     if (referencing.size) {
-      notes.push(`${referencing.size} more definition(s) reference it without calling it (value use, callback, handler, macro, dispatch, rebinding): pass include_references=true to list them`);
+      notes.push(`${referencing.size} more definition(s) reference it without calling it (value use, callback, handler, macro, dispatch, rebinding): `
+        + 'pass include_references=true to list them');
     }
   }
   const comps = new Set(rows.map((r) => r.component ?? '(no component)'));
@@ -170,16 +171,20 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
     notes.push(`${countLine('entry points reached', byEntry, true)}${routes.length ? `; first routes: ${routes.join(', ')}` : ''}`);
   }
   if (beyond) notes.push(`callers continue beyond depth ${max}; omit depth to walk to the end`);
-  notes.push('potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings): a path here may never run');
+  notes.push('potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, '
+    + 'dispatch candidates, rebindings): a path here may never run');
   if (deeper.length) notes.push(`${deeper.length} caller(s) at depth ${SHALLOW_DEPTH + 1}+ are in section "deeper": page with section="deeper" offset= limit=`);
   const scope = capped ? `depth ${max}` : 'all depths';
-  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true, searched: `call and reference edges up to depth ${Math.min(max, SHALLOW_DEPTH)}` }];
+  const sections: Section[] = [{ name: 'affected', rows: shallow, tree: true,
+    searched: `call and reference edges up to depth ${Math.min(max, SHALLOW_DEPTH)}` }];
   if (deeper.length) sections.push({ name: 'deeper', rows: deeper, tree: true });
   return {
     name: 'blast_radius',
     query,
     title: `blast radius of ${target.name} (${scope})`,
-    verdict: `${rows.length} caller(s) over ${deepest} depth(s) in ${byComp.size} component(s)${entryRows.length ? `, ${entryRows.length} entry point(s) reach it` : ''}${capped ? ` (depth capped at ${max}${beyond ? ', more callers exist' : ''})` : ''}`,
+    verdict: `${rows.length} caller(s) over ${deepest} depth(s) in ${byComp.size} component(s)`
+      + `${entryRows.length ? `, ${entryRows.length} entry point(s) reach it` : ''}`
+      + `${capped ? ` (depth capped at ${max}${beyond ? ', more callers exist' : ''})` : ''}`,
     found: true,
     matches: [target.id],
     sections: gated(g, ['definitions'], sections),
@@ -329,7 +334,8 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
     return { state: unknown ? 'unknown' : 'permission', text };
   }
   if (exempt.length) return { state: 'exempt', text: `exempt: ${exempt.map((e) => g.byId.get(e.to)?.name ?? e.to).join('; ')}` };
-  if (chainUnread) return { state: 'unknown', text: `not provable: the route's middleware could not be read, and no check or exemption is recorded on the route itself (${CHAIN_UNREAD_MORE})` };
+  if (chainUnread) return { state: 'unknown',
+    text: `not provable: the route's middleware could not be read, and no check or exemption is recorded on the route itself (${CHAIN_UNREAD_MORE})` };
   return { state: 'none', text: 'NO permission check and NO exemption recorded' };
 }
 
@@ -349,7 +355,8 @@ export function routeSiblings(g: Graph, route: GraphNode): { text: string; odd: 
   const mine = routeVerdict(g, route.id).state;
   const odd = mine === 'none' && perm > sibs.length / 2;
   return {
-    text: `${sibs.length} sibling route(s) in ${route.file}: ${perm} check a permission, ${exempt} exempt, ${none} neither${unknown ? `, ${unknown} unknown (not provable from this graph)` : ''}${odd ? '; this route lacks the check its siblings have' : ''}`,
+    text: `${sibs.length} sibling route(s) in ${route.file}: ${perm} check a permission, ${exempt} exempt, ${none} neither`
+      + `${unknown ? `, ${unknown} unknown (not provable from this graph)` : ''}${odd ? '; this route lacks the check its siblings have' : ''}`,
     odd,
   };
 }
@@ -358,15 +365,20 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
   const title = `route authz of ${query}`;
   const match = matchRoutes(g, query);
   const found = match.routes;
-  if (!found.length) return notFound(g, 'route_authz', query, title, 'route', ['routes', 'route_authz'], 'paths match with :param and {param} segments treated alike');
+  if (!found.length) return notFound(g, 'route_authz', query, title, 'route', ['routes', 'route_authz'],
+    'paths match with :param and {param} segments treated alike');
   const routes = found.slice(0, MAX_ROUTE_ANSWERS);
   const sections: Section[] = [];
   const notes: string[] = [...capabilityNotes(g, ['route_authz'])];
   const verdicts: string[] = [];
   const next: string[] = [];
-  if (found.length > routes.length) notes.push(`${found.length} routes match; the first ${routes.length} are answered, pass a longer path or a method for the rest`);
+  if (found.length > routes.length) {
+    notes.push(`${found.length} routes match; the first ${routes.length} are answered, pass a longer path or a method for the rest`);
+  }
   else if (routes.length > 1) notes.push(`${routes.length} routes match; each served copy is listed separately`);
-  if (match.partial) notes.push(`matched as part of the path: ${routes.length > 1 ? 'these routes are' : 'this route is'} longer than ${JSON.stringify(query)}`);
+  if (match.partial) {
+    notes.push(`matched as part of the path: ${routes.length > 1 ? 'these routes are' : 'this route is'} longer than ${JSON.stringify(query)}`);
+  }
   if (match.methodless) notes.push(`${match.methodless} matched route(s) have no recorded method: the method in the query could not be checked for them`);
   for (const r of routes) {
     const a = r.attrs ?? {};
@@ -377,7 +389,8 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
       .slice()
       .sort((x, y) => num(x.attrs?.order, 0) - num(y.attrs?.order, 0))
       .map((e) => edgeRow(g, e.to, e, {
-        detail: [`#${num(e.attrs?.order, 0)}`, e.attrs?.level && `${String(e.attrs.level)}`, e.attrs?.inherited_from && `inherited from ${String(e.attrs.inherited_from)}`]
+        detail: [`#${num(e.attrs?.order, 0)}`, e.attrs?.level && `${String(e.attrs.level)}`,
+          e.attrs?.inherited_from && `inherited from ${String(e.attrs.inherited_from)}`]
           .filter(Boolean).join(' '),
       }));
     const permE = outEdges(g, r.id, ['requires_permission']);
@@ -391,7 +404,8 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
     sections.push(
       { name: `${head}: verdict ${verdict}`, short: 'route', rows: [nodeRow(r)], ordered: true },
       ...gated(g, ['routes'], [{ name: `${head}: handler`, short: 'handler', rows: handler, ordered: true, searched: 'routes_to edges' }]),
-      { name: `${head}: ${unread ? 'middleware' : 'middleware (outermost first)'}`, short: 'middleware', rows: mw, ordered: true, searched: 'guarded_by edges', ...(unread ? { unextracted: 'not extracted (UNKNOWN)' } : {}) },
+      { name: `${head}: ${unread ? 'middleware' : 'middleware (outermost first)'}`, short: 'middleware', rows: mw, ordered: true,
+        searched: 'guarded_by edges', ...(unread ? { unextracted: 'not extracted (UNKNOWN)' } : {}) },
       ...gated(g, ['route_authz'], [
         { name: `${head}: permissions`, short: 'permissions', rows: perms, ordered: true, searched: 'requires_permission edges' },
         { name: `${head}: exempt`, short: 'exempt', rows: exempt, ordered: true, searched: 'exempted_by edges' },
@@ -404,13 +418,16 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
     for (const p of perms.slice(0, 1)) next.push(call('permission_routes', { permission: p.label }));
   }
   next.push(call('tests_covering', { target: query }));
-  return { name: 'route_authz', query, title, verdict: `${verdicts.join('; ')}${found.length > routes.length ? `; +${found.length - routes.length} more routes` : ''}`, found: true, matches: routes.map((r) => r.id), sections, notes: [...new Set(notes)], next: [...new Set(next)].slice(0, 3) };
+  return { name: 'route_authz', query, title,
+    verdict: `${verdicts.join('; ')}${found.length > routes.length ? `; +${found.length - routes.length} more routes` : ''}`, found: true,
+      matches: routes.map((r) => r.id), sections, notes: [...new Set(notes)], next: [...new Set(next)].slice(0, 3) };
 }
 
 export function permissionRoutes(g: Graph, query: string): QueryResult {
   const title = `routes requiring ${query}`;
   const hits = resolve(g, ['permission'], query);
-  if (!hits.length) return notFound(g, 'permission_routes', query, title, 'permission', ['route_authz'], 'use the exact permission name, with its namespace if it has one');
+  if (!hits.length) return notFound(g, 'permission_routes', query, title, 'permission', ['route_authz'],
+    'use the exact permission name, with its namespace if it has one');
   if (hits.length > 1) return ambiguous('permission_routes', query, title, hits, 'permission');
   const perm = hits[0];
   const perms = permEdges(inEdges(g, perm.id, ['requires_permission']));
@@ -418,7 +435,8 @@ export function permissionRoutes(g: Graph, query: string): QueryResult {
     .map((p) => {
       const route = g.byId.get(p.edge.from);
       const write = /^(POST|PUT|PATCH|DELETE)\b/.test(route ? String(routeMethod(route) ?? '') : '');
-      return edgeRow(g, p.edge.from, p.edge, { detail: permDetail(p), ...(route?.component ? { component: route.component } : {}), ...(write ? { entry: 'write method' } : {}) });
+      return edgeRow(g, p.edge.from, p.edge, { detail: permDetail(p), ...(route?.component ? { component: route.component } : {}),
+        ...(write ? { entry: 'write method' } : {}) });
     })
     .sort((a, b) => compareText(a.label, b.label));
   const alone = perms.filter((p) => p.alternatives === 1).length;
@@ -518,7 +536,8 @@ export function attributeUsage(g: Graph, query: string): QueryResult {
     found: true,
     matches: [attr.id],
     sections: gated(g, ['data_attributes'], sections),
-    counts: { 'proven writers': writers.length, 'uncertain writers': uncertainW.length, 'proven readers': readers.length, 'uncertain readers': uncertainR.length },
+    counts: { 'proven writers': writers.length, 'uncertain writers': uncertainW.length, 'proven readers': readers.length,
+      'uncertain readers': uncertainR.length },
     notes,
     next: [call('tests_for', { symbol: attr.name }), ...(firstWriter ? [call('blast_radius', { var: firstWriter.label })] : [])],
   };
@@ -533,6 +552,8 @@ export function eventFlow(g: Graph, query: string): QueryResult {
   const sections: Section[] = [];
   const all: Row[] = [];
   const verdicts: string[] = [];
+  const dynamicSites = g.byKind.get('dynamic_event')?.flatMap((d) => inEdges(g, d.id, ['dispatches']).map((e) => edgeRow(g, e.from, e))) ?? [];
+  const dynamicNote = `${dynamicSites.length} dispatch site(s) with a non-literal event id may also dispatch it`;
   for (const n of hits) {
     const head = `${n.kind} ${n.name}`;
     const handlers = outEdges(g, n.id, ['registers']).map((e) => edgeRow(g, e.to, e));
@@ -547,15 +568,19 @@ export function eventFlow(g: Graph, query: string): QueryResult {
         { name: `${head}: handler`, short: 'handler', rows: handlers, ordered: true, searched: 'registers edges' },
         { name: `${head}: handler dispatches`, short: 'handler dispatches', rows: next, ordered: true, searched: 'dispatches edges out of the handler' },
         { name: `${head}: handler requests`, short: 'handler requests', rows: requests, ordered: true, searched: 'issues_request edges out of the handler' },
+        ...(dynamicSites.length ? [{ name: `${head}: dispatch sites with a non-literal event id`, short: 'dispatch sites with a non-literal event id',
+          rows: dynamicSites, searched: 'dispatches edges to the non-literal event id' }] : []),
       );
-      verdicts.push(`${n.name}: dispatched from ${dispatchers.length} site(s), ${handlers.length} handler(s), fires ${next.length} event(s) and ${requests.length} request(s)`);
-      all.push(...dispatchers, ...handlers, ...next, ...requests);
+      verdicts.push(`${n.name}: dispatched from ${dispatchers.length} site(s)${dynamicSites.length ? ` (${dynamicNote})` : ''}, ${handlers.length} handler(s), `
+        + `fires ${next.length} event(s) and ${requests.length} request(s)`);
+      all.push(...dispatchers, ...handlers, ...next, ...requests, ...dynamicSites);
     } else {
       const subscribers = inEdges(g, n.id, ['subscribes']).map((e) => edgeRow(g, e.from, e));
       const inputs = handlers.flatMap((h) => outEdges(g, h.id, ['subscribes']).map((e) => edgeRow(g, e.to, e)));
       sections.push(
         { name: `${head}: handler`, short: 'handler', rows: handlers, ordered: true, searched: 'registers edges' },
-        { name: `${head}: handler reads subscriptions`, short: 'handler reads subscriptions', rows: inputs, ordered: true, searched: 'subscribes edges out of the handler' },
+        { name: `${head}: handler reads subscriptions`, short: 'handler reads subscriptions', rows: inputs, ordered: true,
+          searched: 'subscribes edges out of the handler' },
         { name: `${head}: subscribed by`, short: 'subscribed by', rows: subscribers, searched: 'subscribes edges' },
       );
       verdicts.push(`${n.name}: ${handlers.length} handler(s), ${inputs.length} input subscription(s), ${subscribers.length} subscriber(s)`);
@@ -571,7 +596,7 @@ export function eventFlow(g: Graph, query: string): QueryResult {
     found: true,
     matches: hits.map((n) => n.id),
     sections: gated(g, ['events'], sections),
-    notes: [...capabilityNotes(g, ['events']), ...unknownNote(all)],
+    notes: [...capabilityNotes(g, ['events']), ...unknownNote(all), ...(dynamicSites.length && hits.some((n) => n.kind === 'event') ? [dynamicNote] : [])],
     next: [call('tests_for', { symbol: hits[0].name })],
   };
 }
@@ -598,7 +623,8 @@ function testsOfMember(g: Graph, member: string, band: Band, via: string, acc: M
     if (from?.kind === 'test') addHit(acc, { test: e.from, band: weakest(band, e.band), via, depth });
     else if (from?.kind === 'page_object_member') {
       for (const e2 of inEdges(g, e.from, ['calls', 'asserts_on'])) {
-        if (g.byId.get(e2.from)?.kind === 'test') addHit(acc, { test: e2.from, band: weakest(weakest(band, e.band), e2.band), via: `${via} via ${from.name}`, depth });
+        if (g.byId.get(e2.from)?.kind === 'test') addHit(acc,
+          { test: e2.from, band: weakest(weakest(band, e.band), e2.band), via: `${via} via ${from.name}`, depth });
       }
     }
   }
@@ -615,7 +641,8 @@ function testsOfRoute(g: Graph, route: string, band: Band, acc: Map<string, Hit>
   const name = g.byId.get(route)?.name ?? route;
   for (const e of inEdges(g, route, ['requests_route'])) {
     for (const e2 of inEdges(g, e.from, ['awaits_request', 'issues_request'])) {
-      if (g.byId.get(e2.from)?.kind === 'test') addHit(acc, { test: e2.from, band: weakest(weakest(band, e.band), e2.band), via: `${prefix}route ${name}`, depth });
+      if (g.byId.get(e2.from)?.kind === 'test') addHit(acc,
+        { test: e2.from, band: weakest(weakest(band, e.band), e2.band), via: `${prefix}route ${name}`, depth });
     }
   }
 }
@@ -662,7 +689,8 @@ export function testsCovering(g: Graph, query: string): QueryResult {
       else if (n.kind === 'page_object_member') testsOfMember(g, n.id, 'static_proven', n.name, acc);
     }
   }
-  if (!matches.length) return notFound(g, 'tests_covering', q, title, 'file, definition, selector or route', ['definitions', 'routes', 'selectors', 'browser_tests']);
+  if (!matches.length) return notFound(g, 'tests_covering', q, title, 'file, definition, selector or route',
+    ['definitions', 'routes', 'selectors', 'browser_tests']);
   const rows = hitRows(g, acc, 'test');
   const notes = [...capabilityNotes(g, ['selectors', 'browser_tests']), ...unknownNote(rows)];
   if (!rows.length) notes.push('no browser test reaches this target through selectors, page objects or requests');
@@ -689,7 +717,8 @@ export function isUnitTest(n: GraphNode | undefined): boolean {
   return typeof by !== 'string' || /deftest|defspec/.test(by);
 }
 
-const TESTS_FOR_LIMITS = 'static links only: tests reaching the target through multimethods, resolve/apply or HTTP fixtures are not counted; 0 tests means no static link, not untested';
+const TESTS_FOR_LIMITS = 'static links only: tests reaching the target through multimethods, resolve/apply or HTTP fixtures are not counted; '
+  + '0 tests means no static link, not untested';
 
 const testsBeyondNote = (max: number): string => `callers continue beyond depth ${max}; tests further out are not listed`;
 
@@ -699,7 +728,8 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
   const hits = resolve(g, ['definition', 'data_attribute', 'data_value', 'event', 'subscription'], query);
   if (!hits.length) {
     const viaBrowser = testsCovering(g, query);
-    if (!viaBrowser.found) return notFound(g, 'tests_for', query, title, 'definition, attribute, event, selector or route', ['definitions', 'data_attributes', 'events', 'selectors', 'browser_tests'], FQN_HINT);
+    if (!viaBrowser.found) return notFound(g, 'tests_for', query, title, 'definition, attribute, event, selector or route',
+      ['definitions', 'data_attributes', 'events', 'selectors', 'browser_tests'], FQN_HINT);
     return { ...viaBrowser, name: 'tests_for', title };
   }
   if (hits.length > 1) return ambiguous('tests_for', query, title, hits, 'symbol');
@@ -739,7 +769,8 @@ export function testsFor(g: Graph, query: string, depth = MAX_DEPTH): QueryResul
     if (!ns.has(comp)) ns.set(comp, new Set());
     ns.get(comp)?.add(r.label.slice(0, i));
   }
-  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows]), ...fractionNote(depth, asked)];
+  const notes = [TESTS_FOR_LIMITS, ...capabilityNotes(g, ['definitions', 'browser_tests']), ...unknownNote([...unitRows, ...browserRows]),
+    ...fractionNote(depth, asked)];
   if (asked > max) notes.push(`depth ${depth} was cut to ${max}, the most this query walks`);
   if (beyond) notes.push(testsBeyondNote(max));
   for (const [comp, set] of ns) notes.push(`run in ${comp}: ${[...set].sort().join(' ')}`);
@@ -798,7 +829,8 @@ export interface ChangeOptions {
 }
 
 // A file's language family: a graph that indexes one Clojure (or one JS/TS) dialect is taken to cover the others.
-const FAMILIES: Record<string, string> = { '.clj': 'clj', '.cljs': 'clj', '.cljc': 'clj', '.bb': 'clj', '.ts': 'js', '.tsx': 'js', '.js': 'js', '.jsx': 'js', '.mjs': 'js', '.cjs': 'js' };
+const FAMILIES: Record<string, string> = { '.clj': 'clj', '.cljs': 'clj', '.cljc': 'clj', '.bb': 'clj', '.ts': 'js', '.tsx': 'js', '.js': 'js', '.jsx': 'js',
+  '.mjs': 'js', '.cjs': 'js' };
 const extOf = (f: string): string => {
   const ext = /\.[^./]+$/.exec(f)?.[0] ?? '';
   return FAMILIES[ext] ?? ext;
@@ -831,7 +863,7 @@ function outsideCallers(g: Graph, changed: GraphNode[], deleted: Set<string>): {
 }
 
 // Routes touched directly or through their handler: their authz rows, and the routes without a provable check as HIGH risks.
-function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>; authz: Row[]; risk: Risk[] } {
+function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>; authz: Row[]; risk: Risk[]; unassessed: boolean } {
   const routeIds = new Set<string>();
   for (const n of changed) {
     if (n.kind === 'route') routeIds.add(n.id);
@@ -840,17 +872,21 @@ function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>
   const authz: Row[] = [];
   const risk: Risk[] = [];
   const noAuthz = routeAuthzMissing(g);
+  // the changed code is on a route whose permission check nothing was extracted for: the risk cannot be called LOW
+  const unassessed = routeIds.size > 0 && noAuthz;
   for (const id of routeIds) {
     const route = g.byId.get(id);
     if (!route) continue;
     const v = routeVerdict(g, id);
     const sib = routeSiblings(g, route);
     authz.push(nodeRow(route, { detail: v.text + (sib ? `; ${sib.text}` : '') }));
-    if (v.state === 'none') risk.push(...risks([nodeRow(route, { detail: `route has no permission check and no exemption${sib?.odd ? '; its siblings check one' : ''}` })], true));
+    if (v.state === 'none') risk.push(...risks([nodeRow(route,
+      { detail: `route has no permission check and no exemption${sib?.odd ? '; its siblings check one' : ''}` })], true));
     // without the capability nothing was extracted: say so once in the notes, never as a finding about the route
-    if (v.state === 'unknown' && !noAuthz) risk.push(...risks([nodeRow(route, { band: 'unknown', detail: middlewareUnread(route) ? v.text : 'permission check decided at runtime; not provable; evidence in the route data' })], true));
+    if (v.state === 'unknown' && !noAuthz) risk.push(...risks([nodeRow(route,
+      { band: 'unknown', detail: middlewareUnread(route) ? v.text : 'permission check decided at runtime; not provable; evidence in the route data' })], true));
   }
-  return { routeIds, authz, risk };
+  return { routeIds, authz, risk, unassessed };
 }
 
 // Attributes the changed code reads or writes; a write to an attribute that is read elsewhere is a risk.
@@ -862,7 +898,8 @@ function attributeRows(g: Graph, changed: GraphNode[]): { attrs: Row[]; risk: Ri
       const writers = inEdges(g, e.to, ['writes']).length;
       const readers = inEdges(g, e.to, ['reads']).length;
       attrs.push(edgeRow(g, e.to, e, { detail: `${e.kind} by ${n.name}; ${writers} writer(s), ${readers} reader(s) in total` }));
-      if (e.kind === 'writes' && readers > 0) risk.push(edgeRow(g, e.to, e, { detail: `changed code writes ${g.byId.get(e.to)?.name ?? e.to}, read in ${readers} place(s)` }));
+      if (e.kind === 'writes' && readers > 0) risk.push(edgeRow(g, e.to, e,
+        { detail: `changed code writes ${g.byId.get(e.to)?.name ?? e.to}, read in ${readers} place(s)` }));
     }
   }
   return { attrs, risk: risks(risk, false) };
@@ -901,10 +938,14 @@ function coverageNotes(g: Graph, changes: Change[], changed: GraphNode[], added:
   // added file is new code the graph predates; a file type the graph never indexes (translations, styles, docs) is counted
   if (missing.length) {
     const names = missing.slice(0, 3).map((c) => c.file).join(', ');
-    notes.push(`no graph node in ${missing.length} file(s): ${names}${missing.length > 3 ? ` +${missing.length - 3} more` : ''} (or outside the given lines): not covered by this graph`);
+    const more = missing.length > 3 ? ` +${missing.length - 3} more` : '';
+    notes.push(`no graph node in ${missing.length} file(s): ${names}${more} (or outside the given lines): not covered by this graph`);
   }
   if (newFiles) notes.push(`${newFiles} added file(s) are newer than this graph: their routes, writes and callers are not in it`);
-  if (otherTypes.length) notes.push(`${otherTypes.length} changed file(s) of a type this graph does not index (${[...new Set(otherTypes.map((c) => /\.[^./]+$/.exec(c.file)?.[0] ?? 'no extension'))].slice(0, 4).join(', ')})`);
+  if (otherTypes.length) {
+    const types = [...new Set(otherTypes.map((c) => /\.[^./]+$/.exec(c.file)?.[0] ?? 'no extension'))].slice(0, 4).join(', ');
+    notes.push(`${otherTypes.length} changed file(s) of a type this graph does not index (${types})`);
+  }
   return { uncovered: uncovered.length, notes };
 }
 
@@ -913,22 +954,26 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const title = `context for change (${changes.length} file(s))`;
   const changed = g.doc.nodes.filter((n) => changes.some((c) => touched(n, c)));
   const { outside, broken } = outsideCallers(g, changed, new Set(opts.deleted ?? []));
-  const { routeIds, authz, risk: routeRisk } = routeAuthzRows(g, changed);
+  const { routeIds, authz, risk: routeRisk, unassessed } = routeAuthzRows(g, changed);
   const { attrs, risk: attrRisk } = attributeRows(g, changed);
   const { run, add, beyond } = testRows(g, changed);
-  const entryRisk = risks(outside.filter((x) => x.cross && x.entry).map((r) => ({ ...r, detail: `entry point in another component calls ${r.parentLabel}` })), false);
+  const entryRisk = risks(outside.filter((x) => x.cross && x.entry).map((r) => ({ ...r,
+    detail: `entry point in another component calls ${r.parentLabel}` })), false);
   const tableKeys = changeKeyRows(g, changes);
   const keyRows = [...changeSignatureRows(g, changed.filter((x) => x.kind === 'definition')), ...tableKeys.rows];
   const found = [...broken, ...routeRisk, ...attrRisk, ...entryRisk, ...risks(keyRows.map((r) => ({ ...r, detail: r.label })), false)];
   const risk = found.map((x) => x.row);
   const cover = coverageNotes(g, changes, changed, new Set(opts.added ?? []));
   const coverage = cover.uncovered ? ` (${cover.uncovered} of ${changes.length} file(s) not covered)` : '';
-  // nothing matched means nothing was assessed: UNKNOWN, never LOW
-  const level = found.some((x) => x.high) ? 'HIGH' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length ? 'UNKNOWN' : 'LOW';
+  // nothing matched, or a contributing capability absent for a changed route, means nothing was assessed: UNKNOWN, never LOW
+  const level = found.some((x) => x.high) ? 'HIGH' : unassessed ? 'UNKNOWN' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length ? 'UNKNOWN' : 'LOW';
   const notes = [
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
-    ...(tableKeys.weak ? [`${tableKeys.weak} key-sibling row(s) dropped: the key they lack is absent in ${Math.round(WEAK_PATTERN_ABSENT * 100)}%+ of sibling rows, no sibling pattern`] : []),
+    ...(tableKeys.weak
+      ? [`${tableKeys.weak} key-sibling row(s) dropped: the key they lack is absent in ${Math.round(WEAK_PATTERN_ABSENT * 100)}%+ `
+        + 'of sibling rows, no sibling pattern']
+      : []),
     ...(beyond ? [testsBeyondNote(MAX_DEPTH)] : []),
     ...(changed.length ? [] : ['no changed symbol matched: the risk is not decidable from this graph, which says nothing about the change']),
     ...cover.notes,
@@ -937,7 +982,8 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
     name: 'context_for_change',
     query: specs.join(' '),
     title,
-    verdict: `${changes.length} file(s), ${changed.length} changed symbol(s), ${routeIds.size} route(s), ${new Set(attrs.map((a) => a.id)).size} attribute(s); risk ${level}${coverage}`,
+    verdict: `${changes.length} file(s), ${changed.length} changed symbol(s), ${routeIds.size} route(s), `
+      + `${new Set(attrs.map((a) => a.id)).size} attribute(s); risk ${level}${coverage}`,
     found: changed.length > 0,
     matches: changed.map((n) => n.id),
     sections: [
@@ -946,7 +992,8 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
       { name: 'callers outside the diff', rows: outside, searched: 'call and reference edges into the changed symbols' },
       { name: 'route authz', rows: authz, ordered: true, searched: 'routes defined or handled by the changed code' },
       { name: 'attributes', rows: attrs, searched: 'reads and writes of the changed code' },
-      { name: 'signatures and key siblings', short: 'keys', rows: keyRows, ordered: true, searched: 'callers of changed definitions with an undefined arity or a never-passed key; table rows on the changed lines lacking a sibling key' },
+      { name: 'signatures and key siblings', short: 'keys', rows: keyRows, ordered: true,
+        searched: 'callers of changed definitions with an undefined arity or a never-passed key; table rows on the changed lines lacking a sibling key' },
       { name: 'tests to run', rows: run, searched: `unit tests up to depth ${MAX_DEPTH} and browser tests` },
       { name: 'tests to add', rows: add, ordered: true, searched: 'changed definitions with no static test' },
     ],

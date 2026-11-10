@@ -1,5 +1,6 @@
-// Playwright page objects and tests, read with the analyzed project's own TypeScript (its compiler API; clojure-atlas
-// ships none). Page objects are classes whose members hold literal locators; a test reaches a member when the type
+// Playwright page objects and tests, read with the TypeScript compiler API of clojure-atlas's own install (an optional
+// peer dependency; never the analyzed repository's copy, which would run that repository's code during a build). Page objects are classes whose
+// members hold literal locators; a test reaches a member when the type
 // checker proves the receiver is that class. Only exact literals count: a selector built at runtime is not followed.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -134,7 +135,8 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
         for (const ctor of n.members.filter(ts.isConstructorDeclaration)) {
           const assigned = (x: Node): void => {
             const left = ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.EqualsToken ? x.left : undefined;
-            if (left && ts.isPropertyAccessExpression(left) && left.expression.kind === ts.SyntaxKind.ThisKeyword) added(left.name.text, lineOf(sf, x.getStart(sf)), lineOf(sf, x.getEnd()), inspect(x.right));
+            if (left && ts.isPropertyAccessExpression(left) && left.expression.kind === ts.SyntaxKind.ThisKeyword) added(left.name.text,
+              lineOf(sf, x.getStart(sf)), lineOf(sf, x.getEnd()), inspect(x.right));
             ts.forEachChild(x, assigned);
           };
           if (ctor.body) assigned(ctor.body);
@@ -171,7 +173,8 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
     if (!ts.isCallExpression(n)) return false;
     const callee = n.expression;
     if (ts.isIdentifier(callee)) return callee.text === 'expect';
-    return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'expect' && ['soft', 'poll'].includes(callee.name.text);
+    return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'expect' && ['soft',
+      'poll'].includes(callee.name.text);
   };
   // expect(<member access or its call>).not?.toX(...): the matcher
   const matcherOf = (n: Node): string | undefined => {
@@ -239,8 +242,13 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
   return { dir, typescript: ts.version, pageObjects, tests };
 }
 
-// Every Playwright project in the repo (a package.json naming @playwright/test), read with its own TypeScript.
-export function readPlaywright(root: string, packageJsons: readonly string[], typescript: readonly string[], load: (pkg: string) => Ts = (pkg) => createRequire(path.join(root, pkg))('typescript')): Playwright {
+// The compiler is resolved from this package's own location, so a clone's node_modules (or a parent directory of it) is
+// never searched.
+const ownTypeScript = (): Ts => createRequire(import.meta.url)('typescript');
+
+// Every Playwright project in the repo (a package.json naming @playwright/test), read with clojure-atlas's own TypeScript.
+export function readPlaywright(root: string, packageJsons: readonly string[], typescript: readonly string[],
+  load: (pkg: string) => Ts = ownTypeScript): Playwright {
   const out: Playwright = { projects: [], skipped: [] };
   for (const pkg of packageJsons) {
     const text = readFileSync(path.join(root, pkg), 'utf8');
@@ -250,11 +258,13 @@ export function readPlaywright(root: string, packageJsons: readonly string[], ty
     try {
       ts = load(pkg);
     } catch (err) {
-      out.skipped.push(`${dir}: typescript is not installed there (${(err as NodeJS.ErrnoException).code ?? 'error'})`);
+      out.skipped.push(`${dir}: no TypeScript 5 compiler in clojure-atlas's own install (${(err as NodeJS.ErrnoException).code ?? 'error'}); `
+        + 'install typescript@5 beside clojure-atlas to read browser tests');
       continue;
     }
     if (typeof ts.createProgram !== 'function') {
-      out.skipped.push(`${dir}: typescript ${String(ts.version)} has no compiler API (TypeScript 7 removed it)`);
+      out.skipped.push(`${dir}: typescript ${String(ts.version)} in clojure-atlas's own install has no compiler API (TypeScript 7 removed it); `
+        + 'install typescript@5 beside clojure-atlas');
       continue;
     }
     out.projects.push(readProject(ts, root, dir, typescript.filter((f) => dir === '.' || f.startsWith(`${dir}/`))));

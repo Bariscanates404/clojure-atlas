@@ -84,7 +84,8 @@ const warnOnce = (message: string) => {
 
 function git(root: string, args: string[], input?: string): string | null {
   try {
-    return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', input, maxBuffer: 1 << 30, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'] });
+    return execFileSync('git', ['-C', root, ...args],
+      { encoding: 'utf8', input, maxBuffer: 1 << 30, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'] });
   } catch {
     return null;
   }
@@ -109,7 +110,8 @@ const CODE_FILE = /\.(clj|cljs|cljc|edn|ts)$|(^|\/)package\.json$/;
 // analyzed directory: a file the builder reads counts; a directory is a submodule, so every file read under it
 // counts; a path that is gone counts when it looks like code. `ignored` are the read files git ignores (never in the
 // commit). Files the builder never reads (logs, build output) are not part of the snapshot.
-export function dirtyFiles(analyzed: readonly string[], changed: readonly string[], ignored: readonly string[], isDirectory: (rel: string) => boolean, exists: (rel: string) => boolean): string[] {
+export function dirtyFiles(analyzed: readonly string[], changed: readonly string[], ignored: readonly string[], isDirectory: (rel: string) => boolean,
+  exists: (rel: string) => boolean): string[] {
   const read = new Set(analyzed);
   const out = new Set(ignored);
   for (const p of changed) {
@@ -145,9 +147,14 @@ function readFileList(root: string): string[] {
   return [...f.sources, ...f.edn, ...f.typescript, ...f.packageJsons];
 }
 
-// The read files git ignores and does not track, which `git status` never lists.
-function ignoredAmong(root: string, files: readonly string[]): string[] {
-  const out = git(root, ['check-ignore', '-z', '--stdin'], files.join('\0'));
+// The read files git ignores and does not track, which `git status` never lists. A tracked file is never one of them,
+// so only the untracked ones are put to check-ignore: asking about every file of a large repository costs seconds.
+export function ignoredAmong(root: string, files: readonly string[]): string[] {
+  const tracked = git(root, ['ls-files', '-z', '--', '.']);
+  const known = new Set(tracked === null ? [] : tracked.split('\0'));
+  const untracked = files.filter((f) => !known.has(f));
+  if (!untracked.length) return [];
+  const out = git(root, ['check-ignore', '-z', '--stdin'], untracked.join('\0'));
   return out === null ? [] : out.split('\0').filter(Boolean);
 }
 
@@ -182,6 +189,19 @@ export function snapshotOf(root: string, analyzer: string): Snapshot {
   const configHash = sha256(configSourcesList.map((f) => `${f}\0${sha256(readFileSync(path.join(root, f)))}`).join('\n'));
   const id = sha256(JSON.stringify({ sha, dirty, configHash, analyzer })).slice(0, 16);
   return { id, sha, ref, dirty, configHash, configSources: configSourcesList, analyzer };
+}
+
+// A snapshot function that walks the tree at most once per `ttlMs`: the MCP server asks on every tool call, and a walk
+// of a large repository takes seconds. An edit shows from the first call after the window ends.
+export const SNAPSHOT_TTL_MS = 3000;
+
+export function cachedSnapshot(take: () => Snapshot, ttlMs: number, now: () => number = Date.now): () => Snapshot {
+  let last: { at: number; snapshot: Snapshot } | undefined;
+  return () => {
+    const at = now();
+    if (!last || at - last.at >= ttlMs || at < last.at) last = { at, snapshot: take() };
+    return last.snapshot;
+  };
 }
 
 export const analyzerVersion = (kondoVersion: string) => `clojure-atlas ${VERSION}, ${kondoVersion}`;
