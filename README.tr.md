@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build`, `.clojure-atlas/graph.json.gz` dosyasını yazar. integrant deposunda şunu yazdırır:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init`, yazacağı proje `.mcp.json` dosyasını gösterir ve yalnızca `--yes` ile yazar:
@@ -120,7 +120,7 @@ bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]
 Grafın hangi commit'i anlattığı, her adaptörün ne bulduğu ve band sayıları. Soru: integrant grafı neleri biliyor?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -415,16 +415,28 @@ Boş bir yanıt hiçbir zaman çıplak bir boş liste değildir. Şu biçimlerde
   yazar.
 
 Grafın kendisi eksik olduğunda, build günlüğü, graph_info ve her yanıt bir `DEGRADED` satırı ile başlar. Satır,
-clj-kondo'nun ayrıştıramadığı dosyaları, atlanan 2 MB'tan büyük kaynak dosyalarını, birden fazla dosyada tanımlanan
+clj-kondo'nun hiç ayrıştıramadığı dosyaları, kurtarabildiği sözdizimi hatalı dosyaları (bazı formlar eksik olabilir),
+okunmayan izlenen dosyaları ve nedenini (gizli ya da build klasörü, symlink, silinmiş dosya), atlanan 2 MB'tan büyük
+dosyaları (bir `.edn` dosyasında verisi, anahtarları ve config'i eksiktir), birden fazla dosyada tanımlanan
 namespace'leri (bunların kullanımları `duplicate-namespace` üzerinden HEURISTIC'tir) ve bir ucu node olmadığı için
-düşürülen edge'leri adlandırır. Büyük olasılıkla ayrıştırılamayan ya da atlanan bir dosyada duran bir ad bu şekilde
-bildirilir. Bir dosyanın ayrıştırılamadığı ve bir namespace'in iki kez tanımlandığı biff'ten:
+düşürülen edge'leri adlandırır. Bulunamayan bir ad büyük olasılıkla böyle bir dosyada duruyorsa, yanıt o dosyayı
+adlandırır. Bir dosyanın ayrıştırılamadığı shadow-cljs'ten:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
+note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+Sözdizimi hataları olan ama analiz edilebilen bir dosyanın bulunduğu biff'ten: tanım yine de eksik olabilir, bu
+yüzden yanıt hem yazım ipucunu hem makro ipucunu korur:
+
+```
+DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
 note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
 note: use a fully qualified name (ns/name)
 ```
 
@@ -517,7 +529,10 @@ bildirilen hook'ları clj-kondo'nun kendisi yorumlar, clj-kondo çalıştıran h
 graf dosyasını okur ve `--repo` ile salt okunur git komutları çalıştırır. Her git çağrısı, deponun kendi komut
 çalıştıran ayarlarını (`core.fsmonitor`, filter driver'ları, hook'lar) yok sayar, asla soru sormaz ve bir zaman aşımı
 vardır. Her clj-kondo çalıştırmasının da bir zaman aşımı vardır: hiç dönmeyen bir hook build'i değil, kendi batch'ini
-götürür (DEGRADED altında listelenir).
+götürür (DEGRADED altında listelenir). Git hiçbir zaman bir submodule'ün içinde çalışmaz (kendi config'ini clojure-atlas kapatamaz), bu yüzden bir
+submodule'ün dosyaları her zaman değişmiş sayılır. Her iki program da PATH üzerinde bulunan mutlak bir yoldan başlatılır,
+hiçbir zaman analiz edilen dizinden değil; projenin `:output` ve `:analysis` clj-kondo ayarları, grafın ihtiyaç duyduğu
+ayarlarla değiştirilir.
 
 ## Neden TypeScript?
 
@@ -529,9 +544,11 @@ TypeScript'i kendiniz yazabilirsiniz.
 
 ## Sınırlar
 
-- **Yalnızca statik.** Çalışma zamanında çözülen bir var (`resolve`, `requiring-resolve`, veriyle seçilen bir
-  fonksiyon) izlenmez. Yalnızca dinamik olarak okunan ya da yazılan bir map anahtarı izlenmez. Koda multimethod'lar,
-  `resolve`/`apply` ya da HTTP fixture'ları üzerinden ulaşan testler sayılmaz.
+- **Yalnızca statik.** Çalışma zamanında çözülen bir var izlenmez. Sabit bir sembolün `requiring-resolve`, `resolve`
+  ya da `ns-resolve` ile çözülmesi bir HEURISTIC referanstır; çalışma zamanında üretilen bir sembol ya da veriyle
+  seçilen bir fonksiyon değildir; proje var'ları dinamik çözdüğünde callers ve blast_radius bunu söyler. Yalnızca
+  dinamik olarak okunan ya da yazılan bir map anahtarı izlenmez. Koda multimethod'lar, `resolve`/`apply` ya da HTTP
+  fixture'ları üzerinden ulaşan testler sayılmaz.
 - **Heuristic kısımlar**: multimethod ve protocol dispatch (`may_dispatch_to`), bazı compojure handler'ları
   (`heuristic match` olarak gösterilir), compojure ve Ring middleware zincirleri, middleware factory çağrıları, reitit
   gerektirmeyen namespace'lerdeki reitit frontend route tabloları (projede herhangi bir yerde `reitit.frontend`

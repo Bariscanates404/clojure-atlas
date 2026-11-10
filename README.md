@@ -28,7 +28,7 @@ npx clojure-atlas init
 `build` writes `.clojure-atlas/graph.json.gz`. On the integrant repo it prints:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` shows the project `.mcp.json` it would write and writes it only with `--yes`:
@@ -119,7 +119,7 @@ Which commit the graph describes, what each adapter found, with band counts. Que
 graph know?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -412,16 +412,28 @@ An empty answer is never a bare empty list. It takes one of these forms:
   read reads `not extracted (UNKNOWN)`.
 
 When the graph itself is incomplete, the build log, graph_info and every answer start with a `DEGRADED` line. It
-names files clj-kondo could not parse, source files over 2 MB that were skipped, namespaces defined in more than
+names files clj-kondo could not parse at all, files with syntax errors it recovered from (some forms may be
+missing), tracked files that were not read and why (a hidden or build folder, a symlink, a deleted file), files
+over 2 MB that were skipped (for an `.edn` file, its data, keys and config are missing), namespaces defined in more than
 one file (usages of them are HEURISTIC, via `duplicate-namespace`), and edges dropped because one end was not a
-node. A name that probably lives in an unparsed or skipped file is reported as such. From biff, where one file
-cannot be parsed and one namespace is defined twice:
+node. A not-found name that probably lives in such a file names it. From shadow-cljs, where one file cannot be
+parsed:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
+note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+From biff, whose file has syntax errors but was analyzed: the definition may still be missing, so the answer
+keeps both the spelling and the macro hint:
+
+```
+DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
 note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
 note: use a fully qualified name (ns/name)
 ```
 
@@ -523,8 +535,9 @@ TypeScript yourself.
 
 ## Limits
 
-- **Static only.** A var resolved at runtime (`resolve`, `requiring-resolve`, a function chosen by data) is not
-  followed. A map key read or written only dynamically is not tracked. Tests that reach code through
+- **Static only.** A var resolved at runtime is not followed. `requiring-resolve`, `resolve` or `ns-resolve` of a
+  literal symbol is a HEURISTIC reference; a symbol built at runtime, or a function chosen by data, is not, and
+  callers and blast_radius say so when the project resolves vars dynamically. A map key read or written only dynamically is not tracked. Tests that reach code through
   multimethods, `resolve`/`apply` or HTTP fixtures are not counted.
 - **Heuristic parts**: multimethod and protocol dispatch (`may_dispatch_to`), some compojure handlers (shown as
   `heuristic match`), compojure and Ring middleware chains, middleware factory calls, reitit frontend route tables

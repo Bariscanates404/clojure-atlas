@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` escreve `.clojure-atlas/graph.json.gz`. No repo do integrant ele imprime:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` mostra o `.mcp.json` do projeto que escreveria e só o escreve com `--yes`:
@@ -122,7 +122,7 @@ Qual commit o grafo descreve e o que cada adaptador encontrou, com a contagem de
 do integrant sabe?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -415,16 +415,28 @@ Uma resposta vazia nunca é uma lista vazia simples. Ela toma uma destas formas:
   `not extracted (UNKNOWN)`.
 
 Quando o próprio grafo está incompleto, o log de build, o graph_info e toda resposta começam com uma linha `DEGRADED`. Ela
-nomeia os arquivos que o clj-kondo não conseguiu analisar, os arquivos-fonte acima de 2 MB que foram pulados, os
-namespaces definidos em mais de um arquivo (seus usos são HEURISTIC, via `duplicate-namespace`) e as arestas
-descartadas porque uma ponta não era um nó. Um nome que provavelmente está em um arquivo não analisado ou pulado é
-reportado como tal. Do biff, onde um arquivo não pode ser analisado e um namespace é definido duas vezes:
+nomeia os arquivos que o clj-kondo não conseguiu analisar de forma alguma, os arquivos com erros de sintaxe dos quais ele
+se recuperou (algumas formas podem estar faltando), os arquivos rastreados que não foram lidos e o motivo (uma pasta
+oculta ou de build, um symlink, um arquivo apagado), os arquivos acima de 2 MB que foram pulados (para um arquivo `.edn`,
+faltam seus dados, chaves e configuração), os namespaces definidos em mais de um arquivo (seus usos são HEURISTIC, via
+`duplicate-namespace`) e as arestas descartadas porque uma ponta não era um nó. Um nome não encontrado que
+provavelmente está em um arquivo assim nomeia esse arquivo. Do shadow-cljs, onde um arquivo não pode ser analisado:
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
+note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+Do biff, cujo arquivo tem erros de sintaxe mas foi analisado: a definição ainda pode estar faltando, então a resposta
+mantém tanto a grafia quanto a dica de macro:
+
+```
+DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
 note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
 note: use a fully qualified name (ns/name)
 ```
 
@@ -514,7 +526,10 @@ declarados nela são interpretados pelo próprio clj-kondo, como em qualquer edi
 apenas lê o arquivo do grafo e, com `--repo`, executa comandos git somente de leitura. Toda chamada ao git ignora as
 configurações do próprio repositório que executam comandos (`core.fsmonitor`, filter drivers, hooks), nunca pergunta
 nada e tem um timeout. Cada execução do clj-kondo também tem um timeout: um hook que nunca retorna custa o seu lote
-(listado em DEGRADED), não o build.
+(listado em DEGRADED), não o build. O git nunca é executado dentro de um
+submódulo (cuja configuração própria o clojure-atlas não consegue desligar), então os arquivos de um submódulo sempre contam como
+alterados. Os dois programas são iniciados a partir de um caminho absoluto encontrado no PATH, nunca a partir do diretório
+analisado, e as configurações `:output` e `:analysis` do clj-kondo do projeto são substituídas pelas que o grafo precisa.
 
 ## Por que TypeScript?
 
@@ -526,8 +541,9 @@ TypeScript você mesmo.
 
 ## Limites
 
-- **Somente estático.** Um var resolvido em tempo de execução (`resolve`, `requiring-resolve`, uma função escolhida por dados) não é
-  seguido. Uma chave de mapa lida ou escrita apenas dinamicamente não é rastreada. Testes que alcançam código por
+- **Somente estático.** Um var resolvido em tempo de execução não é seguido. `requiring-resolve`, `resolve` ou `ns-resolve`
+  de um símbolo literal é uma referência HEURISTIC; um símbolo construído em tempo de execução, ou uma função escolhida por dados, não é, e
+  callers e blast_radius dizem isso quando o projeto resolve vars dinamicamente. Uma chave de mapa lida ou escrita apenas dinamicamente não é rastreada. Testes que alcançam código por
   multimethods, `resolve`/`apply` ou fixtures HTTP não são contados.
 - **Partes heurísticas**: despacho de multimethods e protocolos (`may_dispatch_to`), alguns handlers do compojure
   (mostrados como `heuristic match`), cadeias de middleware do compojure e do Ring, chamadas a fábricas de middleware,

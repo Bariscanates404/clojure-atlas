@@ -237,6 +237,7 @@ not keyword matches.
 ```
 DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS mount.core/unpound — 0 direct caller(s) in 0 component(s)
+note: dynamic resolution (requiring-resolve, resolve, ns-resolve) is used at 2 site(s), 1 naming a project var by a literal symbol (HEURISTIC references); a symbol built at runtime is not followed, so a caller reached that way is not listed
 definition (1)
   1. mount.core/unpound  src/mount/core.cljc:43 [S]
 callers: none (searched: call edges into this definition)

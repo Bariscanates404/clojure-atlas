@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` は `.clojure-atlas/graph.json.gz` を書き出します。integrant リポジトリでは次のように出力されます。
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` は書き込む予定のプロジェクトの `.mcp.json` を表示します。実際に書き込むのは `--yes` を付けたときだけです。
@@ -120,7 +120,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 グラフがどのコミットを表すか、各アダプタが何を見つけたかを、band ごとの件数付きで返します。質問: integrant のグラフは何を知っているか。
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -402,17 +402,27 @@ tests to add: none (searched: changed definitions with no static test)
   `not extracted (route_authz is absent)` と表示され、「none」にはなりません。読み取れないミドルウェアチェーンは
   `not extracted (UNKNOWN)` と表示されます。
 
-グラフ自体が不完全なとき、ビルドログ、graph_info、すべての回答は `DEGRADED` 行で始まります。この行には、clj-kondo が解析できなかった
-ファイル、スキップされた 2 MB を超えるソースファイル、複数のファイルで定義されている namespace (その使用は
-`duplicate-namespace` により HEURISTIC になります)、端が node でなかったために落ちたエッジが挙がります。
-解析されなかった、またはスキップされたファイルに存在すると思われる名前は、そのように報告されます。
-1 つのファイルを解析できず、1 つの namespace が二重に定義されている biff の例です。
+グラフ自体が不完全なとき、ビルドログ、graph_info、すべての回答は `DEGRADED` 行で始まります。この行には、clj-kondo がまったく解析できなかった
+ファイル、復旧したものの構文エラーがあったファイル (一部の form が欠けている可能性があります)、読み取られなかった追跡対象ファイルとその理由
+(隠しフォルダやビルドフォルダ、シンボリックリンク、削除されたファイル)、スキップされた 2 MB を超えるファイル (`.edn` ファイルでは、そのデータ、キー、設定が欠けます)、
+複数のファイルで定義されている namespace (その使用は `duplicate-namespace` により HEURISTIC になります)、
+端が node でなかったために落ちたエッジが挙がります。見つからなかった名前がそのようなファイルに存在すると思われる場合は、そのファイルが示されます。
+1 つのファイルを解析できない shadow-cljs の例です。
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
+note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+構文エラーがあるものの解析されたファイルを持つ biff の例です。定義はまだ欠けている可能性があるため、回答はつづりの問題とマクロのヒントの両方を残します。
+
+```
+DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
 note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
 note: use a fully qualified name (ns/name)
 ```
 
@@ -508,6 +518,8 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 リポジトリ自身の設定のうちコマンドを実行するもの (`core.fsmonitor`、filter driver、hook) を無視し、プロンプトを出さず、
 タイムアウトがあります。clj-kondo の各実行にもタイムアウトがあります。決して戻らない hook はそのバッチを失わせますが
 (DEGRADED に挙がります)、ビルド全体は失われません。
+git はサブモジュールの中では実行されないため (サブモジュール自身の設定を clojure-atlas は無効にできません)、サブモジュールのファイルは常に変更ありとして数えられます。
+2 つのプログラムはどちらも、PATH 上で見つけた絶対パスから起動し、解析対象のディレクトリからは起動しません。また、プロジェクトの clj-kondo 設定の `:output` と `:analysis` は、グラフに必要なものに置き換えられます。
 
 ## なぜ TypeScript なのか
 
@@ -518,8 +530,9 @@ clj-kondo が行います。clojure-atlas はその出力とソースの形を�
 
 ## 制限
 
-- **静的解析のみ。** 実行時に解決される var (`resolve`、`requiring-resolve`、データで選ばれる関数) は辿りません。
-  動的にしか読み書きされないマップキーは追跡しません。マルチメソッド、`resolve`/`apply`、HTTP フィクスチャ経由で
+- **静的解析のみ。** 実行時に解決される var は辿りません。リテラルのシンボルに対する `requiring-resolve`、`resolve`、`ns-resolve` は
+  HEURISTIC な参照です。実行時に組み立てられたシンボルや、データで選ばれる関数はそうではなく、プロジェクトが var を動的に解決している場合は
+  callers と blast_radius がその旨を伝えます。動的にしか読み書きされないマップキーは追跡しません。マルチメソッド、`resolve`/`apply`、HTTP フィクスチャ経由で
   コードに到達するテストは数えません。
 - **ヒューリスティックな部分**: マルチメソッドとプロトコルのディスパッチ (`may_dispatch_to`)、一部の compojure ハンドラ
   (`heuristic match` と表示)、compojure と Ring のミドルウェアチェーン、ミドルウェアファクトリの呼び出し、

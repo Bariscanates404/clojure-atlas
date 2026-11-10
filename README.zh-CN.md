@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` 会写出 `.clojure-atlas/graph.json.gz`。在 integrant 仓库上的输出如下：
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` 会显示它将要写入的项目 `.mcp.json`，只有加上 `--yes` 才会真正写入：
@@ -120,7 +120,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 图描述的是哪个提交，每个适配器找到了什么，并附各 band 的数量。问题：integrant 的图知道什么？
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -401,16 +401,26 @@ tests to add: none (searched: changed definitions with no static test)
   `capability route_authz is absent: an empty answer is not proof of absence`。依赖它的部分会显示为
   `not extracted (route_authz is absent)`，绝不会是 “none”。无法读取的中间件链显示为 `not extracted (UNKNOWN)`。
 
-当图本身不完整时，构建日志、graph_info 和每个回答都以一行 `DEGRADED` 开头。它会列出 clj-kondo 无法解析的文件、
-被跳过的超过 2 MB 的源文件、在多个文件中定义的命名空间（对它们的使用是 HEURISTIC，通过 `duplicate-namespace`），
-以及因一端不是节点而被丢弃的边。很可能位于未解析或被跳过文件中的名字会被如此说明。
-下面是 biff 的例子，其中有一个文件无法解析，还有一个命名空间被定义了两次：
+当图本身不完整时，构建日志、graph_info 和每个回答都以一行 `DEGRADED` 开头。它会列出 clj-kondo 完全无法解析的文件、
+已恢复但存在语法错误的文件（其中可能缺少一些形式）、未被读取的受跟踪文件及原因（隐藏文件夹或构建文件夹、符号链接、已删除的文件）、
+被跳过的超过 2 MB 的文件（对于 `.edn` 文件，其数据、键和配置会缺失）、在多个文件中定义的命名空间（对它们的使用是 HEURISTIC，通过 `duplicate-namespace`），
+以及因一端不是节点而被丢弃的边。未找到的名字若很可能位于这样的文件中，会指明该文件。
+下面是 shadow-cljs 的例子，其中有一个文件无法解析：
 
 ```
-DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
+CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
+note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+下面是 biff 的例子，其文件有语法错误但已被分析：定义仍可能缺失，因此回答同时保留拼写提示和宏提示：
+
+```
+DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
 note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
 note: use a fully qualified name (ns/name)
 ```
 
@@ -497,7 +507,8 @@ compojure 中间件链（q13）和 reitit 前端路由（q14）。
 绝不会用 Node、JVM 或 shell 运行被分析仓库的代码。TypeScript 从 clojure-atlas 自己的安装中加载，
 绝不从被分析的仓库中加载。clj-kondo 会应用项目的 `.clj-kondo` 配置；其中声明的 hook 由 clj-kondo 自己解释，
 与任何运行 clj-kondo 的编辑器一样。MCP 服务器只读取图文件，指定 `--repo` 时运行只读的 git 命令。每次 git 调用都会忽略仓库自身那些会运行命令的设置（`core.fsmonitor`、filter driver、hook），
-从不弹出提示，并且有超时。每次 clj-kondo 运行同样有超时：一个永不返回的 hook 只会让它所在的批次失效（列在 DEGRADED 下），而不会让整个构建失败。
+从不弹出提示，并且有超时。每次 clj-kondo 运行同样有超时：一个永不返回的 hook 只会让它所在的批次失效（列在 DEGRADED 下），而不会让整个构建失败。git 绝不会在子模块内运行（clojure-atlas 无法关闭子模块自身的配置），因此子模块的文件始终算作已更改。
+这两个程序都从在 PATH 上找到的绝对路径启动，绝不从被分析的目录启动，项目的 clj-kondo `:output` 和 `:analysis` 设置会被图所需的设置替换。
 
 ## 为什么用 TypeScript？
 
@@ -508,7 +519,8 @@ clj-kondo 完成；clojure-atlas 读取它的输出和源码形式，并构建�
 
 ## 限制
 
-- **仅静态分析。** 在运行时才解析的 var（`resolve`、`requiring-resolve`、由数据选择的函数）不会被追踪。
+- **仅静态分析。** 在运行时才解析的 var 不会被追踪。对字面量符号做 `requiring-resolve`、`resolve` 或 `ns-resolve` 是 HEURISTIC 引用；
+  在运行时构造的符号，或由数据选择的函数则不是，当项目动态解析 var 时，callers 和 blast_radius 会如此说明。
   只以动态方式读写的 map 键不会被追踪。通过多方法、`resolve`/`apply` 或 HTTP fixture 到达代码的测试不计入。
 - **启发式部分**：多方法和协议的分派（`may_dispatch_to`）、部分 compojure 处理器（显示为 `heuristic match`）、
   compojure 和 Ring 的中间件链、中间件工厂调用、未 require reitit 的命名空间中的 reitit 前端路由表（只要项目中任何地方
