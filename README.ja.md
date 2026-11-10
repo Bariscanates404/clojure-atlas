@@ -437,11 +437,21 @@ Babashka、Logseq、Metabase、Penpot、re-frame、Reitit と、より小さな�
 
 | リポジトリ | Resolved | Unresolved | 解決率 | 未知の名前空間(生の件数、除外) |
 |---|---:|---:|---:|---:|
-| Integrant | 442 | 0 | 100.0% | 0 |
-| Babashka | 15,264 | 61 | 99.6% | 2,176 |
 | Metabase | 311,181 | 111 | 100.0% | 9,522 |
-| DataScript | 4,392 | 496 | 89.9% | 1,255 |
-| day-of-datomic | 84 | 29 | 74.3% | 1 |
+| Penpot | 124,814 | 13 | 100.0% | 1,888 |
+| Logseq | 69,041 | 0 | 100.0% | 162 |
+| Babashka | 15,264 | 61 | 99.6% | 2,176 |
+| XTDB v1 | 11,437 | 3 | 100.0% | 483 |
+| shadow-cljs | 5,051 | 16 | 99.7% | 909 |
+| Reitit | 3,654 | 0 | 100.0% | 14 |
+| re-frame | 2,629 | 0 | 100.0% | 47 |
+| polylith-realworld | 871 | 0 | 100.0% | 0 |
+| Integrant | 442 | 0 | 100.0% | 0 |
+| DataScript † | 4,392 | 496 | 89.9% | 1,255 |
+| day-of-datomic † | 84 | 29 | 74.3% | 1 |
+| **All 26 repos** | | | **median 100.0%; 24 of 26 at 99.3% or more** | |
+
+† [docs/COVERAGE.md](docs/COVERAGE.md#repos-under-95-resolution-rate-or-with-unknown-namespace-usages-above-5-of-resolved)
 
 率は小数第 1 位に丸めています。必ず unresolved と未知の名前空間の**両方**の件数と合わせて読んでください。
 未知の名前には、見逃された var 使用のほか、見慣れないマクロが束縛するローカル変数も含まれる可能性があり、解析ツールは
