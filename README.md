@@ -46,6 +46,24 @@ the tools; Atlas returns the relationships it can establish, with `file:line` ci
 A call, a callback and a keyword with the same spelling are different things. Atlas models those distinctions,
 including Clojure's registrations and data-driven connections. It gives your agent evidence to inspect before editing.
 
+### Bugs it helps you catch before they ship
+
+Each row is a real answer on a public project; follow the link for the full transcript.
+
+| Possible bug | Ask with | What Atlas showed (real example) |
+|---|---|---|
+| A config or data row is missing a key its siblings have | `key_siblings` | re-frame: 2 rows of a query table lack `:re-frame/lifecycle`, which 3 of 4 sibling rows have ([transcript](docs/GUIDE.md#key_siblings)) |
+| A new required key breaks existing callers | `signature_impact` with `added_keys` | polylith-realworld: if `login!` needs `:tenant-id`, 3 callers pass a literal map without it and 1 forwards a map Atlas cannot see ([transcript](#inspect-the-contract-inside-a-map-argument)) |
+| A caller passes the wrong arity, or a key the function never reads, or misses a key it destructures | `signature_impact` | integrant: `init` checked against 38 callers and both arities; "no finding" with the searches named ([transcript](docs/GUIDE.md#signature_impact)) |
+| An endpoint is missing middleware or a permission check | `route_authz`, `permission_routes` | polylith-realworld: `POST /api/articles` with its 11 wrappers in order, `wrap-authorization` last; permissions honestly "not extracted" without a declared model ([transcript](docs/GUIDE.md#route_authz)) |
+| A key is read that nothing writes (often a typo or a renamed key) | `key_flow` | compojure: `:compojure/path` has 1 producer (`assoc-path`) and 2 consumers ([transcript](docs/GUIDE.md#key_flow)) |
+| An unexpected writer of a database attribute | `attribute_usage` | mount: `:order/bid` has 2 proven writers, one of them in test code, and no readers ([transcript](docs/GUIDE.md#attribute_usage)) |
+| A dispatched event has no handler, or a handler fires unexpected events | `event_flow` | re-frame todomvc: `:delete-todo` dispatched from 2 sites, handled once, fires nothing ([transcript](docs/GUIDE.md#event_flow)) |
+| A small change ripples further than expected | `blast_radius` | integrant: a change to `ref?` reaches 31 definitions over 6 levels ([transcript](docs/GUIDE.md#blast_radius)) |
+| Changed code that no test reaches | `context_for_change`, `tests_for` | polylith-realworld: lines 60-80 of the article store touch 3 definitions, 9 outside callers and 24 related tests ([transcript](docs/GUIDE.md#context_for_change)) |
+
+Atlas points at the place to look; deciding whether it is a bug stays with you or your agent.
+
 ### An agent's workflow
 
 1. **Orient:** use `graph_info` to check the snapshot, active adapters and analysis gaps.
