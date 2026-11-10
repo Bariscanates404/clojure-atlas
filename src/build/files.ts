@@ -1,8 +1,8 @@
 // The files a build reads: Clojure sources for kondo, .edn files for system configs, and the module roots
 // (directories with their own deps.edn, project.clj, ...) that name each file's component.
-import { execFileSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { runGit } from '../shared/git.ts';
 
 const SOURCE_EXT = /\.(clj|cljs|cljc)$/;
 const EDN_EXT = /\.edn$/;
@@ -63,7 +63,7 @@ export function componentOf(moduleRoots: readonly string[], file: string): strin
 // Clojure files git tracks, whatever directory they sit in; without git, the ones listed plus the large ones skipped.
 export function expectedSources(root: string, files: RepoFiles): number {
   try {
-    const out = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', '*.clj', '*.cljs', '*.cljc'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const out = runGit(root, ['ls-files', '-z', '--', '*.clj', '*.cljs', '*.cljc']);
     return out.split('\0').filter((f) => f && path.posix.basename(f) !== 'project.clj').length;
   } catch (err) {
     process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message.split('\n')[0]}); expected files = files listed\n`);

@@ -1,13 +1,13 @@
 // What a graph was built from, as one id: the commit, every dirty or untracked file's content, the configuration that
 // shapes the analysis (the project's clj-kondo config files and .clojure-atlas.edn) and the analyzer versions. A
 // working tree with another id is not what the graph describes.
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { ednValue } from './build/config.ts';
 import { listFiles } from './build/files.ts';
 import { readForms } from './build/reader.ts';
+import { git } from './shared/git.ts';
 import { VERSION } from './version.ts';
 
 export interface Snapshot {
@@ -81,15 +81,6 @@ const warnOnce = (message: string) => {
   warned.add(message);
   process.stderr.write(`clojure-atlas: ${message}\n`);
 };
-
-function git(root: string, args: string[], input?: string): string | null {
-  try {
-    return execFileSync('git', ['-C', root, ...args],
-      { encoding: 'utf8', input, maxBuffer: 1 << 30, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'] });
-  } catch {
-    return null;
-  }
-}
 
 // The paths `git status --porcelain=v1 -z` names, sorted: a rename or copy names both its paths. They are relative to
 // the top of the repository, not to the directory git ran in.

@@ -3,9 +3,9 @@
 // `git rev-list --left-right --count` in a local clone when one is configured; without a clone a differing sha is
 // reported as STALE with an unknown distance, never as fresh. A graph ahead of or diverged from the base describes
 // code the base does not contain, so it is stale however few commits that is.
-import { execFileSync } from 'node:child_process';
 import { UNVERSIONED, type Snapshot } from '../snapshot.ts';
 import type { Graph } from './graph.ts';
+import { runGit } from '../shared/git.ts';
 import { shortSha } from '../shared/sha.ts';
 
 export const DEFAULT_MAX_DISTANCE = 20;
@@ -32,15 +32,10 @@ export interface Staleness {
   header: string | null;
 }
 
-// A full hex sha is shortened to ten characters; any other name (a branch, a tag) is shown whole.
-const short = shortSha;
-
 export function gitDistance(repoDir: string): (graphSha: string, base: string) => Divergence | null {
   return (graphSha, base) => {
     try {
-      const out = execFileSync('git', ['-C', repoDir, 'rev-list', '--left-right', '--count', `${graphSha}...${base}`], {
-        encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'],
-      });
+      const out = runGit(repoDir, ['rev-list', '--left-right', '--count', `${graphSha}...${base}`], { timeoutMs: 10000 });
       const [ahead, behind] = out.trim().split(/\s+/).map((x) => Number.parseInt(x, 10));
       return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null;
     } catch (err) {
@@ -64,7 +59,7 @@ function treeDifference(g: Graph, now: Snapshot): string | null {
   // git could not read the tree: what changed in it is unknown, not zero
   const unreadable = now.sha === UNVERSIONED && s.sha !== UNVERSIONED;
   const why = unreadable ? ['git could not read the working tree (no repository there, or git failed), so what changed in it is unknown'] : [
-    ...(sameCommit(s.sha, now.sha) ? [] : [`commit ${short(now.sha)} (graph ${short(s.sha)})`]),
+    ...(sameCommit(s.sha, now.sha) ? [] : [`commit ${shortSha(now.sha)} (graph ${shortSha(s.sha)})`]),
     ...((s.dirty_files ?? 0) || now.dirty.length ? [`${now.dirty.length} uncommitted file(s) now, ${s.dirty_files ?? 0} at build`] : []),
     ...(s.config_hash && s.config_hash !== now.configHash ? ['the clj-kondo or .clojure-atlas.edn config changed'] : []),
     ...(s.analyzer && s.analyzer !== now.analyzer ? [`analyzer ${now.analyzer} (graph ${s.analyzer})`] : []),
@@ -90,27 +85,27 @@ function stalenessToBase(g: Graph, base: string | undefined, opts: StalenessOpti
     return {
       stale: true,
       distance: null,
-      header: `STALE: graph built at ${short(sha)}, base ${short(base)}; `
+      header: `STALE: graph built at ${shortSha(sha)}, base ${shortSha(base)}; `
         + `distance unknown${measure ? ' (git could not compare them)' : ' (no repo configured)'}. Cited lines may have moved since.`,
     };
   }
   const { behind: distance, ahead } = found;
   if (ahead > 0) {
     const relation = distance > 0
-      ? `diverged from base ${short(base)} (${ahead} commit(s) ahead, ${distance} behind)`
-      : `${ahead} commit(s) ahead of base ${short(base)}`;
+      ? `diverged from base ${shortSha(base)} (${ahead} commit(s) ahead, ${distance} behind)`
+      : `${ahead} commit(s) ahead of base ${shortSha(base)}`;
     return {
       stale: true,
       distance,
-      header: `STALE: graph built at ${short(sha)} is ${relation}: it describes code the base does not contain. Cited lines may not exist there.`,
+      header: `STALE: graph built at ${shortSha(sha)} is ${relation}: it describes code the base does not contain. Cited lines may not exist there.`,
     };
   }
   if (distance > max) {
     return {
       stale: true,
       distance,
-      header: `STALE: graph built at ${short(sha)} is ${distance} commits behind base ${short(base)} (threshold ${max}). Cited lines may have moved since.`,
+      header: `STALE: graph built at ${shortSha(sha)} is ${distance} commits behind base ${shortSha(base)} (threshold ${max}). Cited lines may have moved since.`,
     };
   }
-  return { stale: false, distance, header: `graph ${short(sha)} is ${distance} commit(s) behind base ${short(base)} (within threshold ${max})` };
+  return { stale: false, distance, header: `graph ${shortSha(sha)} is ${distance} commit(s) behind base ${shortSha(base)} (within threshold ${max})` };
 }
