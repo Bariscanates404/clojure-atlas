@@ -28,13 +28,14 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
   const sources = new Map<string, string>();
   for (const f of [...files.sources, ...files.edn]) sources.set(f, readFileSync(path.join(root, f), 'utf8'));
   const playwright = readTs(root, files.packageJsons, files.typescript);
-  const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f));
+  const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f), projectKnownSymbols(root));
   const snap = snapshotOf(root, analyzerVersion(k.version));
   const doc = assemble(ctx, ADAPTERS, {
     repo_name: path.basename(root), ref: snap.ref, sha: snap.sha, built_at: new Date().toISOString(),
     snapshot: snap.id, dirty_files: snap.dirty.length, config_hash: snap.configHash, config_sources: snap.configSources, analyzer: snap.analyzer,
   }, {
-    expected: expectedSources(root, files), sources: files.sources.length, edn: files.edn.length, skipped_large: files.skippedLarge.length,
+    expected: expectedSources(root, files), sources: files.sources.length, edn: files.edn.length,
+    skipped_large: files.skippedLarge.length, skipped_large_names: files.skippedLarge,
   });
   doc.stats.build_ms = Date.now() - started;
   return doc;

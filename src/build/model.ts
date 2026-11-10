@@ -24,6 +24,11 @@ export interface Context {
   projectNs: ReadonlySet<string>;
   // "ns/name" to its definition (the first one, see merged)
   defs: ReadonlyMap<string, VarDef>;
+  // namespaces defined in more than one file (two source roots of a monorepo), with those files: the graph has one
+  // node per name, so a usage cannot be told apart from its twin
+  duplicateNs: ReadonlyMap<string, string[]>;
+  // "ns/name" of macros the project teaches clj-kondo (its :lint-as and hooks, .clojure-atlas.edn's :lint-as and route macros)
+  understood: ReadonlySet<string>;
   edn: readonly string[];
   forms: (file: string) => Form[];
   componentOf: (file: string) => string | undefined;
@@ -96,7 +101,20 @@ function merged(prev: VarDef, d: VarDef): VarDef {
   return { ...winner, langs: [...new Set([...prev.langs, ...d.langs])].sort() };
 }
 
-export function createContext(analysis: Analysis, config: ProjectConfig, playwright: Playwright, sources: ReadonlyMap<string, string>, edn: readonly string[], componentOf: (file: string) => string | undefined): Context {
+// The files defining each namespace more than once. One namespace in a .clj and a .cljs file of the same path is one
+// namespace; the same name under two different paths is two.
+function duplicateNamespaces(nsDefs: readonly { name: string; file: string }[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const [name, defs] of groupBy(nsDefs.filter((d) => d.name), (d) => d.name)) {
+    if (new Set(defs.map((d) => d.file.replace(/\.clj[sc]?$/, ''))).size > 1) out.set(name, [...new Set(defs.map((d) => d.file))].sort());
+  }
+  return out;
+}
+
+export function createContext(
+  analysis: Analysis, config: ProjectConfig, playwright: Playwright, sources: ReadonlyMap<string, string>, edn: readonly string[],
+  componentOf: (file: string) => string | undefined, understood: ReadonlySet<string> = new Set(),
+): Context {
   const defs = new Map<string, VarDef>();
   for (const d of analysis.varDefs) {
     if (!d.name || LANGUAGE_NS.test(d.ns)) continue;
@@ -149,6 +167,8 @@ export function createContext(analysis: Analysis, config: ProjectConfig, playwri
     // the language's own namespaces are never the project's, even where a repo declares them in test fixtures
     projectNs: new Set(analysis.nsDefs.map((d) => d.name).filter((n) => !LANGUAGE_NS.test(n))),
     defs,
+    duplicateNs: duplicateNamespaces(analysis.nsDefs),
+    understood: new Set([...understood, ...Object.keys(config.lintAs), ...Object.keys(config.routeMacros)]),
     edn,
     componentOf,
     forms,

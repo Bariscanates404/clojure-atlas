@@ -4,7 +4,7 @@
 // at runtime, an UNKNOWN boundary) or a value use (data, an alias, a returned value).
 import type { Band } from '../mcp/graph.ts';
 import type { VarUse } from './analysis.ts';
-import { textOf, type Form } from './reader.ts';
+import { formAt, kids, textOf, type Form } from './reader.ts';
 import { CORE_NS, isSpecialForm, UNKNOWN_NS, type Context } from './model.ts';
 
 export type Relation = 'calls' | 'references' | 'passes_callback' | 'registers_handler' | 'expands_via' | 'rebinds';
@@ -13,6 +13,10 @@ export interface Classified {
   kind: Relation;
   band: Band;
   via?: string;
+  // set where the usage cannot be attributed with certainty (see classify): its arity is not proven either
+  weak?: true;
+  // the macro around the usage that clj-kondo could not expand
+  inMacro?: string;
 }
 
 // binding forms that name their value: the right-hand side of a pair is aliased (for and doseq iterate theirs)
@@ -21,7 +25,8 @@ const REBINDINGS = new Set(['binding', 'with-redefs', 'with-bindings']);
 const DEFINING = new Set(['def', 'defonce']);
 // functions that store their last argument as a handler; the arguments before it (ids, interceptors, keys) are values
 const REGISTRARS = new Set([
-  ...['core', 'alpha'].flatMap((ns) => ['reg-event-db', 'reg-event-fx', 'reg-event-ctx', 'reg-sub', 'reg-sub-raw', 'reg-fx', 'reg-cofx'].map((n) => `re-frame.${ns}/${n}`)),
+  ...['core', 'alpha'].flatMap((ns) =>
+    ['reg-event-db', 'reg-event-fx', 'reg-event-ctx', 'reg-sub', 'reg-sub-raw', 'reg-fx', 'reg-cofx'].map((n) => `re-frame.${ns}/${n}`)),
   'clojure.core/add-watch', 'clojure.core/add-tap',
 ]);
 
@@ -52,7 +57,7 @@ function inTemplate(ctx: Context, file: string, row: number, col: number): boole
   return false;
 }
 
-export function classify(ctx: Context, u: VarUse): Classified {
+function shape(ctx: Context, u: VarUse): Classified {
   if (inTemplate(ctx, u.file, u.nameRow, u.nameCol)) return { kind: 'references', band: 'heuristic', via: 'syntax-quote' };
   if (u.macro) return { kind: 'expands_via', band: 'static_proven' };
   const at = placeOf(ctx, u.file, u.nameRow, u.nameCol);
@@ -83,4 +88,54 @@ export function classify(ctx: Context, u: VarUse): Classified {
     if (binder && ALIASING.has(binder) && (at?.index ?? 0) % 2 === 1) return { kind: 'references', band: 'static_proven', via: 'alias' };
   }
   return { kind: 'references', band: 'static_proven' };
+}
+
+// Whether a call head is a macro clj-kondo cannot see through: a symbol it could not resolve at all (an unknown
+// macro, an unbound name), or a project macro the project's configuration does not teach it. Special forms and
+// the language's and libraries' macros are known.
+const unexpanded = (ctx: Context, head: VarUse): boolean =>
+  head.to === UNKNOWN_NS
+    ? !isSpecialForm(head) && !assertionHeads(ctx)(head)
+    : head.macro && ctx.projectNs.has(head.to) && !ctx.understood.has(`${head.to}/${head.name}`);
+
+// The innermost unexpanded macro whose arguments hold the usage; the call the usage heads is not its own argument.
+function macroAround(ctx: Context, u: VarUse): string | undefined {
+  let at = placeOf(ctx, u.file, u.nameRow, u.nameCol);
+  if (at?.parent.t === 'list' && at.index === 0) at = placeOf(ctx, u.file, at.parent.row, at.parent.col);
+  for (; at; at = placeOf(ctx, u.file, at.parent.row, at.parent.col)) {
+    const head = at.parent.t === 'list' && at.index > 0 ? at.parent.children[0] : undefined;
+    const use = head?.t === 'symbol' ? ctx.useAt(u.file, head.row, head.col) : undefined;
+    if (use && unexpanded(ctx, use)) return use.to === UNKNOWN_NS ? use.name : `${use.to}/${use.name}`;
+  }
+  return undefined;
+}
+
+const heads = new WeakMap<Context, (u: VarUse) => boolean>();
+const TEST_NS = /^(clojure|cljs)\.test$/;
+
+// Places where a list is the assertion of an `is`: its head symbol is an assert-expr dispatch value.
+export function assertionHeads(ctx: Context): (u: VarUse) => boolean {
+  const memo = heads.get(ctx);
+  if (memo) return memo;
+  const byFile = new Map<string, Set<string>>();
+  for (const u of ctx.analysis.varUses) {
+    if (u.name !== 'is' || !TEST_NS.test(u.to)) continue;
+    const form = formAt(ctx.forms(u.file), u.row, u.col);
+    const arg = form ? kids(form)[1] : undefined;
+    const head = arg && arg.t === 'list' ? arg.children[0] : undefined;
+    if (head) byFile.set(u.file, (byFile.get(u.file) ?? new Set()).add(`${head.row}:${head.col}`));
+  }
+  const isHead = (u: VarUse) => byFile.get(u.file)?.has(`${u.nameRow}:${u.nameCol}`) ?? false;
+  heads.set(ctx, isHead);
+  return isHead;
+}
+
+// What the usage is, and how far it can be trusted: a name defined in two files, or a call inside a macro that is
+// not expanded, may mean something else than kondo's static reading, so it is never STATIC_PROVEN.
+export function classify(ctx: Context, u: VarUse): Classified {
+  const rel = shape(ctx, u);
+  const inMacro = macroAround(ctx, u);
+  const reason = inMacro ? 'unexpanded-macro' : ctx.duplicateNs.has(u.to) ? 'duplicate-namespace' : undefined;
+  if (!reason) return rel;
+  return { ...rel, band: rel.band === 'static_proven' ? 'heuristic' : rel.band, via: rel.via ?? reason, weak: true, ...(inMacro ? { inMacro } : {}) };
 }

@@ -16,6 +16,7 @@ import { callTool } from '../src/mcp/server.ts';
 import { fixtureDir } from './helpers/atlas-fixture.ts';
 import { graphOf } from './helpers/inline-graph.ts';
 
+const NO_LARGE = { files: 0, names: [] };
 const CORE = '(ns demo.core)\n(defn target [a] (inc a))\n(defn lonely [] 1)\n(defn user [] (target 1))\n';
 const BROKEN = '(ns demo.broken\n  (:require [demo.core :as c]))\n(defn oops [] (c/target 2)\n';
 
@@ -72,6 +73,36 @@ describe('degraded builds: answers', () => {
   });
 });
 
+describe('files over the size limit', () => {
+  const HUGE = `(ns app.big)\n(defn huge-fn [] 1)\n;${'x'.repeat(2 * 1024 * 1024)}\n`;
+  let big: AtlasDocument;
+  before(async () => {
+    big = await graphOf({ 'src/app/big.clj': HUGE, 'src/app/use.clj': '(ns app.use (:require [app.big :as b]))\n(defn go [] (b/huge-fn))\n' });
+  });
+  const askBig = (tool: string, args: Record<string, unknown>) => callTool(indexGraph(big), tool, args).text;
+
+  it('are counted with their names in the build stats', () => {
+    assert.equal(big.stats.files.skipped_large, 1);
+    assert.deepEqual(big.stats.files.skipped_large_names, ['src/app/big.clj']);
+  });
+
+  it('are named in the DEGRADED line of an answer and of graph_info', () => {
+    assert.match(askBig('graph_info', {}), /^DEGRADED: 1 file\(s\) over 2 MB were skipped \(src\/app\/big\.clj\), so their definitions and calls are missing/m);
+    assert.match(askBig('callers', { var: 'app.use/go' }), /DEGRADED: 1 file\(s\) over 2 MB were skipped/);
+  });
+
+  it('a name that matches a skipped file is not blamed on its spelling', () => {
+    const t = askBig('callers', { var: 'app.big/huge-fn' });
+    assert.match(t, /app\.big\/huge-fn probably lives in src\/app\/big\.clj, which is over 2 MB and was skipped/);
+    assert.doesNotMatch(t, /check the spelling/);
+  });
+
+  it('are listed in the build log line, three names at most', () => {
+    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'] }, duplicates: [] });
+    assert.match(line, /5 file\(s\) over 2 MB were skipped \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
+  });
+});
+
 describe('degradation helpers', () => {
   it('reads nothing from a graph without stats, and ignores malformed ones', () => {
     assert.equal(degradation({ format: 'code-graph', version: 2, source: { sha: 'a' }, capabilities: [], nodes: [], edges: [] }), null);
@@ -79,15 +110,15 @@ describe('degradation helpers', () => {
   });
 
   it('lists the first three files and the dropped edges', () => {
-    const line = degradedLine({ files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edges: 670 });
+    const line = degradedLine({ files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edges: 670, large: NO_LARGE, duplicates: [] });
     assert.match(line, /5 file\(s\) could not be parsed \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
     assert.match(line, /670 edge\(s\) dropped because an end was not a node/);
-    assert.match(degradedLine({ files: 0, names: [], edges: 2 }), /^DEGRADED: 2 edge\(s\) dropped/);
-    assert.match(degradedLine({ files: 2, names: [], edges: 0 }), /^DEGRADED: 2 file\(s\) could not be parsed, so/);
+    assert.match(degradedLine({ files: 0, names: [], edges: 2, large: NO_LARGE, duplicates: [] }), /^DEGRADED: 2 edge\(s\) dropped/);
+    assert.match(degradedLine({ files: 2, names: [], edges: 0, large: NO_LARGE, duplicates: [] }), /^DEGRADED: 2 file\(s\) could not be parsed, so/);
   });
 
   it('matches a namespace to a path with dashes as underscores, and a path to itself', () => {
-    const d = { files: 2, names: ['src/my_app/core_x.cljc', 'docs/a.clj'], edges: 0 };
+    const d = { files: 2, names: ['src/my_app/core_x.cljc', 'docs/a.clj'], edges: 0, large: NO_LARGE, duplicates: [] };
     assert.deepEqual(unparsedFor(d, 'my-app.core-x/f'), ['src/my_app/core_x.cljc']);
     assert.deepEqual(unparsedFor(d, 'docs/a.clj'), ['docs/a.clj']);
     assert.deepEqual(unparsedFor(d, 'other.ns/f'), []);
@@ -109,7 +140,7 @@ describe('dropped edges', () => {
     };
     const empty = { nsDefs: [], nsUses: [], varDefs: [], varUses: [], keywords: [], protocolImpls: [], syntaxErrors: [] };
     const ctx = createContext(empty, EMPTY_CONFIG, { projects: [], skipped: [] }, new Map(), [], () => undefined);
-    const d = assemble(ctx, [adapter], { sha: 'a' }, { expected: 0, sources: 0, edn: 0, skipped_large: 0 });
+    const d = assemble(ctx, [adapter], { sha: 'a' }, { expected: 0, sources: 0, edn: 0, skipped_large: 0, skipped_large_names: [] });
     assert.equal(d.stats.dropped_edges, 2);
     assert.match(callTool(indexGraph(d), 'graph_info', {}).text, /DEGRADED: 2 edge\(s\) dropped because an end was not a node/);
   });

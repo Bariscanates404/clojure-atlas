@@ -3,7 +3,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { NOT_USED } from '../shared/capability.ts';
 import { capability, inEdges, compareText } from './graph.ts';
-import { degradation, unparsedFor } from './degraded.ts';
+import { degradation, skippedFor, unparsedFor } from './degraded.ts';
 
 export interface Row {
   label: string;
@@ -106,14 +106,20 @@ export function nodeRow(n: GraphNode, extra: Partial<Row> = {}): Row {
 export const call = (tool: string, args: Record<string, string | number>) =>
   `${tool}(${Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`;
 
+const NOT_SPELLING = ': its definitions are not in the graph, so this is not a spelling problem';
+
 // Not found is only as strong as the capabilities that could have produced a match: their state is always named.
 export function notFound(g: Graph, name: string, query: string, title: string, what: string, caps: string[], note?: string): QueryResult {
-  const unparsed = unparsedFor(degradation(g.doc), query);
+  const degraded = degradation(g.doc);
+  const parseFailed = unparsedFor(degraded, query);
+  const skipped = skippedFor(degraded, query);
+  const unparsed = [...parseFailed, ...skipped];
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
     verdict: `no ${what} matches ${JSON.stringify(query)}`,
     notes: [
-      ...(unparsed.length ? [`${query} probably lives in ${unparsed.join(', ')}, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem`] : []),
+      ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
+      ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
       ...capabilityNotes(g, caps), ...(note ? [note] : []),
     ],
     ...(unparsed.length ? { unparsed } : {}),
@@ -142,7 +148,9 @@ export function capabilityNotes(g: Graph, names: string[]): string[] {
     const c = capability(g, name);
     if (!c) notes.push(`capability ${name} is not listed in this graph: an empty answer is not proof of absence`);
     else if (c.status !== 'available') notes.push(`capability ${name} is ${c.status}: an empty answer is not proof of absence`);
-    else if (c.note === NOT_USED) notes.push(`capability ${name} is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence`);
+    else if (c.note === NOT_USED) {
+      notes.push(`capability ${name} is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence`);
+    }
     else if (c.note) notes.push(`${name}: ${c.note}`);
   }
   return notes;

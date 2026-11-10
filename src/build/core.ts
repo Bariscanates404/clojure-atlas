@@ -4,9 +4,9 @@
 import { compareText, type Band, type GraphEdge, type GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../shared/testfile.ts';
 import type { NsUse, VarDef, VarUse } from './analysis.ts';
-import { defId, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
+import { defId, groupBy, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids, textOf } from './reader.ts';
-import { classify } from './relations.ts';
+import { assertionHeads, classify } from './relations.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
@@ -24,21 +24,6 @@ export interface UsageStats {
   topUnknown: [string, number][];
 }
 
-const TEST_NS = /^(clojure|cljs)\.test$/;
-
-// Places where a list is the assertion of an `is`: its head symbol is an assert-expr dispatch value.
-function assertionHeads(ctx: Context): (u: VarUse) => boolean {
-  const byFile = new Map<string, Set<string>>();
-  for (const u of ctx.analysis.varUses) {
-    if (u.name !== 'is' || !TEST_NS.test(u.to)) continue;
-    const form = formAt(ctx.forms(u.file), u.row, u.col);
-    const arg = form ? kids(form)[1] : undefined;
-    const head = arg && arg.t === 'list' ? arg.children[0] : undefined;
-    if (head) byFile.set(u.file, (byFile.get(u.file) ?? new Set()).add(`${head.row}:${head.col}`));
-  }
-  return (u) => byFile.get(u.file)?.has(`${u.nameRow}:${u.nameCol}`) ?? false;
-}
-
 // `[lib :as-alias x]` only names a namespace for ::x/kw keywords; nothing is loaded, unless the same vector also
 // says :as or :refer.
 function loadsNamespace(ctx: Context, u: NsUse): boolean {
@@ -49,7 +34,7 @@ function loadsNamespace(ctx: Context, u: NsUse): boolean {
 
 const isTestDef = (d: VarDef) => d.test || /(^|\/)(deftest|defspec)$/.test(d.definedBy ?? '');
 
-function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): GraphNode {
+function definitionNode(ctx: Context, d: VarDef, signature: Arity[] | null, files: readonly string[]): GraphNode {
   const component = ctx.componentOf(d.file);
   const test = isTestDef(d) || isTestFile(d.file);
   return {
@@ -66,9 +51,20 @@ function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): Gr
       ...(d.macro ? { macro: true } : {}),
       ...(d.private ? { private: true } : {}),
       ...(d.langs.length > 1 ? { platforms: d.langs } : {}),
+      ...(files.length > 1 ? { defined_in: files } : {}),
       ...(signature ? { signature: { arities: signature } } : {}),
     },
   };
+}
+
+// The arities of a name's definitions: one per defn, the distinct ones when several files define it.
+function signatureOfAll(ctx: Context, defs: readonly VarDef[]): Arity[] | null {
+  const seen = new Map<string, Arity>();
+  for (const d of defs) {
+    const form = /\/defn-?$/.test(d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
+    for (const a of (form && signatureOf(form, (f) => ctx.nameOf(d.file, f))) || []) seen.set(JSON.stringify(a), a);
+  }
+  return seen.size ? [...seen.values()] : null;
 }
 
 // A file without an ns form (dev/user.clj, a data-only file) or one that switches with (in-ns 'x) still lives in a
@@ -80,7 +76,11 @@ function namespaceNodes(ctx: Context): GraphNode[] {
     if (!name || seen.has(name)) return;
     seen.add(name);
     const component = ctx.componentOf(file);
-    out.push({ id: nsId(name), kind: 'namespace', name, file, line: row, ...(endRow ? { end_line: endRow } : {}), ...(component ? { component } : {}) });
+    const files = ctx.duplicateNs.get(name);
+    out.push({
+      id: nsId(name), kind: 'namespace', name, file, line: row, ...(endRow ? { end_line: endRow } : {}), ...(component ? { component } : {}),
+      ...(files ? { attrs: { defined_in: files } } : {}),
+    });
   };
   for (const d of ctx.analysis.nsDefs) add(d.name, d.file, d.row, d.endRow);
   const sites = [
@@ -101,17 +101,25 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
   const edges: GraphEdge[] = [];
   const testIds = new Set<string>();
   const signatures = new Map<string, Arity[]>();
+  const twins = groupBy(ctx.analysis.varDefs.filter((d) => ctx.duplicateNs.has(d.ns)), (d) => `${d.ns}/${d.name}`);
   for (const d of ctx.defs.values()) {
-    const form = /\/defn-?$/.test(d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
-    const sig = form ? signatureOf(form, (f) => ctx.nameOf(d.file, f)) : null;
-    if (sig) signatures.set(`${d.ns}/${d.name}`, sig);
-    const node = definitionNode(ctx, d, sig);
+    const full = `${d.ns}/${d.name}`;
+    // a name defined in two files has the arities of both
+    const sig = signatureOfAll(ctx, twins.get(full) ?? [d]);
+    if (sig) signatures.set(full, sig);
+    const node = definitionNode(ctx, d, sig, [...new Set((twins.get(full) ?? []).map((t) => t.file))].sort());
     nodes.push(node);
     if (isTestDef(d)) testIds.add(node.id);
     edges.push({ from: nsId(d.ns), to: node.id, kind: 'defines', band: 'static_proven', file: d.file, line: d.row });
   }
   for (const u of ctx.analysis.nsUses) {
-    if (ctx.projectNs.has(u.to) && u.to !== u.from && loadsNamespace(ctx, u)) edges.push({ from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: 'static_proven', file: u.file, line: u.row });
+    if (ctx.projectNs.has(u.to) && u.to !== u.from && loadsNamespace(ctx, u)) {
+      const twin = ctx.duplicateNs.has(u.to);
+      edges.push({
+        from: nsId(u.from), to: nsId(u.to), kind: 'requires', band: twin ? 'heuristic' : 'static_proven', file: u.file, line: u.row,
+        ...(twin ? { attrs: { via: 'duplicate-namespace' } } : {}),
+      });
+    }
   }
 
   const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [] };
@@ -149,8 +157,13 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     const call = rel.kind === 'calls' && u.arity !== undefined ? formAt(ctx.forms(u.file), u.row, u.col) : undefined;
     const attrs = {
       ...(rel.via ? { via: rel.via } : {}),
+      ...(rel.inMacro ? { in_macro: rel.inMacro } : {}),
       ...(rel.kind === 'calls' && u.arity !== undefined
-        ? { arity: u.arity, arity_band: 'static_proven', ...(call ? callArgs(call, u.arity, signatures.get(full) ?? null, (f) => ctx.nameOf(u.file, f)) : {}) }
+        ? {
+          arity: u.arity,
+          arity_band: rel.weak ? 'heuristic' : 'static_proven',
+          ...(call ? callArgs(call, u.arity, signatures.get(full) ?? null, (f) => ctx.nameOf(u.file, f)) : {}),
+        }
         : {}),
     };
     link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), rel.kind, rel.band, u, Object.keys(attrs).length ? attrs : undefined);

@@ -18,7 +18,9 @@ export interface AdapterStats {
 
 export interface BuildStats {
   // expected: Clojure files the repo tracks (build output and dependencies included); sources: the ones analyzed
-  files: { expected: number; sources: number; edn: number; skipped_large: number };
+  files: { expected: number; sources: number; edn: number; skipped_large: number; skipped_large_names: string[] };
+  // namespaces defined in more than one file: one graph node stands for them all, and usages of them are heuristic
+  duplicate_namespaces: { ns: string; files: string[] }[];
   syntax_errors: { files: number; errors: number; names: string[] };
   definitions: number;
   usages: UsageStats;
@@ -43,9 +45,13 @@ const AUTHZ_KINDS = ['requires_permission', 'exempted_by'];
 // Route authorization is project-specific: it is extracted only where .clojure-atlas.edn says how it is declared,
 // so elsewhere a route without a check reads as unknown, never as unguarded.
 function routeAuthz(ctx: Context, edges: readonly GraphEdge[]): Capability {
-  if (!declaresAuthz(ctx.config)) return { name: 'route_authz', status: 'absent', note: 'not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn' };
+  if (!declaresAuthz(ctx.config)) {
+    return { name: 'route_authz', status: 'absent', note: 'not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn' };
+  }
   const mine = edges.filter((e) => AUTHZ_KINDS.includes(e.kind));
-  return { name: 'route_authz', status: 'available', edge_kinds: AUTHZ_KINDS, edges: mine.length, bands: bandCounts(mine), note: 'as declared in .clojure-atlas.edn' };
+  return {
+    name: 'route_authz', status: 'available', edge_kinds: AUTHZ_KINDS, edges: mine.length, bands: bandCounts(mine), note: 'as declared in .clojure-atlas.edn',
+  };
 }
 
 // Arities and parameters ride on definitions, the arity and passed keys on calls edges.
@@ -85,7 +91,10 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
   }
 
   const capabilities: Capability[] = [
-    ...[['definitions', ['defines', 'requires', 'calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'rebinds', 'tests']] as const, ...adapters.map((a) => [a.name, a.edgeKinds] as const)].map(([name, kinds]): Capability => {
+    ...[
+      ['definitions', ['defines', 'requires', 'calls', 'references', 'passes_callback', 'registers_handler', 'expands_via', 'rebinds', 'tests']] as const,
+      ...adapters.map((a) => [a.name, a.edgeKinds] as const),
+    ].map(([name, kinds]): Capability => {
       const rows = kept.get(name);
       const why = detected.get(name);
       const missing = why ? null : adapters.find((a) => a.name === name)?.unavailable?.(ctx);
@@ -113,8 +122,9 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     nodes: [...nodes.values()].sort((a, b) => compareText(a.id, b.id)),
     edges: [...edges.values()].sort((a, b) => compareText(edgeKey(a), edgeKey(b))),
     stats: {
-      files,
+      files: { ...files, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES) },
       syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES) },
+      duplicate_namespaces: [...ctx.duplicateNs].map(([ns, files]) => ({ ns, files })).sort((a, b) => compareText(a.ns, b.ns)),
       definitions: ctx.defs.size,
       usages: base.stats,
       adapters: adapterStats,
