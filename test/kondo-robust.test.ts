@@ -2,7 +2,7 @@
 // returns must not hang the build, and every failure says why.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -74,5 +74,61 @@ describe('a hook that never returns', () => {
     assert.equal(doc.stats.files.timed_out, 1);
     const line = degradedLine(degradation(doc)!);
     assert.match(line, /1 file\(s\) were not analyzed because clj-kondo did not finish on them \(src\/demo\/core\.clj\)/);
+  });
+});
+
+// A clj-kondo that hangs the way a very deeply nested file makes it hang: only with --parallel (`parallelOnly`), or on
+// the file named bad.clj whatever the flags. Everything else runs the real binary; a log line per run says what ran.
+function hangingKondo(name: string, parallelOnly: boolean): { wrapper: string; log: string } {
+  const wrapper = path.join(top, `${name}.sh`);
+  const log = path.join(top, `${name}.log`);
+  const hang = parallelOnly
+    ? 'case " $* " in *" --parallel "*) case " $* " in *bad.clj*) exec sleep 30;; esac;; esac'
+    : 'case " $* " in *bad.clj*) exec sleep 30;; esac';
+  writeFileSync(wrapper, `#!/bin/sh\ncase " $* " in *" --parallel "*) echo parallel >> '${log}';; *) echo serial >> '${log}';; esac\n${hang}\nexec '${cmd}' "$@"\n`);
+  chmodSync(wrapper, 0o755);
+  return { wrapper, log };
+}
+
+function repoOfFiles(name: string, names: string[]): { root: string; files: string[] } {
+  const root = path.join(top, name);
+  mkdirSync(path.join(root, 'src/demo'), { recursive: true });
+  for (const n of names) writeFileSync(path.join(root, 'src/demo', n), `(ns demo.${n.replace('.clj', '')})\n(defn ${n.replace('.clj', '')}-fn [] 1)\n`);
+  return { root, files: names.map((n) => `src/demo/${n}`) };
+}
+
+describe('a batch that times out is retried without --parallel in smaller batches', () => {
+  const quiet = async <T>(f: () => Promise<T>): Promise<{ result: T; stderr: string }> => {
+    const real = process.stderr.write;
+    let stderr = '';
+    process.stderr.write = ((c: string) => { stderr += String(c); return true; }) as typeof process.stderr.write;
+    try {
+      return { result: await f(), stderr };
+    } finally {
+      process.stderr.write = real;
+    }
+  };
+
+  it('a file that only hangs under --parallel is analyzed by the retry: nothing is left out', async () => {
+    const { wrapper, log } = hangingKondo('par-only', true);
+    const { root, files } = repoOfFiles('par-only', ['a.clj', 'bad.clj', 'c.clj', 'd.clj']);
+    const { result, stderr } = await quiet(() => analyze(wrapper, root, files, {}, { timeoutMs: 2000 }));
+    assert.deepEqual(result.timedOut, []);
+    assert.deepEqual(result.analysis.varDefs.map((d) => d.name).sort(), ['a-fn', 'bad-fn', 'c-fn', 'd-fn']);
+    assert.match(readFileSync(log, 'utf8'), /serial/);
+    assert.match(stderr, /retrying them in smaller batches without --parallel/);
+    assert.doesNotMatch(stderr, /a hook that never returns\?\)/);
+  });
+
+  it('a file that hangs whatever the flags is reported by name, the others are saved', async () => {
+    const { wrapper } = hangingKondo('always', false);
+    const { root, files } = repoOfFiles('always', ['a.clj', 'bad.clj', 'c.clj', 'd.clj']);
+    const started = Date.now();
+    const { result, stderr } = await quiet(() => analyze(wrapper, root, files, {}, { timeoutMs: 2000 }));
+    assert.deepEqual(result.timedOut, ['src/demo/bad.clj']);
+    assert.deepEqual(result.analysis.varDefs.map((d) => d.name).sort(), ['a-fn', 'c-fn', 'd-fn']);
+    assert.ok(Date.now() - started < 20_000, 'the retry is bounded');
+    assert.match(stderr, /src\/demo\/bad\.clj/);
+    assert.match(stderr, /a hook that never returns, or a file clj-kondo cannot finish/);
   });
 });

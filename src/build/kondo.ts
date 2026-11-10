@@ -76,6 +76,7 @@ export function chunkFiles(files: readonly string[], maxFiles = CHUNK, maxChars 
 }
 
 // A run that did not finish in time: kondo was killed, its files have no analysis.
+const STUCK_HINT = '(a hook that never returns, or a file clj-kondo cannot finish, e.g. extremely deep nesting)';
 class TimedOut extends Error {}
 
 const head = (text: string, max = 300): string => text.replace(/\s+/g, ' ').trim().slice(0, max);
@@ -97,9 +98,9 @@ export function analysisJson(text: string): Record<string, unknown> | null {
   return null;
 }
 
-function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>, timeoutMs: number): Promise<Analysis> {
+function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>, timeoutMs: number, parallel = true): Promise<Analysis> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, ['--repro', '--cache', 'false', '--parallel', '--config', config(lintAs), '--lint', ...files.map(asArgument)], {
+    const child = spawn(cmd, ['--repro', '--cache', 'false', ...(parallel ? ['--parallel'] : []), '--config', config(lintAs), '--lint', ...files.map(asArgument)], {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -119,7 +120,7 @@ function runChunk(cmd: string, root: string, files: string[], lintAs: Record<str
     child.on('close', (code) => {
       clearTimeout(timer);
       if (timedOut) {
-        reject(new TimedOut(`clj-kondo did not finish within ${Math.round(timeoutMs / 1000)} s on ${files.length} file(s) from ${files[0]} (a hook that never returns?)`));
+        reject(new TimedOut(`clj-kondo did not finish within ${Math.round(timeoutMs / 1000)} s on ${files.length} file(s) from ${files[0]} ${STUCK_HINT}`));
         return;
       }
       // kondo exits 2 or 3 when it reports warnings or errors; the JSON is complete either way
@@ -154,6 +155,32 @@ export interface Analyzed {
   timedOut: string[];
 }
 
+// The shortest wait a retry gets, so a lone file is not cut off at a few milliseconds of a proportional share.
+const RETRY_FLOOR_MS = 5000;
+
+// A batch that timed out under --parallel is run again without it, in halves: the files that were only stuck behind
+// the parallel run are saved, and the file that really cannot finish ends up alone and is named. A retry of `n` files
+// waits its share of the batch's timeout (never less than RETRY_FLOOR_MS), so the waits along the path to one bad
+// file add up to about one more timeout of the batch.
+async function retrySerial(
+  cmd: string, root: string, files: string[], lintAs: Record<string, string>, batchTimeout: number, batchSize: number, out: { done: Analysis[]; left: string[] },
+): Promise<void> {
+  const wait = Math.max(Math.min(batchTimeout, RETRY_FLOOR_MS), Math.round((batchTimeout * files.length) / batchSize));
+  try {
+    out.done.push(await runChunk(cmd, root, files, lintAs, wait, false));
+  } catch (e) {
+    if (!(e instanceof TimedOut)) throw e;
+    if (files.length === 1) {
+      process.stderr.write(`clojure-atlas: clj-kondo did not finish within ${Math.round(wait / 1000)} s on ${files[0]}, also without --parallel ${STUCK_HINT}; the file is left out\n`);
+      out.left.push(files[0]);
+      return;
+    }
+    const mid = Math.ceil(files.length / 2);
+    await retrySerial(cmd, root, files.slice(0, mid), lintAs, batchTimeout, batchSize, out);
+    await retrySerial(cmd, root, files.slice(mid), lintAs, batchTimeout, batchSize, out);
+  }
+}
+
 export async function analyze(cmd: string, root: string, files: string[], lintAs: Record<string, string>, opts: AnalyzeOptions = {}): Promise<Analyzed> {
   const rel = path.relative(root, cmd);
   if (path.isAbsolute(cmd) && rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)) {
@@ -168,12 +195,19 @@ export async function analyze(cmd: string, root: string, files: string[], lintAs
     while (nextChunk < chunks.length) {
       const k = nextChunk++;
       const chunk = chunks[k];
+      const batchTimeout = opts.timeoutMs ?? Math.max(60_000, chunk.length * 1000);
       try {
-        results[k] = await runChunk(cmd, root, chunk, lintAs, opts.timeoutMs ?? Math.max(60_000, chunk.length * 1000));
+        results[k] = await runChunk(cmd, root, chunk, lintAs, batchTimeout);
       } catch (e) {
         if (!(e instanceof TimedOut)) throw e;
-        process.stderr.write(`clojure-atlas: ${e.message}; those files are left out\n`);
-        timedOut.push(...chunk);
+        process.stderr.write(`clojure-atlas: ${e.message}; retrying them in smaller batches without --parallel\n`);
+        const retried = { done: [] as Analysis[], left: [] as string[] };
+        const mid = Math.ceil(chunk.length / 2);
+        for (const part of chunk.length > 1 ? [chunk.slice(0, mid), chunk.slice(mid)] : [chunk]) {
+          await retrySerial(cmd, root, part, lintAs, batchTimeout, chunk.length, retried);
+        }
+        results[k] = concat(retried.done);
+        timedOut.push(...retried.left);
       }
     }
   }));
