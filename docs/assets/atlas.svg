@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="268" viewBox="0 0 1080 268" role="img" aria-labelledby="title desc">
+  <title id="title">Clojure Atlas</title>
+  <desc id="desc">An ASCII wordmark and a map of source relationships: calls, events, routes and tests. Local code intelligence, delivered over MCP.</desc>
+  <rect width="1080" height="268" rx="14" fill="#101e24"/>
+  <rect x="1" y="1" width="1078" height="266" rx="13" fill="none" stroke="#2c4148"/>
+  <g font-family="Menlo, 'DejaVu Sans Mono', monospace">
+    <text x="36" y="34" font-size="12" letter-spacing="2" fill="#9fb5bc">CLOJURE / CODE ATLAS</text>
+    <text x="1044" y="34" text-anchor="end" font-size="12" fill="#91d5b6">(know your code)</text>
+    <path d="M36 50H1044" stroke="#2c4148"/>
+    <g font-size="24" fill="#b8eed4" xml:space="preserve" style="white-space:pre">
+      <text x="36" y="93">&#160;&#160;&#160;&#160;_&#160;&#160;&#160;_____&#160;_&#160;&#160;&#160;&#160;&#160;&#160;_&#160;&#160;&#160;____&#160;&#160;</text>
+      <text x="36" y="122">&#160;&#160;&#160;/&#160;\&#160;|_&#160;&#160;&#160;_|&#160;|&#160;&#160;&#160;&#160;/&#160;\&#160;/&#160;___|&#160;</text>
+      <text x="36" y="151">&#160;&#160;/&#160;_&#160;\&#160;&#160;|&#160;|&#160;|&#160;|&#160;&#160;&#160;/&#160;_&#160;\\___&#160;\&#160;</text>
+      <text x="36" y="180">&#160;/&#160;___&#160;\&#160;|&#160;|&#160;|&#160;|__/&#160;___&#160;\___)&#160;|</text>
+      <text x="36" y="209">/_/&#160;&#160;&#160;\_\|_|&#160;|____/_/&#160;&#160;&#160;\_\____/&#160;</text>
+    </g>
+    <path d="M532 73V211" stroke="#2c4148"/>
+    <g font-size="15" xml:space="preserve" style="white-space:pre">
+      <text x="566" y="85" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;.--&#160;(calls)&#160;--.</text>
+      <text x="566" y="111" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;/&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;\</text>
+      <text x="566" y="137" fill="#91d5b6">&#160;&#160;(source)&#160;+---&#160;(atlas)&#160;---+&#160;(events)</text>
+      <text x="566" y="163" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;\&#160;&#160;&#160;&#160;&#160;&#160;|&#160;&#160;&#160;&#160;&#160;&#160;&#160;/</text>
+      <text x="566" y="189" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;'--&#160;(routes)-'</text>
+      <text x="566" y="215" fill="#e5cd91">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;+---&#160;(tests)</text>
+    </g>
+    <path d="M36 230H1044" stroke="#2c4148"/>
+    <text x="36" y="251" font-size="11" letter-spacing="1" fill="#9fb5bc">SOURCE RELATIONSHIPS. LOCAL GRAPH. MCP TOOLS.</text>
+    <text x="1044" y="251" text-anchor="end" font-size="11" fill="#91d5b6">FOR THE SAKE OF ALL CLOJURIANS.</text>
+  </g>
+</svg>

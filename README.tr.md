@@ -1,5 +1,7 @@
 # clojure-atlas
 
+> Güncel yetenekler, desteklenen teknolojiler, kurulum ve güvenlik modeli için [ana README](README.md) sayfasına bakın. Paket henüz npm üzerinde yayımlanmadığı için aşağıda Git üzerinden kurulur; depo özelken erişim yetkisi gerekir.
+
 **For the sake of all Clojurians.**
 
 *Tüm Clojure'cular için.*
@@ -22,7 +24,8 @@ söyleyen bir band taşır. Her boş yanıt da neyin arandığını ve grafın b
 ## Hızlı başlangıç
 
 ```sh
-npm i -D clojure-atlas
+npm install --save-dev \
+  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
 npx clojure-atlas build
 npx clojure-atlas init
 ```
