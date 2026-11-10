@@ -132,7 +132,7 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
     name, query, title, found: false, matches: [], sections: [], next: [],
     verdict: `no ${what} matches ${JSON.stringify(query)}${used.length ? `; used at ${used.map(([, s]) => at(s)).join('; ')} but no definition was found` : ''}`,
     notes: [
-      ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${MACRO_HINT}`),
+      ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${unparsed.length ? 'its definition is probably in the file named below' : MACRO_HINT}`),
       ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
       ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
       ...(timedOut.length ? [`${query} probably lives in ${timedOut.join(', ')}, which was not analyzed because clj-kondo did not finish on it${NOT_SPELLING}`] : []),

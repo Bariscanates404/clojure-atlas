@@ -186,3 +186,14 @@ describe('the build log', () => {
     assert.match(r.stderr, /\nclojure-atlas: DEGRADED: 1 file\(s\) could not be parsed \(src\/demo\/broken_one\.clj\)/);
   });
 });
+
+describe('a name used elsewhere whose own file could not be parsed', () => {
+  it('blames the unparsed file, not a macro', () => {
+    const usages = { ...doc.stats.usages, unresolvedSites: { 'demo.broken/oops': ['src/demo/user.clj:3'] } };
+    const withUse = { ...doc, stats: { ...doc.stats, usages } };
+    const t = callTool(indexGraph(withUse), 'callers', { var: 'demo.broken/oops' }).text;
+    assert.match(t, /demo\.broken\/oops probably lives in src\/demo\/broken\.clj, which could not be parsed/);
+    assert.match(t, /used at src\/demo\/user\.clj:3/);
+    assert.doesNotMatch(t, /probably defined by a macro/);
+  });
+});
