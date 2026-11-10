@@ -1,7 +1,7 @@
 // The core graph every codebase gets: namespaces and definitions, and the edges kondo resolves statically:
 // defines (namespace -> definition), requires (namespace -> namespace), each var usage as the relation relations.ts
 // names (calls, references, passes_callback, registers_handler, expands_via, rebinds) and tests (a deftest -> what it uses).
-import type { Band, GraphEdge, GraphNode } from '../mcp/graph.ts';
+import { compareText, type Band, type GraphEdge, type GraphNode } from '../mcp/graph.ts';
 import { isTestFile } from '../shared/testfile.ts';
 import type { NsUse, VarDef, VarUse } from './analysis.ts';
 import { defId, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
@@ -71,15 +71,24 @@ function definitionNode(ctx: Context, d: VarDef, signature?: Arity[] | null): Gr
   };
 }
 
+// A file without an ns form (dev/user.clj, a data-only file) or one that switches with (in-ns 'x) still lives in a
+// namespace clj-kondo names on its definitions and usages: user by default.
 function namespaceNodes(ctx: Context): GraphNode[] {
   const seen = new Set<string>();
   const out: GraphNode[] = [];
-  for (const d of ctx.analysis.nsDefs) {
-    if (seen.has(d.name)) continue;
-    seen.add(d.name);
-    const component = ctx.componentOf(d.file);
-    out.push({ id: nsId(d.name), kind: 'namespace', name: d.name, file: d.file, line: d.row, end_line: d.endRow, ...(component ? { component } : {}) });
-  }
+  const add = (name: string, file: string, row: number, endRow?: number) => {
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    const component = ctx.componentOf(file);
+    out.push({ id: nsId(name), kind: 'namespace', name, file, line: row, ...(endRow ? { end_line: endRow } : {}), ...(component ? { component } : {}) });
+  };
+  for (const d of ctx.analysis.nsDefs) add(d.name, d.file, d.row, d.endRow);
+  const sites = [
+    ...ctx.analysis.varDefs.map((d) => ({ ns: d.ns, file: d.file, row: d.row })),
+    ...ctx.analysis.varUses.map((u) => ({ ns: u.from, file: u.file, row: u.row })),
+    ...ctx.analysis.keywords.map((k) => ({ ns: k.from, file: k.file, row: k.row })),
+  ].sort((a, b) => compareText(a.file, b.file) || a.row - b.row);
+  for (const x of sites) add(x.ns, x.file, x.row);
   return out;
 }
 

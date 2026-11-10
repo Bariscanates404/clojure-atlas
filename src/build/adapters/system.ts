@@ -125,6 +125,11 @@ function componentSystems(ctx: Context): { keys: Key[]; deps: Dep[]; starts: Dep
   return { keys, deps, starts };
 }
 
+function systemNode(ctx: Context, k: Key, undeclared = false): GraphNode {
+  const component = ctx.componentOf(k.file);
+  return { id: systemKeyId(k.name), kind: 'system_key', name: k.name, file: k.file, line: k.line, ...(component ? { component } : {}), attrs: { library: k.library, ...(undeclared ? { undeclared: true } : {}) } };
+}
+
 export const systemKeys: Adapter = {
   name: 'system',
   edgeKinds: ['registers', 'depends_on'],
@@ -165,11 +170,25 @@ export const systemKeys: Adapter = {
     keys.push(...comp.keys);
     deps.push(...comp.deps);
     for (const s of comp.starts) edges.push({ from: systemKeyId(s.from), to: defId(s.to), kind: 'registers', band: 'static_proven', file: s.file, line: s.line, attrs: { via: 'system-map' } });
-    for (const d of deps) edges.push({ from: systemKeyId(d.from), to: systemKeyId(d.to), kind: 'depends_on', band: 'static_proven', file: d.file, line: d.line });
-    const nodes: GraphNode[] = keys.map((k) => {
-      const component = ctx.componentOf(k.file);
-      return { id: systemKeyId(k.name), kind: 'system_key', name: k.name, file: k.file, line: k.line, ...(component ? { component } : {}), attrs: { library: k.library } };
-    });
+    const declared = new Set(keys.map((k) => k.name));
+    const libraryOf = new Map(keys.map((k) => [k.name, k.library]));
+    const partsOf = (name: string) => (name.startsWith('[') ? name.slice(1, -1).split(' ') : [name]);
+    // a ref names a key by itself or by some of the parts of a composite key; an unmatched ref names a key nobody declares
+    const targetsOf = (to: string): string[] => {
+      if (declared.has(to)) return [to];
+      const want = partsOf(to);
+      return [...declared].filter((k) => k.startsWith('[') && want.every((p) => partsOf(k).includes(p)));
+    };
+    const undeclared = new Map<string, Key>();
+    for (const d of deps) {
+      const matches = targetsOf(d.to);
+      if (!matches.length && !undeclared.has(d.to)) undeclared.set(d.to, { name: d.to, file: d.file, line: d.line, library: libraryOf.get(d.from) ?? 'integrant' });
+      for (const to of matches.length ? matches : [d.to]) edges.push({ from: systemKeyId(d.from), to: systemKeyId(to), kind: 'depends_on', band: 'static_proven', file: d.file, line: d.line });
+    }
+    const nodes: GraphNode[] = [
+      ...keys.map((k) => systemNode(ctx, k)),
+      ...[...undeclared.values()].map((k) => systemNode(ctx, k, true)),
+    ];
     return { nodes, edges };
   },
 };

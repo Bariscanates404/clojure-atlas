@@ -30,6 +30,7 @@ describe('builder fixtures', () => {
   for (const [name, what] of FIXTURES) {
     it(`${name}: ${what}`, async () => {
       const doc = await buildFixture(name);
+      assert.equal(doc.stats.dropped_edges, 0, 'a healthy build drops no edge');
       assert.equal(rowsText(doc), readFileSync(path.join(fixtureDir(name), 'expected.txt'), 'utf8'));
       assert.doesNotThrow(() => parseDocument(JSON.parse(JSON.stringify(doc))), 'the MCP loader accepts the document');
     });

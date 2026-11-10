@@ -65,6 +65,7 @@ How to read the columns:
   reported as a raw count and kept out of the rate.
 - adapter columns: edges each adapter added (0 when its library is not used); key_tables counts tables.
 - **unknown edges**: edges in band UNKNOWN (attribute references of unproven role).
+- **dropped edges**: edges the assembler discarded because an end was not a node; a healthy build drops 0.
 
 ${coverageTable(rows)}
 

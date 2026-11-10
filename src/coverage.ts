@@ -20,6 +20,7 @@ export interface CoverageRow {
   nodes: number;
   edges: number;
   unknownEdges: number;
+  droppedEdges: number;
   buildMs: number;
   graphBytes: number;
 }
@@ -43,6 +44,7 @@ export function coverageRow(doc: AtlasDocument, graphBytes: number): CoverageRow
     nodes: doc.nodes.length,
     edges: doc.edges.length,
     unknownEdges: doc.edges.filter((e) => e.band === 'unknown').length,
+    droppedEdges: doc.stats.dropped_edges ?? 0,
     buildMs: doc.stats.build_ms ?? 0,
     graphBytes,
   };
@@ -53,12 +55,12 @@ const kb = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} M
 
 export function coverageTable(rows: readonly CoverageRow[]): string {
   const adapters = [...new Set(rows.flatMap((r) => Object.keys(r.adapters)))];
-  const head = ['repo', 'files expected', 'files analyzed', 'syntax-error files', 'definitions', 'resolved', 'unresolved', 'resolution rate', 'unknown namespace', ...adapters, 'unknown edges', 'build', 'graph'];
+  const head = ['repo', 'files expected', 'files analyzed', 'syntax-error files', 'definitions', 'resolved', 'unresolved', 'resolution rate', 'unknown namespace', ...adapters, 'unknown edges', 'dropped edges', 'build', 'graph'];
   const lines = [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`];
   for (const r of rows) {
     lines.push(`| ${[
       r.repo, r.filesExpected, r.files, r.syntaxErrorFiles, r.definitions, r.resolved, r.unresolved, pct(r.resolutionRate), r.unknown,
-      ...adapters.map((a) => r.adapters[a] ?? 0), r.unknownEdges, `${(r.buildMs / 1000).toFixed(1)} s`, kb(r.graphBytes),
+      ...adapters.map((a) => r.adapters[a] ?? 0), r.unknownEdges, r.droppedEdges, `${(r.buildMs / 1000).toFixed(1)} s`, kb(r.graphBytes),
     ].join(' | ')} |`);
   }
   return lines.join('\n');
