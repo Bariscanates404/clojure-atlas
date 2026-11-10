@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { deflateRawSync } from 'node:zlib';
-import { ASSETS, cacheRoot, downloader, HOST, KONDO_VERSION, locateKondo, unzipEntry, type KondoHost } from '../src/build/kondo-binary.ts';
+import { ASSETS, cacheRoot, downloader, HOST, KONDO_VERSION, locateKondo, unzipEntry, versionProbe, type KondoHost } from '../src/build/kondo-binary.ts';
 import { analyze, chunkFiles } from '../src/build/kondo.ts';
 
 // A minimal zip holding the given files (one deflated, one stored), written by hand.
@@ -196,6 +196,22 @@ describe('the real host', () => {
     const notExecutable = path.join(cache, 'plain-file');
     writeFileSync(notExecutable, 'x');
     assert.equal(HOST.version(notExecutable), null);
+  });
+
+  it('gives up on a --version that never returns, and says so', { skip: process.platform === 'win32' }, () => {
+    const hang = path.join(cache, 'hang-kondo');
+    writeFileSync(hang, '#!/bin/sh\nsleep 20\n', { mode: 0o755 });
+    const written: string[] = [];
+    const real = process.stderr.write;
+    process.stderr.write = ((chunk: string) => { written.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    const t0 = Date.now();
+    try {
+      assert.equal(versionProbe(300)(hang), null);
+    } finally {
+      process.stderr.write = real;
+    }
+    assert.ok(Date.now() - t0 < 5000, 'returned long before the script would have');
+    assert.match(written.join(''), /hang-kondo --version did not answer within 0\.3 s; is it a clj-kondo\?/);
   });
 });
 

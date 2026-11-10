@@ -133,6 +133,20 @@ export const downloader = (timeoutMs: number) => async (url: string): Promise<Bu
   return Buffer.from(await res.arrayBuffer());
 };
 
+export const VERSION_TIMEOUT_MS = 10_000;
+
+// `<command> --version`, or null when it cannot run or does not answer within `timeoutMs` (a binary that hangs must not hang the build).
+export const versionProbe = (timeoutMs: number) => (command: string): string | null => {
+  try {
+    return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: timeoutMs }).trim();
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ETIMEDOUT') process.stderr.write(`clojure-atlas: ${command} --version did not answer within ${timeoutMs / 1000} s; is it a clj-kondo?\n`);
+    else if (code !== 'ENOENT') process.stderr.write(`clojure-atlas: ${command} --version failed: ${(err as Error).message.split('\n')[0]}\n`);
+    return null;
+  }
+};
+
 export const HOST: KondoHost = {
   platform: process.platform,
   arch: process.arch,
@@ -140,14 +154,7 @@ export const HOST: KondoHost = {
   cacheDir: path.join(cacheRoot(process.env, process.platform, homedir()), 'clojure-atlas'),
   download: downloader(DOWNLOAD_TIMEOUT_MS),
   resolve: (name) => whichExecutable(name, [process.cwd()]),
-  version: (command) => {
-    try {
-      return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') process.stderr.write(`clojure-atlas: ${command} --version failed: ${(err as Error).message.split('\n')[0]}\n`);
-      return null;
-    }
-  },
+  version: versionProbe(VERSION_TIMEOUT_MS),
   warn: (message) => process.stderr.write(`clojure-atlas: ${message}\n`),
 };
 
