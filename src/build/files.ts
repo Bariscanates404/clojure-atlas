@@ -78,7 +78,7 @@ export function trackedSources(root: string, files: RepoFiles): Tracked {
     const seen = new Set([...files.sources, ...files.skippedLarge]);
     return { expected: tracked.length, unread: tracked.filter((f) => !seen.has(f)).sort() };
   } catch (err) {
-    process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message.split('\n')[0]}); expected files = files listed\n`);
+    process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message}); expected files = files listed\n`);
     return { expected: files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length, unread: [] };
   }
 }
