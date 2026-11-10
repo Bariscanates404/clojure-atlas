@@ -1,5 +1,7 @@
 # clojure-atlas
 
+> 最新の機能、対応技術、インストール方法、セキュリティモデルは[メインの README](README.md)をご覧ください。パッケージはまだ npm に公開されていないため、以下では Git からインストールします。リポジトリが非公開の間はアクセス権が必要です。
+
 **For the sake of all Clojurians.**
 
 *すべての Clojurian のために。*
@@ -22,7 +24,8 @@ Clojure を編集するエージェントは、たいていテキスト検索で
 ## クイックスタート
 
 ```sh
-npm i -D clojure-atlas
+npm install --save-dev \
+  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
 npx clojure-atlas build
 npx clojure-atlas init
 ```

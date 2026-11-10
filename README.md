@@ -1,220 +1,181 @@
 # clojure-atlas
 
-**For the sake of all Clojurians.**
+**Built for agentic coding. Give your AI agent a map of your Clojure codebase.**
+
+Trace callers and data providers/consumers, inspect function contracts **down to the keys inside map arguments**,
+follow re-frame events and routes, and identify tests affected by a change.
+clojure-atlas turns **Clojure, ClojureScript and `.cljc` source** into a local code graph, then exposes it as
+**13 MCP tools** with source locations and explicit confidence levels.
+
+Built as a **companion tool for coding agents**, Atlas supplies the structural context they need before changing
+code: who depends on it, which parameters and map keys its consumers expect, and which tests relate to it.
+
+![clojure-atlas — provider to map parameter set to consumer; inspect contracts with signature_impact and key_flow](docs/assets/atlas.svg)
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
+[![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-91d5b6?style=flat-square&labelColor=17252b)](#requirements)
+[![MCP: stdio](https://img.shields.io/badge/MCP-stdio-91d5b6?style=flat-square&labelColor=17252b)](#quick-start)
+[![Required npm runtime dependencies: 0](https://img.shields.io/badge/npm_runtime_dependencies-0-91d5b6?style=flat-square&labelColor=17252b)](#local-by-design)
+
+**Zero required npm runtime dependencies. Local analysis. For the sake of all Clojurians.**
+
+A personal project by **Barış Can Ateş** · MIT licensed · Built on [clj-kondo](https://github.com/clj-kondo/clj-kondo).
 
 English | [Türkçe](README.tr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
-A structural map of a Clojure, ClojureScript or .cljc codebase, served to AI coding agents as MCP tools.
-Built for agentic development. MIT licensed. Created by Barış Can Ateş.
+[Capabilities](#what-you-can-do) · [Map contracts](#contracts-down-to-map-keys) · [Supported stack](#languages-and-ecosystem-support) · [Examples](#see-it-in-action) ·
+[Quick start](#quick-start) · [Coverage](#coverage) · [Full guide](docs/GUIDE.md)
 
-## What it is
+## What you can do
 
-An agent that edits Clojure usually finds relations with text search. Text search cannot tell a call from a
-keyword of the same name, cannot see a handler registered with `reg-event-fx`, a route that reaches a var, or a
-function passed to `partial`, and it cannot say "nothing calls this" with any confidence. clojure-atlas runs
-[clj-kondo](https://github.com/clj-kondo/clj-kondo) over the project once, turns its analysis into a graph
-(definitions, calls, value uses, re-frame events, routes, system keys, data attributes, map keys, tests), and
-answers questions about it over MCP. Every answer row carries a band that says how it was proven, and every empty
-answer says what was searched and whether the graph can know at all.
+Use it when exploring an unfamiliar project, planning a refactor or reviewing a change. Your MCP client calls
+the tools; Atlas returns the relationships it can establish, with `file:line` citations.
 
-## Quick start
+| Ask your agent… | Atlas gives it… | MCP tools |
+|---|---|---|
+| “Who calls this, and what could my change affect?” | Direct callers, value references and transitive dependents | `callers`, `blast_radius` |
+| “What parameter set does each caller provide, and what does the function read?” | Arities, destructured map keys, defaults, keyword arguments and keys supplied at each call site | `signature_impact` |
+| “Who provides this map key, and who consumes it?” | Key producers and consumers, including literal keys inside nested maps and key paths | `key_flow` |
+| “Is this configuration row missing a key?” | Keys present in sibling map rows but absent from this one | `key_siblings` |
+| “What handles this endpoint? Where is permission checked?” | Route handlers, ordered middleware and configured permission checks | `route_authz`, `permission_routes` |
+| “What happens when this re-frame event fires?” | Dispatchers, handlers, subscriptions and HTTP requests | `event_flow` |
+| “Who reads or writes this database attribute?” | Proven reads and writes, with uncertain references kept visible | `attribute_usage` |
+| “Which tests relate to this change?” | Static unit-test links, Playwright links and a review context for changed files or lines | `tests_for`, `tests_covering`, `context_for_change` |
+| “What does this graph actually know?” | Source commit, active adapters, evidence counts and coverage warnings | `graph_info` |
 
-```sh
-npm i -D clojure-atlas
-npx clojure-atlas build
-npx clojure-atlas init
+A call, a callback and a keyword with the same spelling are different things. Atlas models those distinctions,
+including Clojure's registrations and data-driven connections. It gives your agent evidence to inspect before editing.
+
+### An agent's workflow
+
+1. **Orient:** use `graph_info` to check the snapshot, active adapters and analysis gaps.
+2. **Investigate:** inspect callers, parameter contracts, map-key providers/consumers and the potential impact of a change.
+3. **Plan and verify:** use `context_for_change` and the test tools to find affected code and related tests; inspect
+   cited source, make the change and run the relevant tests. Rebuild the graph and restart the MCP server for the next pass.
+
+## Contracts, down to map keys
+
+Atlas makes the **source-visible parameter contract** inspectable: what a caller supplies, what a function
+destructures or reads, and which call sites a proposed change affects.
+
+| Level | What Atlas can show |
+|---|---|
+| **Parameter set** | Accepted arities, positional/rest parameters and keyword arguments such as `& {:keys [verbose]}` |
+| **Keys inside a map argument** | `{:keys [email password]}`, `:or` defaults, `:as` aliases, literal keys passed by callers and supported reads in the function body |
+| **Provider / consumer** | Producers such as map literals, `assoc` and `assoc-in`; consumers such as destructuring, keyword lookup, `get` and `get-in` |
+| **Contract changes** | Call sites affected by added/removed keys or changed arities, using `signature_impact` with `added_keys`, `removed_keys`, `arities` or `base_graph` |
+| **Nested maps** | Literal key occurrences in nested maps, destructuring and paths such as `(get-in cart [:meta :count])`, through `key_flow` |
+
+The scope is **static key usage**, not value/type validation. `key_flow` groups occurrences by keyword, not by
+the identity of a particular map. `signature_impact` records the outer key of nested destructuring or `get-in`,
+not a complete nested schema. Runtime-built maps and keys may remain unknown.
+
+## Languages and ecosystem support
+
+**Core languages:** Clojure (`.clj`), ClojureScript (`.cljs`) and shared code (`.cljc`). EDN files contribute
+supported configuration and data forms. TypeScript (`.ts`) is read only for the optional Playwright integration;
+this is not a general JavaScript or TypeScript analyzer.
+
+| Area | Recognized libraries / forms | What is covered today |
+|---|---|---|
+| Core Clojure | Vars, calls, value uses, callbacks, multimethods, protocols | Definitions and dependency relations; dispatch candidates are heuristic |
+| Parameter and map contracts | `defn` arities, map destructuring, keyword args, map literals and key operations | Caller-supplied key sets, consumed keys, provider/consumer sites and signature-change impact |
+| Frontend state | **re-frame**, including `re-frame.alpha` | Event/subscription registrations, dispatch, subscription inputs and subscribers |
+| Backend routing | **Compojure**, **Reitit**, **Pedestal** table routes | Paths, mounted route copies and handlers; Pedestal service-map interceptors are not extracted |
+| Middleware | **Ring**, Compojure `wrap-routes`, Reitit route data and `ring-handler` | Ordered chains, including outer wrappers; inferred chains are marked heuristic |
+| Route authorization | Project-defined permission keys, middleware and functions | Requires a small `.clojure-atlas.edn` declaration |
+| Browser routing | **Reitit frontend**, **Secretary** | Client-route nodes in the graph; there is no dedicated MCP tool to list them yet |
+| HTTP requests | **cljs-ajax**, **cljs-http**, `js/fetch`, request effect maps | Request sites and matches to backend routes by method and path |
+| Data | **Datomic**, **DataScript**, **XTDB v1 / Crux** | Attributes, transaction writes, query/pull reads and uncertain references |
+| System lifecycle | **Integrant**, **Mount**, **Component** | System keys, registrations and dependency edges; Integrant config extraction relies on refs |
+| Schemas | **clojure.spec / cljs.spec**, **Malli** | Registered spec schemas and Malli schemas held in vars; Malli registries are not supported |
+| Tests and UI | **clojure.test / cljs.test**, **Playwright**, literal Hiccup selectors | Static test links; Playwright page objects and `.ts` tests need optional TypeScript 5 |
+| Project layout | **deps.edn**, **Leiningen**, **shadow-cljs**, **Babashka**, **Boot**, **Polylith** layouts | Source discovery and grouping by module/component; build aliases and task execution are not analyzed |
+
+Framework adapters recognize specific source forms, not every possible use of a library. `graph_info` reports
+what was available and activated in **your** project. Repos such as Fulcro, Pathom, HoneySQL and next.jdbc are in
+the measurement corpus, but their presence there does **not** mean dedicated framework or SQL analysis is implemented.
+See the [roadmap](ROADMAP.md) for those adapters, bidi, compojure-api and other gaps.
+
+## See it in action
+
+These excerpts come from the [committed example graphs](examples/) of public projects. The invocation is an
+MCP tool call, not a shell command. `[S]` means statically proven; `[H]` means heuristic.
+
+### Inspect the contract inside a map argument
+
+In polylith-realworld, `login!` takes **one map argument** and destructures **`:email` and `:password`**.
+Atlas shows that key set beside the arguments supplied by its callers:
+
+```text
+signature_impact {"fn": "clojure.realworld.user.core/login!", "group_by": "none"}
 ```
 
-`build` writes `.clojure-atlas/graph.json.gz`. On the integrant repo it prints:
-
-```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.7 s -> .clojure-atlas/graph.json.gz
-```
-
-`init` shows the project `.mcp.json` it would write and writes it only with `--yes`:
-
-```
-.mcp.json would become:
-{
-  "mcpServers": {
-    "clojure-atlas": {
-      "command": "npx",
-      "args": [
-        "clojure-atlas",
-        "mcp",
-        "--graph",
-        ".clojure-atlas/graph.json.gz",
-        "--repo",
-        "."
-      ]
-    }
-  }
-}
-
-run `clojure-atlas init --yes` to write it, then `clojure-atlas build`
-```
-
-Other servers already in `.mcp.json` are kept.
-
-### Claude Code
-
-`npx clojure-atlas init --yes` writes the project `.mcp.json`, which Claude Code reads. Or add the server by hand:
-
-```sh
-claude mcp add clojure-atlas -- npx clojure-atlas mcp --graph .clojure-atlas/graph.json.gz --repo .
-```
-
-### Any other MCP client
-
-The server speaks MCP over stdio. Most clients take this JSON:
-
-```json
-{
-  "mcpServers": {
-    "clojure-atlas": {
-      "command": "npx",
-      "args": ["clojure-atlas", "mcp", "--graph", ".clojure-atlas/graph.json.gz", "--repo", "."]
-    }
-  }
-}
-```
-
-### Commands
-
-```
-usage:
-  clojure-atlas build [dir] [-o .clojure-atlas/graph.json.gz]
-  clojure-atlas mcp [--graph .clojure-atlas/graph.json.gz] [--repo <clone>] [--max-distance N]
-  clojure-atlas coverage [graph]
-  clojure-atlas init [--yes]
-```
-
-- `build` analyzes `dir` (default `.`) and writes the graph.
-- `mcp` serves a graph. With `--repo`, answers start with a `STALE` line when the working tree is not the one the
-  graph was built from, or when the commit the agent passes as `base` is more than `--max-distance` commits
-  past the graph's commit (default 20), or the graph's commit is ahead of `base` or diverged from it. The working-tree check
-  is repeated at most every 3 seconds, so an edit shows from the first call after that.
-- `coverage` prints the coverage row of a graph and its most frequent unresolved names.
-- `init` adds the server to the project `.mcp.json`.
-
-Rebuild the graph after you change code. A served graph does not update itself:
-
-```
-STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
-```
-
-The project's own `.clj-kondo` config is honored. An optional `.clojure-atlas.edn` in the project root adds what
-the generic adapters cannot guess: `:lint-as` for def-like macros, `:route-macros`, and the route authorization
-keys `:route-authz`, `:permission-middleware` and `:permission-fns`.
-
-### Project configuration
-
-A var made by a project macro, and a route written with a project macro, are invisible until the macro is named.
-Take a small probe project with this macro and route:
-
-```clojure
-;; src/probe/defs.clj
-(ns probe.defs)
-
-(defmacro defsetting [name value]
-  `(def ~name ~value))
-
-(defsetting timeout-ms 5000)
-
-;; src/probe/core.clj
-(ns probe.core
-  (:require [probe.defs :as defs]))
-
-(defn deadline [now]
-  (+ now defs/timeout-ms))
-
-;; src/probe/web.clj
-(ns probe.web
-  (:require [compojure.core :as c]))
-
-(defmacro GET* [path args & body]
-  `(c/GET ~path ~args ~@body))
-
-(defn hello [_req]
-  {:status 200 :body "hello"})
-
-(def app
-  (c/routes
-    (GET* "/hello" [] hello)))
-```
-
-Without configuration, the var is used but has no definition, and the route does not exist:
-
-```
-CALLERS probe.defs/timeout-ms — no definition matches "probe.defs/timeout-ms"; used at src/probe/core.clj:5 but no definition was found
+```text
+SIGNATURE_IMPACT clojure.realworld.user.core/login! — 4 caller(s) in 1 component(s); arities 1; no finding
+counts: arities=1 [S1]  callers=4 [S4]
 [... trimmed ...]
-ROUTE_AUTHZ GET /hello — no route matches "GET /hello"
+arities (1)
+  1. [{:keys [email password]}]  components/user/src/clojure/realworld/user/core.clj:50 [S]  (4 caller(s))
+callers (4 S4)
+  1. clojure.realworld.user.interface/login!: arity 1, arg0 symbol login-input (keys unknown)  components/user/src/clojure/realworld/user/interface.clj:6 [S]
+  2. clojure.realworld.user.core-test/login--invalid-password--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:34 [S]
 [... trimmed ...]
 ```
 
-Put this `.clojure-atlas.edn` in the project root and rebuild. Both keys map a fully qualified macro to the
-fully qualified form it behaves like:
+The literal map's key set is visible; the map passed as `login-input` remains unknown. `[S]` on that row proves
+the call relationship, not the contents of the runtime map.
 
-```clojure
-{:lint-as      {probe.defs/defsetting clojure.core/def}
- :route-macros {probe.web/GET* compojure.core/GET}}
+<details>
+<summary><strong>Change the parameter contract: what if login! also needs :tenant-id?</strong></summary>
+
+```text
+signature_impact {"fn": "clojure.realworld.user.core/login!", "added_keys": [":tenant-id"], "group_by": "none"}
 ```
 
-```
-CALLERS probe.defs/timeout-ms — 1 direct caller(s) in 1 component(s)
-counts: callers and references=1 [S1]
-definition (1)
-  1. probe.defs/timeout-ms  src/probe/defs.clj:6 [S]
-callers and references (1)
-  1. probe.core/deadline  src/probe/core.clj:5 [S]
+```text
+SIGNATURE_IMPACT clojure.realworld.user.core/login! — 3 caller(s) affected by the change (new keys: :tenant-id); 4 caller(s) in 1 component(s); arities 1; no finding
+counts: affected=4 [S3 ?1]  arities=1 [S1]  callers=4 [S4]
+[... trimmed ...]
+  1. clojure.realworld.user.core-test/login--invalid-password--return-negative-result does not pass :tenant-id  components/user/test/clojure/realworld/user/core_test.clj:34 [S]  (argument 0 passes {:email :password})
 [... trimmed ...]
 ```
 
+All three literal-map callers omit the proposed key. The fourth caller forwards `login-input`, so its impact
+is **UNKNOWN**. This is a hypothetical contract change; the tool does not modify source. “No finding” refers
+to the existing signature; the `affected` section describes the proposed change.
+
+</details>
+
+<details>
+<summary><strong>Find the providers and consumers of :email across the project</strong></summary>
+
+```text
+key_flow {"key": ":email", "group_by": "none", "limit": 2}
 ```
-ROUTE_AUTHZ GET /hello — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [S1]
+
+```text
+KEY_FLOW :email — 9 producer(s), 5 consumer(s) in 1 component(s); 23 site(s) in tests
+counts: producers=9 [S9]  consumers=5 [S5]  tests=23 [S23]
 [... trimmed ...]
-GET /hello @probe.web/app (base probe.web/app): handler (1)
-  1. probe.web/hello  src/probe/web.clj:12 [S]  entry: route GET /hello @probe.web/app
-[... trimmed ...]
 ```
 
-(The first answer is `callers` with `include_references: true`, since `timeout-ms` is a value, not a function.)
-`:lint-as` can live in the project's `.clj-kondo/config.edn` instead, in clj-kondo's own format, with the same
-result; `:route-macros` exists only in `.clojure-atlas.edn`:
+The result lists map-literal producers in `register!` and destructuring consumers including `login!`, with
+source locations. Because `:email` is unqualified, every map using that keyword is grouped together; this
+does not prove that a specific producer's map reaches a specific consumer.
 
-```clojure
-{:lint-as {probe.defs/defsetting clojure.core/def}}
+</details>
+
+<details>
+<summary><strong>Find the callers before a refactor</strong></summary>
+
+**Question:** Who calls `integrant.core/dependent-keys`?
+
+```text
+callers {"var": "integrant.core/dependent-keys"}
 ```
 
-## Tools
-
-Every example below is real output of `clojure-atlas mcp` over a graph in [examples/](examples/), trimmed only
-where marked. mount defines four namespaces in more than one file, so its answers start with a `DEGRADED` line
-(see the next section). `[S]`, `[H]` and `[?]` are the bands, explained in the next section.
-
-### graph_info
-
-Which commit the graph describes, what each adapter found, with band counts. Question: what does the integrant
-graph know?
-
-```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T04:47:34.989Z: 296 nodes, 1481 edges
-snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
-config c77762fd2fd2 from .clj-kondo/config.edn
-  definitions: available, 854 edges {"static_proven":854}
-  multimethods: available, 52 edges {"static_proven":26,"heuristic":26} (switched on by defmethod)
-  events: available, 0 edges {} (not used: nothing in this codebase switches it on)
-  system: available, 69 edges {"static_proven":69} (switched on by integrant)
-  route_authz: absent (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
-  [... trimmed ...]
-```
-
-### callers
-
-Direct callers of a definition. Question: who calls `integrant.core/dependent-keys`?
-
-```
+```text
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -227,132 +188,16 @@ callers (4 S4)
 next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symbol="integrant.core/dependent-keys")
 ```
 
-With `include_references: true` it also lists value uses, callbacks, registered handlers, macro expansions,
-dispatch candidates and rebindings. A var named inside a syntax-quoted macro body (compojure's `defroutes` naming
-`routes`) is a HEURISTIC reference, not a call.
+</details>
 
-### blast_radius
+<details>
+<summary><strong>Trace a re-frame event across dispatch sites and its handler</strong></summary>
 
-Transitive dependents of a definition. Question: what can a change to `integrant.core/ref?` reach?
-
-```
-BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
-counts: affected=6 [S6]  deeper=25 [S25]
-note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
-note: potential impact over known dependency relations (calls, value uses, callbacks, registered handlers, macro expansions, dispatch candidates, rebindings): a path here may never run
-affected (6 S6)
-  1. integrant.core/ambiguous-refs  src/integrant/core.cljc:323 [S]
-    └─ called by integrant.core/build  src/integrant/core.cljc:446 [S] d2  fan-in 4
-  3. integrant.core/find-derived-refs  src/integrant/core.cljc:178 [S]
-    └─ called by integrant.core/dependency-graph  src/integrant/core.cljc:192 [S] d2  fan-in 6
-  5. integrant.core/missing-refs  src/integrant/core.cljc:328 [S]
-  6. integrant.core-test/ref-test  test/integrant/core_test.cljc:80 [S]
-deeper (25 S25)
-  1. integrant.core/init  src/integrant/core.cljc:658 [S] d3  fan-in 8
-  [... trimmed ...]
+```text
+event_flow {"name": ":delete-todo"}
 ```
 
-### signature_impact
-
-Arities, destructured keys and what each caller passes. Question: how is `integrant.core/init` called?
-
-```
-SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
-counts: arities=2 [S2]  callers=38 [S38]
-findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
-arities (2 S2)
-  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
-  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
-callers (38 S38)
-  1. integrant.core/init: arity 2, arg0 symbol config (keys unknown)  src/integrant/core.cljc:655 [S]  fan-in 8
-  2. integrant.core-test/fold-test: arity 1, arg0 symbol config (keys unknown)  test/integrant/core_test.cljc:649 [S]
-  [... trimmed ...]
-```
-
-In diff mode (`base_graph`, or `added_keys` / `removed_keys` / `arities`) it lists the callers a signature change
-affects.
-
-### route_authz
-
-Handler, middleware chain and permission check of a backend route. Question: what serves `POST /api/articles` in
-polylith-realworld, and which middleware wraps it?
-
-```
-ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
-note: capability route_authz is absent: an empty answer is not proof of absence
-POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
-  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
-POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
-  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
-  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
-  [... trimmed ...]
-  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
-  +1 more (next page: offset=10 section="middleware")
-POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
-POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
-next: tests_covering(target="POST /api/articles")
-```
-
-The eleventh row, on the next page, is the authorization middleware, applied with compojure's `wrap-routes`:
-
-```
-  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
-```
-
-When the wrapping of a route cannot be read, the section says so instead of "none" (usermanager, `GET /user/list`):
-
-```
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
-```
-
-Middleware wrapped outside the route table is read at HEURISTIC: Ring wraps, `->`, `->>`, nested calls,
-`wrap-routes`, and the outer wraps and third-argument `{:middleware [...]}` of reitit's `ring-handler`. A
-permission middleware found there counts as a check. Middleware in reitit and pedestal route data
-(`:middleware`, `:interceptors`) is read from the route itself. When the wrapping could not be fully read,
-route_authz says `no permission check found in what could be read (...); not provable that none exists`. A route
-tree that no router reaches shows its middleware as UNKNOWN; today that is every pedestal route, because the
-interceptors of a pedestal service map are not read. A handler the graph cannot resolve shows as
-`handler: not resolved (UNKNOWN)`. Here the permission verdict is "not provable", because this project declares
-no authorization model in `.clojure-atlas.edn`.
-
-### permission_routes
-
-Every route that checks a permission. Question: which routes in mount require `:admin`?
-
-```
-DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-PERMISSION_ROUTES :admin — no permission matches ":admin"
-note: capability route_authz is absent: an empty answer is not proof of absence
-note: use the exact permission name, with its namespace if it has one
-searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name
-```
-
-### attribute_usage
-
-Proven readers and writers of a Datomic, datascript or XTDB attribute. Question: who writes `:order/bid` in mount's
-example app?
-
-```
-DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
-counts: writers=2 [S2]
-note: data_attributes: switched on by datascript, datomic
-definition (1)
-  1. :order/bid  dev/clj/app/db.clj:33 [S]
-writers (2 S2)
-  1. app.nyse/add-order  dev/clj/app/nyse.clj:8 [S]
-  2. tapp.example/add-order  test/clj/tapp/example.clj:51 [S]
-readers: none (searched: proven read edges and unproven references)
-next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
-```
-
-### event_flow
-
-Dispatchers and handler of a re-frame event, or handler, inputs and subscribers of a subscription. A dispatch whose
-event is not a literal keyword is listed as UNKNOWN. Question: who dispatches `:delete-todo` in re-frame's todomvc?
-
-```
+```text
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -362,314 +207,221 @@ event :delete-todo: dispatched by (2 S2)
     2. todomvc.views/todo-item  examples/todomvc/src/todomvc/views.cljs:47 [S]
 event :delete-todo: handler (1)
   1. :delete-todo event handler  examples/todomvc/src/todomvc/events.cljs:188 [S]  entry: event handler
-event :delete-todo: handler dispatches: none (searched: dispatches edges out of the handler)
-event :delete-todo: handler requests: none (searched: issues_request edges out of the handler)
-next: tests_for(symbol=":delete-todo")
+[... trimmed ...]
 ```
 
-### tests_for
+The connection is through an event keyword, so callers of a named function alone would miss it.
 
-Unit tests that reach a definition, directly or up to depth 3. Question: which tests exercise
-`usermanager.model.user-manager/get-user-by-id`?
+</details>
 
-```
-TESTS_FOR usermanager.model.user-manager/get-user-by-id — 2 unit test(s) (2 direct, 0 transitive) and 0 browser test(s) reach it
-counts: clojure.test=2 [S2]
-note: static links only: tests reaching the target through multimethods, resolve/apply or HTTP fixtures are not counted; 0 tests means no static link, not untested
-note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
-note: callers continue beyond depth 3; tests further out are not listed
-note: run in (no component): usermanager.model.user-manager-test
-clojure.test (2 S2)
-  1. usermanager.model.user-manager-test/save-test  test/usermanager/model/user_manager_test.clj:49 [S]
-  2. usermanager.model.user-manager-test/user-test  test/usermanager/model/user_manager_test.clj:38 [S]
-browser tests: none (searched: selectors rendered and routes handled along the same callers)
-next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
+<details>
+<summary><strong>Turn changed lines into review context and related tests</strong></summary>
+
+From polylith-realworld:
+
+```text
+context_for_change {"changes": ["components/article/src/clojure/realworld/article/store.clj:60-80"]}
 ```
 
-### tests_covering
-
-Browser tests (Playwright page objects and tests, read with TypeScript 5 when it is installed beside clojure-atlas as
-the optional peer `typescript`; never the analyzed repo's copy) that reach a file, definition, selector or route. None of the example repos has them, and the answer says so. Question: which browser
-tests reach `mount.core/start`?
-
-```
-DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
-note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
-note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
-note: no browser test reaches this target through selectors, page objects or requests
-tests: none (searched: selector, page-object and request edges)
-```
-
-### key_flow
-
-Producers and consumers of one map key. Question: where is compojure's `:compojure/path` request key written and
-read?
-
-```
-KEY_FLOW :compojure/path — 1 producer(s), 2 consumer(s) in 1 component(s); 0 site(s) in tests
-counts: producers=1 [S1]  consumers=2 [S2]
-note: key_flow: switched on by keywords in code
-note: a key read or written only dynamically (held in a local, built with keyword, merged from another map) is not tracked
-producers (1)
-  1. compojure.middleware/assoc-path (assoc)  src/compojure/middleware.clj:20 [S]
-consumers (2 S2)
-  1. compojure.core/route-matches (keyword-fn)  src/compojure/core.clj:45 [S]
-  2. compojure.middleware/redirect-to-canonical (keyword-fn)  src/compojure/middleware.clj:15 [S]
-in tests: none
-```
-
-### key_siblings
-
-Rows of a literal map table that lack a key most sibling rows have. Question: is a row in re-frame's
-`test/re_frame/subs/alpha_test.cljs` table missing a key?
-
-```
-KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
-counts: findings=2 [H2]  tables=1 [S1]
-note: key_tables: switched on by map literals in code
-findings (2 H2)
-  1. queries: row :re-frame/q :re-frame.subs.alpha-test/map lacks :re-frame/lifecycle  test/re_frame/subs/alpha_test.cljs:21 [H]  heuristic match  (:re-frame/lifecycle: 3 of 4 sibling rows have it; the literal row lacks the key (proven); whether it should have it is a judgement)
-  2. queries: row :re-frame/query-v [:re-frame.subs.alpha-test/query-v _ _ _] lacks :re-frame/lifecycle  test/re_frame/subs/alpha_test.cljs:32 [H]  heuristic match  (:re-frame/lifecycle: 3 of 4 sibling rows have it; the literal row lacks the key (proven); whether it should have it is a judgement)
-tables (1)
-  1. queries  test/re_frame/subs/alpha_test.cljs:20 [S]  (5 map rows; :re-frame/q 5/5, :re-frame/lifecycle 3/5, :re-frame/query-v 1/5)
-next: key_flow(key=":re-frame/lifecycle")  callers(var="re-frame.subs.alpha-test/queries")
-```
-
-The missing key is proven; whether the row should have it is left to the reader.
-
-### context_for_change
-
-One call per review: changed symbols, callers outside the diff, routes, attributes, tests to run and tests to add.
-When a changed route has no extracted authorization, the risk is UNKNOWN, not LOW. A path that is not in the
-graph reads `no such file in the graph` and every section `not checked`; a malformed entry is rejected. Question: what does a change to lines 60-80 of polylith-realworld's article store touch?
-
-```
+```text
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
 counts: changed symbols=3 [S3]  callers outside the diff=9 [S9]  tests to run=24 [S24]
-risk: none (searched: routes without a check, writes to read attributes, entry points in other components)
-changed symbols (3 S3)
-  components/article: 3
-    1. clojure.realworld.article.store/delete-article!  components/article/src/clojure/realworld/article/store.clj:71 [S]
-    2. clojure.realworld.article.store/favorites-count  components/article/src/clojure/realworld/article/store.clj:58 [S]
-    3. clojure.realworld.article.store/update-article!  components/article/src/clojure/realworld/article/store.clj:65 [S]
-callers outside the diff (9 S9)
-  components/article: 9
-    1. clojure.realworld.article.core/article->visible-article  components/article/src/clojure/realworld/article/core.clj:13 [S]  fan-in 7
-    2. clojure.realworld.article.core/delete-article!  components/article/src/clojure/realworld/article/core.clj:73 [S]  fan-in 4
-    [... trimmed ...]
-tests to run (24 S24)
-  components/article: 24
-    1. clojure.realworld.article.store-test/delete-article!--test  components/article/test/clojure/realworld/article/store_test.clj:152 [S]
-    [... trimmed ...]
-tests to add: none (searched: changed definitions with no static test)
+[... trimmed ...]
 ```
 
-Every tool also takes `base` (the commit the agent is looking at), paging (`offset`, `limit`, `section`) and
-`group_by` (`component`, `file`, `none`). More transcripts are in [examples/README.md](examples/README.md).
+The full answer lists the three changed definitions, nine callers outside the diff and 24 related tests,
+grouped by component. `LOW` describes the checks the graph performed; it is not a safety guarantee.
 
-## Bands and absence
+</details>
 
-Every row has one band:
+[More real examples](examples/README.md) · [All tools and full transcripts](docs/GUIDE.md#tools)
 
-- **STATIC_PROVEN** `[S]`: the analyzer resolved both ends (clj-kondo resolved the var, or the literal form is in
-  the source).
-- **HEURISTIC** `[H]`: a name match, a threaded slot or a dispatch candidate. Open the cited line before acting on
-  it. Examples: a defmethod reached from its defmulti (the dispatch value picks the method at runtime), a key table
-  finding.
-- **UNKNOWN** `[?]`: cannot be decided statically, so it is listed as the boundary and never followed. Examples:
-  `binding` and `with-redefs` rebindings, an attribute keyword whose role (read or write) is unproven, an
-  `apply` or `partial` use in signature_impact.
+## Quick start
 
-`counts:` lines give the band totals, for example `callers=4 [S4]` or `findings=2 [H2]`.
+**Prerequisites:** Node.js **22.18+** and Git. No JVM or Babashka runtime is needed.
 
-An empty answer is never a bare empty list. It takes one of these forms:
+### 1. Install and build a graph
 
-- **none**: the thing exists and nothing relates to it. `callers: none (searched: call edges into this definition)`.
-- **not found**: the codebase has no such thing. `no definition matches "integrant.core/stop"`.
-- **capability off**: the graph cannot answer, because the adapter for that kind of fact found nothing to extract
-  or was not configured. `capability route_authz is absent: an empty answer is not proof of absence`. A section
-  that depends on it reads `not extracted (route_authz is absent)`, never "none". A middleware chain that cannot be
-  read reads `not extracted (UNKNOWN)`.
+Run from the root of the **Clojure project you want to analyze**:
 
-When the graph itself is incomplete, the build log, graph_info and every answer start with a `DEGRADED` line. It
-names files clj-kondo could not parse at all, files with syntax errors it recovered from (some forms may be
-missing), tracked files that were not read and why (a hidden or build folder, a symlink, a deleted file), files
-over 2 MB that were skipped (for an `.edn` file, its data, keys and config are missing), namespaces defined in more than
-one file (usages of them are HEURISTIC, via `duplicate-namespace`), and edges dropped because one end was not a
-node. A not-found name that probably lives in such a file names it. From shadow-cljs, where one file cannot be
-parsed:
+```sh
+# Install the reviewed source revision (Git installation builds the CLI).
+npm install --save-dev \
+  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
 
-```
-DEGRADED: 1 file(s) could not be parsed (src/dev/demo/test_fail.cljs), so their definitions and calls are missing; 2 file(s) have syntax errors but were analyzed (src/dev/demo/errors.cljs, src/main/shadow/cljs/devtools/config.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (demo.http) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS demo.test-fail/a-failing-test — no definition matches "demo.test-fail/a-failing-test"
-note: demo.test-fail/a-failing-test probably lives in src/dev/demo/test_fail.cljs, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
-note: use a fully qualified name (ns/name)
+npx clojure-atlas build
 ```
 
-From biff, whose file has syntax errors but was analyzed: the answer points first to a form clj-kondo could not
-read in that file, then to a macro, and keeps the spelling hint:
+The package is not currently published on npm; use the Git install above. Access to the repository is required
+while it is private. A source install uses TypeScript and Node type definitions to compile the CLI; these are
+build-time dependencies, separate from its zero required npm runtime dependencies.
 
-```
-DEGRADED: 1 file(s) have syntax errors but were analyzed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj); some forms in them may be missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
-note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably a form clj-kondo could not read in the file with syntax errors named below, or a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: com.biffweb.sqlite.impl.execute/execute may live in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible
-note: use a fully qualified name (ns/name)
-```
+The graph is saved to `.clojure-atlas/graph.json.gz`. The first build downloads and verifies the pinned
+clj-kondo binary; subsequent analysis uses the cached binary. Add `.clojure-atlas/` to your project's `.gitignore`.
 
-A not-found name that probably lives in a file whose clj-kondo run timed out, or in a file git tracks but the
-build did not analyze, names that file the same way.
+### 2. Connect your MCP client
 
-A name that is used but defined nowhere is usually made by a macro clj-kondo cannot expand. The answer says where
-it is used and what to add. From next.jdbc:
+For Claude Code, preview and then write the project configuration:
 
-```
-CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
-note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
-note: use a fully qualified name (ns/name)
+```sh
+npx clojure-atlas init         # preview .mcp.json
+npx clojure-atlas init --yes   # write it; keep existing servers
 ```
 
-Read a miss as a statement about coverage, not as proof that something does not exist.
+Enable the server in your client, then ask it to use `graph_info` and `callers` on a fully qualified `ns/name`
+from your project.
+
+<details>
+<summary><strong>Configure another MCP client</strong></summary>
+
+Atlas uses **MCP over stdio**. Configure the client to start it from your project root:
+
+```json
+{
+  "mcpServers": {
+    "clojure-atlas": {
+      "command": "npx",
+      "args": ["clojure-atlas", "mcp", "--graph", ".clojure-atlas/graph.json.gz", "--repo", "."]
+    }
+  }
+}
+```
+
+If the client starts servers elsewhere, use its working-directory setting or absolute paths for the installed
+CLI, graph and repository. Client configuration formats may differ.
+
+</details>
+
+### 3. Rebuild after changes
+
+```sh
+npx clojure-atlas build       # refresh the snapshot
+npx clojure-atlas coverage   # inspect resolution counts and unresolved names
+```
+
+There is no watch mode. With `--repo`, queries warn with `STALE` when the working tree no longer matches the
+graph. Restart the MCP server after rebuilding so it loads the new graph.
+
+**Already have clj-kondo configuration?** Atlas applies the project's `.clj-kondo/config.edn`, including its
+macro mappings and hooks. An optional `.clojure-atlas.edn` adds custom route macros and authorization rules.
+See [project configuration](docs/GUIDE.md#project-configuration) and the [authorization fixture](test/fixtures/authz/.clojure-atlas.edn).
+
+## How to read an answer
+
+| Marker | Meaning | How to use it |
+|---|---|---|
+| `[S]` — `STATIC_PROVEN` | Resolved by clj-kondo or established from a literal source form | Follow the cited source location |
+| `[H]` — `HEURISTIC` | Inferred from a name, wrapper, threaded slot or dispatch candidate | Verify the relationship in source |
+| `[?]` — `UNKNOWN` | Cannot be decided statically | Treat it as an analysis boundary |
+
+**An empty result is not automatically proof of absence.** Atlas distinguishes “none found”, “definition not
+found” and “capability not available”. `DEGRADED` warns about incomplete analysis; `STALE` warns about an outdated
+snapshot. A test count of zero means no static link was found, not that the code is untested.
+
+Dynamic dispatch, runtime-created symbols and project macros can limit what the graph sees. Unreadable
+middleware is reported as unknown. Route permissions need explicit project configuration.
+[Evidence and absence](docs/GUIDE.md#bands-and-absence) · [Known limits](docs/GUIDE.md#limits)
+
+## Local by design
+
+The core CLI has **no required npm runtime dependencies**. It uses Node's standard library, clj-kondo for
+Clojure analysis and Git for repository metadata. It builds and queries the graph locally, with no Atlas account,
+hosted index or cloud service required.
+
+### Requirements
+
+| Component | Role |
+|---|---|
+| Node.js 22.18+ | Runs the CLI and MCP server |
+| clj-kondo 2025.10.23 | Native analyzer; downloaded once and cached, with a pinned archive SHA-256 |
+| Git | Source installation, tracked-file checks and snapshot/staleness information |
+| TypeScript 5 — optional at runtime | Playwright page-object and test analysis; install with `npm i -D typescript@5` beside Atlas |
+
+Pinned binaries are available for macOS arm64/x64, Linux arm64/x64 and Windows x64. Development and corpus
+measurements used macOS arm64; **Windows is untested**. If the download is unavailable, including behind a
+proxy, Atlas can fall back to a working `clj-kondo` on `PATH`. [Platform and cache details](docs/GUIDE.md#requirements).
+
+### Security
+
+A small dependency surface helps, but **zero required npm dependencies does not mean zero supply-chain risk**.
+
+- Downloaded clj-kondo archives are checked against a pinned SHA-256. A mismatched download is refused; a
+  fallback executable from `PATH` is trusted separately and is not verified against that pinned archive hash.
+- Atlas does not launch the analyzed application's JVM, shell scripts or Node code. **Project clj-kondo hooks
+  are interpreted by clj-kondo**, so its configuration is part of the code you trust when analyzing a repository.
+- The MCP server reads the graph and uses read-only Git checks. Git command hooks, filter drivers and fsmonitor
+  are disabled for those checks; Git and clj-kondo subprocesses have timeouts.
+- Atlas serves results locally over stdio. Your chosen AI/MCP client's handling of those results is a separate
+  privacy boundary.
+
+These are implementation properties, not a security-audit certification. [Detailed execution model](docs/GUIDE.md#security).
 
 ## Coverage
 
-[docs/COVERAGE.md](docs/COVERAGE.md) measures 26 public repos, each pinned to a sha in
-[corpus.json](corpus.json). The headline metric is named **resolution rate**: of the var usages clj-kondo
-attributes to a project namespace, the share the graph links to a definition. Usages of library vars are not
-counted. Symbols clj-kondo cannot attribute to any namespace are reported as a raw count, **unknown namespace**,
-and kept out of the rate.
+Measured on **26 public repositories**, each pinned to a commit in [corpus.json](corpus.json). The corpus includes
+Babashka, Logseq, Metabase, Penpot, re-frame, Reitit and smaller libraries. The complete results are in
+[docs/COVERAGE.md](docs/COVERAGE.md).
 
-24 of 26 repos are at or above 95%. The two below:
+**Resolution rate measures one specific thing:** `resolved / (resolved + unresolved)` for var usages attributed
+to recognized project namespaces. Library usages and **unknown-namespace usages are outside that denominator**.
+It does not measure all code understood, all framework behavior extracted or runtime correctness.
 
-| repo | resolved | unresolved | resolution rate | unknown namespace |
-|---|---|---|---|---|
-| datascript | 4392 | 496 | 89.9% | 1255 |
+| Repository | Resolved | Unresolved | Resolution rate | Unknown namespace (raw count, excluded) |
+|---|---:|---:|---:|---:|
+| Integrant | 442 | 0 | 100.0% | 0 |
+| Babashka | 15,264 | 61 | 99.6% | 2,176 |
+| Metabase | 311,181 | 111 | 100.0% | 9,522 |
+| DataScript | 4,392 | 496 | 89.9% | 1,255 |
 | day-of-datomic | 84 | 29 | 74.3% | 1 |
 
-The doc explains them as written there:
+Rates are rounded to one decimal. Always read them alongside **both** unresolved and unknown-namespace counts.
+Unknown names can include locals bound by unfamiliar macros as well as missed var usages; the analyzer cannot
+reliably separate them.
 
-> **unresolved**: a var created by a project macro clj-kondo does not know (datascript's record constructors), or
-> a name in a REPL script with no ns form that clj-kondo files under a namespace not defining it (day-of-datomic's
-> tutorials).
+**Metric changes are not analyzer improvements.** Earlier figures used a different denominator. Babashka's
+higher reported rate largely reflects the exclusion of unknown-namespace symbols, not newly resolved code.
+Comparisons across those definitions are not like-for-like; the raw counts above remain visible on purpose.
 
-Six more repos are listed because their unknown-namespace count is above 5% of resolved: babashka, cider-nrepl,
-fulcro, pedestal, shadow-cljs and usermanager. The table prints one decimal, so 100.0% can still hold a few
-unresolved usages (metabase 111, penpot 13, xtdb-v1 3). Both kinds shrink when a repo ships a clj-kondo config for
-its macros, or names them under `:lint-as` in `.clojure-atlas.edn`. The corpus is measured without adding either.
+### Actual extraction improvements
 
-## Benchmark
+These are concrete changes in what Atlas can read, separate from the resolution-rate definition:
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) has 21 questions about corpus repos. Each expected answer was checked by
-hand in the source, without the tool, and its file:line is in [bench/questions.json](bench/questions.json).
+| Improvement | Observable result | Evidence |
+|---|---|---|
+| Read outer Ring/Compojure middleware | polylith-realworld: **0 → 11** middleware entries for `POST /api/articles` | [Benchmark q13](docs/BENCHMARK.md#positive-questions), [fixture](test/fixtures/ring-middleware/) |
+| Read frontend route tables in another namespace | Logseq: **0 → 17** client-route nodes | [Coverage](docs/COVERAGE.md), [benchmark q14](docs/BENCHMARK.md#positive-questions) |
+| Recognize `re-frame.alpha` | Registrations and dispatches through the alpha namespace are extracted | [Benchmark history](docs/BENCHMARK.md), [fixture](test/fixtures/reframe/src/app/alpha.cljs) |
+| Apply the project's clj-kondo config | Project macro mappings and hooks participate in analysis | [Configuration fixture](test/fixtures/project-config/), [tests](test/config.test.ts) |
 
-- **Positive questions: 14 of 14 pass.** A question passes when the answer names every expected definition and
-  nothing else. Expected items found: 40 of 40; items answered: 40.
-- **Absence questions: 7 of 7 pass.** The correct answer is that there is none (*none*, *not-found*,
-  *used-undefined* or *capability-off*), and the answer must state that kind of absence and name nothing.
+### Benchmark
 
-The first twelve positive questions were fixed before the first run, which scored 11 of 12. The miss (re-frame
-registrations through `re-frame.alpha`) was fixed in the builder with a fixture, and the question was kept as it
-was. Two questions were added later, for the compojure middleware chain (q13) and a reitit frontend route (q14).
-No MCP tool lists client routes, so q14 is scored by reading the graph's nodes directly: 13 of the 14 positive
-answers come from a tool.
-
-## Requirements
-
-- Node.js 22.18 or newer. No JVM, no babashka, no global install.
-- On the first `build`, clj-kondo 2025.10.23 is downloaded once from the
-  [official clj-kondo release](https://github.com/clj-kondo/clj-kondo/releases), checked against a pinned sha256,
-  and cached in `$XDG_CACHE_HOME/clojure-atlas` (default `~/.cache/clojure-atlas`; `%LOCALAPPDATA%\clojure-atlas` on
-  Windows). The first run prints:
-
-  ```
-  clojure-atlas: downloading clj-kondo 2025.10.23 (macos-aarch64) once, to <cache>/clojure-atlas/clj-kondo-2025.10.23-macos-aarch64/clj-kondo
-  ```
-
-- Offline, or behind a proxy: put `clj-kondo` on your PATH. Node's `fetch` ignores `HTTPS_PROXY`, so the download
-  fails behind a proxy, and clojure-atlas then uses the clj-kondo on PATH. A download with a wrong sha256 is
-  refused, never run.
-- Optional: TypeScript 5 (`npm i -D typescript@5` beside clojure-atlas) to read Playwright page objects and tests.
-  It is an optional peer dependency. Without it, that reading is off, and graph_info and the browser test answers
-  say why for each Playwright project found.
-- Platforms with a pinned clj-kondo binary: macOS arm64, macOS x64, Linux x64, Linux arm64, Windows x64. Any other
-  platform needs clj-kondo on PATH. This release was developed and measured on macOS arm64. Windows is untested.
-
-## Security
-
-The build reads files. It runs only clj-kondo (the pinned binary, or the one on PATH) and `git ls-files`, and it
-never runs code of the analyzed repository with Node, a JVM or a shell. TypeScript is loaded from clojure-atlas's own
-install, never from the analyzed repository. clj-kondo applies the project's `.clj-kondo` config; hooks declared
-there are interpreted by clj-kondo itself, as in any editor that runs clj-kondo. The MCP server only reads the graph
-file and, with `--repo`, runs read-only git commands. Every git call ignores the repository's own settings that run
-commands (`core.fsmonitor`, filter drivers, hooks), never prompts, and has a timeout. Each clj-kondo run has a timeout
-too: a hook that never returns costs its batch (listed under DEGRADED), not the build. Git never runs inside a
-submodule (whose own config clojure-atlas cannot switch off), so a submodule's files always count as changed. Both
-programs are started from an absolute path found on PATH, never from the analyzed directory, and the project's
-`:output` and `:analysis` clj-kondo settings are replaced by the ones the graph needs.
-
-## Why TypeScript?
-
-Because `npx` just works: no JVM to install and nothing to compile on the user's machine. The Clojure analysis
-itself is done by clj-kondo; clojure-atlas reads its output and the source forms, and builds the graph. Adapter
-contributions are welcome in either language: an adapter is defined by a small Clojure fixture and the graph rows
-expected from it, so you can describe a library's semantics in Clojure and someone can port it, or write the
-TypeScript yourself.
-
-## Limits
-
-- **Static only.** A var resolved at runtime is not followed. `requiring-resolve`, `resolve` or `ns-resolve` of a
-  literal symbol is a HEURISTIC reference; a symbol built at runtime, or a function chosen by data, is not, and
-  callers and blast_radius say so when the project resolves vars dynamically. A map key read or written only dynamically is not tracked. Tests that reach code through
-  multimethods, `resolve`/`apply` or HTTP fixtures are not counted.
-- **Heuristic parts**: multimethod and protocol dispatch (`may_dispatch_to`), some compojure handlers (shown as
-  `heuristic match`), compojure and Ring middleware chains, middleware factory calls, reitit frontend route tables
-  in namespaces that do not require reitit (read when `reitit.frontend` is used anywhere in the project), vars
-  named in syntax-quoted macro bodies, usages inside a project macro clj-kondo cannot expand (via
-  `unexpanded-macro`), usages of a namespace defined in more than one file (via `duplicate-namespace`), threaded
-  key slots, query literals outside a transact or query call, key_siblings findings.
-- **Project macros**: clj-kondo expands a macro only when the project's `.clj-kondo` config gives it a `:lint-as`
-  or a hook (or `.clojure-atlas.edn` names it under `:lint-as`). Add one and rebuild, and the usages inside it are
-  STATIC_PROVEN again. See [Project configuration](#project-configuration).
-- **Middleware whose wrapping cannot be read** is reported as `middleware: not extracted (UNKNOWN)`, not as
-  "none".
-- **Unparsable files and files over 2 MB**: their definitions and calls are missing from the graph. Every answer
-  then starts with a `DEGRADED` line naming them.
-- **Pedestal service-map interceptors** are not read, so the middleware of every pedestal route is UNKNOWN.
-- **Route authorization** needs `.clojure-atlas.edn`. Without it, route_authz says "not provable" and
-  permission_routes reports the capability as absent.
-- **Not supported yet**: bidi routes, compojure-api, pedestal verbose map routes, malli registries, integrant
-  systems without refs. See [ROADMAP.md](ROADMAP.md).
-- **datascript and day-of-datomic** resolve less (89.9% and 74.3%): datascript defines record constructors through
-  a macro clj-kondo does not know; day-of-datomic's tutorials are REPL scripts without an ns form. See
-  [Coverage](#coverage).
-- **Unknown-namespace symbols** (locals bound by unknown macros, fields of deftype or proxy) are counted, not
-  linked.
-- **No incremental build or watch.** Rebuild after a change; the server warns with `STALE` when it can tell.
-- **Windows is untested.** Proxies are not supported for the clj-kondo download.
+The recorded benchmark passes **14/14 positive questions** and **7/7 absence questions**, with expected answers
+checked by hand against source. It is a small regression benchmark, not a general accuracy estimate. Thirteen
+positive answers use MCP tools; the client-route question reads graph nodes directly because no tool lists
+client routes yet. [Questions, results and methodology](docs/BENCHMARK.md).
 
 ## Contributing
 
+**Let's build our Clojure X-ray tool together!**
+
+A useful contribution can start with a tiny Clojure example: “this library connects these two things, and Atlas
+should see it.” Add a fixture and the expected graph rows, or help implement its adapter. Both are welcome.
+
 ```sh
 npm ci
-npm test                                    # all tests
-npm run test:coverage                       # the gate: 98% line coverage of src/
+npm test
+npm run test:coverage   # 98% source line-coverage gate
 npm run typecheck
-node scripts/coverage.ts <corpus-dir>       # rebuilds docs/COVERAGE.md from clones at the corpus.json shas
-node bench/score.ts <corpus-dir>            # scores the benchmark questions
 ```
 
-To add or extend an adapter, start with a fixture: a small Clojure codebase under `test/fixtures/<name>/` and an
-`expected.txt` with every graph row it must produce, reviewed against the source by hand. List it in
-`test/build-fixtures.test.ts`, then write the adapter in `src/build/adapters/` until the rows match. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+The CLI is written in TypeScript for straightforward Node distribution; clj-kondo performs the Clojure analysis.
+[Contributor guide](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Tool reference](docs/GUIDE.md)
 
-## Credits
+## Credits and license
 
-- [clj-kondo](https://github.com/clj-kondo/clj-kondo) by Michiel Borkent does the Clojure analysis.
-- [Model Context Protocol](https://modelcontextprotocol.io) is how agents talk to the server.
-- The corpus repos and their authors, whose public code the coverage and benchmark are measured on.
+Created by **Barış Can Ateş**. [MIT licensed](LICENSE), including the documentation and original artwork in this
+repository. Built on **[clj-kondo](https://github.com/clj-kondo/clj-kondo)** by Michiel Borkent, with
+**[MCP](https://modelcontextprotocol.io)** as the interface to coding agents. Thanks to the authors of the public
+projects used in the corpus and examples. Those projects and dependencies retain their own licenses.
 
-## License
-
-MIT. See [LICENSE](LICENSE). Created by Barış Can Ateş.
+*For the sake of all Clojurians.*

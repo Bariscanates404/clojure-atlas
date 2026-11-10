@@ -1,5 +1,7 @@
 # clojure-atlas
 
+> Consulta las funciones, tecnologías compatibles, instalación y modelo de seguridad actuales en el [README principal](README.md). El paquete aún no está publicado en npm; la instalación siguiente usa Git y requiere acceso mientras el repositorio sea privado.
+
 **For the sake of all Clojurians.**
 
 *Por el bien de todos los Clojurians.*
@@ -22,7 +24,8 @@ respuesta vacía indica qué se buscó y si el grafo puede saberlo siquiera.
 ## Inicio rápido
 
 ```sh
-npm i -D clojure-atlas
+npm install --save-dev \
+  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
 npx clojure-atlas build
 npx clojure-atlas init
 ```

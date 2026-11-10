@@ -1,5 +1,7 @@
 # clojure-atlas
 
+> 最新功能、支持的技术、安装方式和安全模型请参阅[主 README](README.md)。此软件包尚未发布到 npm，以下命令通过 Git 安装；仓库为私有状态时需要访问权限。
+
 **For the sake of all Clojurians.**
 
 *为了所有 Clojurian。*
@@ -22,7 +24,8 @@ Clojure、ClojureScript 或 .cljc 代码库的结构图，以 MCP 工具的形�
 ## 快速开始
 
 ```sh
-npm i -D clojure-atlas
+npm install --save-dev \
+  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
 npx clojure-atlas build
 npx clojure-atlas init
 ```
