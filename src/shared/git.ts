@@ -11,9 +11,15 @@
 //    device, and GIT_OPTIONAL_LOCKS=0 stops status writing the index at all.
 //  - diff.external, diff.<driver>.textconv, core.pager, core.editor, credential/ssh/proxy settings belong to diff,
 //    pagers, editors and network commands, which atlas never runs (stdout is a pipe, so no pager starts anyway).
+//  - submodules: a submodule has its own config under .git/modules, which atlas cannot switch off, so no atlas call may
+//    run git inside one. status gets --ignore-submodules=all (see snapshot.ts); ls-files, rev-parse, rev-list and
+//    check-ignore never enter a submodule unless asked to (--recurse-submodules), which atlas never does.
+//  - the program: git is spawned from an absolute path found by searching PATH here (executable.ts), never from the
+//    analyzed directory, where Windows would look first.
 // GIT_TERMINAL_PROMPT=0 makes any credential question fail instead of waiting, and a timeout bounds every call.
 import { execFileSync } from 'node:child_process';
 import { devNull } from 'node:os';
+import { whichExecutable } from './executable.ts';
 
 export const SAFE_GIT_CONFIG = ['core.fsmonitor=false', 'core.untrackedCache=false', `core.hooksPath=${devNull}`];
 
@@ -27,15 +33,32 @@ export interface GitOptions {
   timeoutMs?: number;
 }
 
+const located = new Map<string, string | null>();
+
+// The absolute path of git for runs in `root`, found once per directory and PATH.
+function gitProgram(root: string): string | null {
+  const key = `${root}\0${process.env.PATH ?? ''}`;
+  if (!located.has(key)) located.set(key, whichExecutable('git', [root, process.cwd()]));
+  return located.get(key) ?? null;
+}
+
 function exec(root: string, args: string[], config: readonly string[], opts: GitOptions): string {
-  return execFileSync('git', [...overrides(config), '-C', root, ...args], {
-    encoding: 'utf8',
-    input: opts.input,
-    maxBuffer: 1 << 30,
-    timeout: opts.timeoutMs ?? GIT_TIMEOUT_MS,
-    env: { ...process.env, ...ENV },
-    stdio: [opts.input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'],
-  });
+  const program = gitProgram(root);
+  if (program === null) throw new Error('git is not installed or not on PATH');
+  try {
+    return execFileSync(program, [...overrides(config), '-C', root, ...args], {
+      encoding: 'utf8',
+      input: opts.input,
+      maxBuffer: 1 << 30,
+      timeout: opts.timeoutMs ?? GIT_TIMEOUT_MS,
+      env: { ...process.env, ...ENV },
+      stdio: [opts.input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'],
+    });
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException & { status?: number | null; signal?: string | null };
+    const how = e.code === 'ETIMEDOUT' ? 'timed out' : e.status != null ? `exited ${e.status}` : `failed (${e.code ?? e.signal ?? 'unknown'})`;
+    throw new Error(`git ${args[0]} ${how}`);
+  }
 }
 
 // Overrides that switch off every filter driver the repository's config defines.

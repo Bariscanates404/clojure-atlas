@@ -47,7 +47,8 @@ function zipOf(files: [string, Buffer, boolean][]): Buffer {
 }
 
 const cache = mkdtempSync(path.join(tmpdir(), 'atlas-kondo-'));
-after(() => rmSync(cache, { recursive: true, force: true }));
+const work = mkdtempSync(path.join(tmpdir(), 'atlas-kondo-work-'));
+after(() => { rmSync(cache, { recursive: true, force: true }); rmSync(work, { recursive: true, force: true }); });
 
 const release = zipOf([['clj-kondo', Buffer.from('#!/bin/sh\n'), true]]);
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
@@ -61,6 +62,7 @@ function host(over: Partial<KondoHost> & { runs?: string[]; dir: string }) {
       log.downloads.push(url);
       return release;
     },
+    resolve: (name) => name,
     version: (cmd) => ((over.runs ?? []).some((r) => cmd.endsWith(r)) ? `clj-kondo v-${path.basename(path.dirname(cmd))}` : null),
     warn: (m) => log.warnings.push(m),
     ...over,
@@ -239,18 +241,38 @@ describe('chunking the command line', () => {
 
 describe('analyze', () => {
   it('stops with the command when it cannot start, and with the exit code when it prints no analysis', async () => {
-    await assert.rejects(analyze(path.join(cache, 'no-such-kondo'), cache, ['a.clj'], {}), /cannot run .*no-such-kondo: spawn .* ENOENT/);
+    await assert.rejects(analyze(path.join(cache, 'no-such-kondo'), work, ['a.clj'], {}), /cannot run .*no-such-kondo: spawn .* ENOENT/);
     const silent = path.join(cache, 'silent-kondo');
     writeFileSync(silent, '#!/bin/sh\necho "WARNING: noise" >&2\necho "it broke" >&2\nexit 7\n', { mode: 0o755 });
-    await assert.rejects(analyze(silent, cache, ['a.clj', 'b.clj'], {}), /clj-kondo exited 7 without analysis on 2 file\(s\) from a\.clj: stderr: it broke$/);
+    await assert.rejects(analyze(silent, work, ['a.clj', 'b.clj'], {}), /clj-kondo exited 7 without analysis on 2 file\(s\) from a\.clj: stderr: it broke$/);
   });
 
   it('puts what kondo printed to stdout into the reason, and says so when it printed nothing', async () => {
     const chatty = path.join(cache, 'chatty-kondo');
     writeFileSync(chatty, '#!/bin/sh\necho "hook says hello"\nexit 0\n', { mode: 0o755 });
-    await assert.rejects(analyze(chatty, cache, ['a.clj'], {}), /clj-kondo exited 0 without analysis on 1 file\(s\) from a\.clj: stdout: hook says hello$/);
+    await assert.rejects(analyze(chatty, work, ['a.clj'], {}), /clj-kondo exited 0 without analysis on 1 file\(s\) from a\.clj: stdout: hook says hello$/);
     const mute = path.join(cache, 'mute-kondo');
     writeFileSync(mute, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-    await assert.rejects(analyze(mute, cache, ['a.clj'], {}), /from a\.clj: no output$/);
+    await assert.rejects(analyze(mute, work, ['a.clj'], {}), /from a\.clj: no output$/);
+  });
+});
+
+describe('clj-kondo from PATH', () => {
+  it('is spawned from the absolute path found on PATH, never by bare name', async () => {
+    const { h, log } = host({ dir: 'abs', platform: 'plan9', runs: ['clj-kondo'], resolve: (n) => `/opt/bin/${n}` });
+    const k = await locateKondo(h);
+    assert.equal(k.command, '/opt/bin/clj-kondo');
+    assert.match(log.warnings.join('\n'), /using clj-kondo on PATH \(\/opt\/bin\/clj-kondo, /);
+  });
+  it('is not used when PATH has none (a planted one in the working directory does not count)', async () => {
+    await assert.rejects(locateKondo(host({ dir: 'absnone', platform: 'plan9', runs: ['clj-kondo'], resolve: () => null }).h), /no native release for plan9-x1, and there is no clj-kondo on PATH/);
+  });
+  it('looks for clj-kondo.exe on Windows', async () => {
+    const asked: string[] = [];
+    await locateKondo(host({ dir: 'absexe', platform: 'win32', arch: 'zz', runs: ['.exe'], resolve: (n) => { asked.push(n); return `C:\\k\\${n}`; } }).h);
+    assert.deepEqual(asked, ['clj-kondo.exe']);
+  });
+  it('the real host resolves through PATH', () => {
+    assert.equal(HOST.resolve('definitely-not-a-program-xyz'), null);
   });
 });

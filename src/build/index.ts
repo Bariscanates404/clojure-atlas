@@ -24,11 +24,12 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
   const configFile = path.join(root, CONFIG_FILE);
   const config = existsSync(configFile) ? parseConfig(readFileSync(configFile, 'utf8')) : EMPTY_CONFIG;
   const k = await kondo();
-  const { analysis, timedOut } = await analyze(k.command, root, files.sources, effectiveLintAs(projectKnownSymbols(root), config.lintAs), kondoOptions);
+  const known = projectKnownSymbols(root);
+  const { analysis, timedOut } = await analyze(k.command, root, files.sources, effectiveLintAs(known, config.lintAs), kondoOptions);
   const sources = new Map<string, string>();
   for (const f of [...files.sources, ...files.edn]) sources.set(f, readFileSync(path.join(root, f), 'utf8'));
   const playwright = readTs(root, files.packageJsons, files.typescript);
-  const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f), projectKnownSymbols(root));
+  const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f), known);
   const tracked = trackedSources(root, files);
   const snap = snapshotOf(root, analyzerVersion(k.version));
   const doc = assemble(ctx, ADAPTERS, {
@@ -37,7 +38,7 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
   }, {
     expected: tracked.expected, sources: files.sources.length, edn: files.edn.length,
     skipped_large: files.skippedLarge.length, skipped_large_names: files.skippedLarge,
-    unread: tracked.unread.length, unread_names: tracked.unread, timed_out: timedOut.length, timed_out_names: timedOut,
+    unread: tracked.unread.length, unread_names: tracked.unread, unread_why: tracked.unreadWhy, timed_out: timedOut.length, timed_out_names: timedOut,
   });
   doc.stats.build_ms = Date.now() - started;
   return doc;

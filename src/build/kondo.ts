@@ -4,6 +4,7 @@
 // for: clj-kondo 2025.10.23 fails to encode them as JSON on some codebases.
 import { spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
+import path from 'node:path';
 import { concat, normalize, type Analysis } from './analysis.ts';
 
 // Library macros that define a var but that clj-kondo does not know without the library's exported config, and
@@ -22,10 +23,35 @@ export function effectiveLintAs(projectKnown: ReadonlySet<string>, declared: Rec
   return { ...Object.fromEntries(builtIns), ...declared };
 }
 
-const config = (lintAs: Record<string, string>) => `{:output {:format :json}
+// :output and :analysis replace the project's own (^:replace), as :linters does: a project that sets
+// {:output {:canonical-paths true}} would turn every path absolute, {:output {:exclude-files ...}} or
+// {:analysis {:var-usages false}} would silently thin the analysis. Keys left out take kondo's defaults
+// (canonical-paths off, no file filters, var usages and definitions on); canonical-paths is written out anyway.
+export const config = (lintAs: Record<string, string>) => `{:output ^:replace {:format :json :canonical-paths false}
  :lint-as {${Object.entries(lintAs).map(([k, v]) => `${k} ${v}`).join(' ')}}
  :linters ^:replace {:syntax {:level :error}}
- :analysis {:keywords true :context true :protocol-impls true :locals false}}`;
+ :analysis ^:replace {:keywords true :context true :protocol-impls true :locals false}}`;
+
+// A file name that starts with `-` would be read as an option; `./` keeps it a file. kondo reports it back as given.
+export const asArgument = (file: string): string => (file.startsWith('-') ? `./${file}` : file);
+
+// Every path in the analysis must be relative to the repository: the graph is keyed by them, and an absolute path
+// would also leak the local directory. kondo echoes a name it was given as `./name`; that prefix is removed. Anything
+// absolute stops the build with the reason.
+export function requireRelativePaths(json: Record<string, unknown>, from: string): void {
+  const records = [json.findings, ...Object.values((json.analysis ?? {}) as Record<string, unknown>)];
+  for (const list of records) {
+    if (!Array.isArray(list)) continue;
+    for (const r of list as Array<Record<string, unknown>>) {
+      const f = r?.filename;
+      if (typeof f !== 'string') continue;
+      if (path.posix.isAbsolute(f) || path.win32.isAbsolute(f)) {
+        throw new Error(`clj-kondo reported the absolute path ${f} for files from ${from}; atlas needs paths relative to the repository (is :output :canonical-paths forced on somewhere?)`);
+      }
+      if (f.startsWith('./')) r.filename = f.slice(2);
+    }
+  }
+}
 
 const CHUNK = 300;
 // Windows refuses a command line over 32767 characters; the file names get most of that.
@@ -73,7 +99,7 @@ export function analysisJson(text: string): Record<string, unknown> | null {
 
 function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>, timeoutMs: number): Promise<Analysis> {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, ['--repro', '--cache', 'false', '--parallel', '--config', config(lintAs), '--lint', ...files], {
+    const child = spawn(cmd, ['--repro', '--cache', 'false', '--parallel', '--config', config(lintAs), '--lint', ...files.map(asArgument)], {
       cwd: root,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -105,6 +131,12 @@ function runChunk(cmd: string, root: string, files: string[], lintAs: Record<str
         reject(new Error(`clj-kondo exited ${code} without analysis on ${files.length} file(s) from ${files[0]}: ${why}`));
         return;
       }
+      try {
+        requireRelativePaths(json, files[0]);
+      } catch (e) {
+        reject(e);
+        return;
+      }
       resolve(normalize(json));
     });
   });
@@ -123,6 +155,10 @@ export interface Analyzed {
 }
 
 export async function analyze(cmd: string, root: string, files: string[], lintAs: Record<string, string>, opts: AnalyzeOptions = {}): Promise<Analyzed> {
+  const rel = path.relative(root, cmd);
+  if (path.isAbsolute(cmd) && rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+    throw new Error(`clj-kondo resolved to ${cmd}, inside the analyzed repository; atlas never runs a program from there`);
+  }
   const chunks = chunkFiles(files, opts.maxFilesPerRun);
   const lanes = Math.max(1, Math.min(chunks.length, Math.floor(availableParallelism() / 2)));
   const results: Analysis[] = new Array(chunks.length);

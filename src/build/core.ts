@@ -7,6 +7,7 @@ import type { NsUse, VarDef, VarUse } from './analysis.ts';
 import { defId, groupBy, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Owner, type Rows } from './model.ts';
 import { formAt, kids, textOf } from './reader.ts';
 import { assertionHeads, classify } from './relations.ts';
+import { dynamicResolutions } from './dynamic.ts';
 import { callArgs, signatureOf, type Arity } from './signatures.ts';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
@@ -25,6 +26,8 @@ export interface UsageStats {
   // where a qualified name was used that no definition matches (a project name never defined, or a bare symbol that
   // resolved nowhere in its namespace), as file:line, at most SITES_PER_NAME each: the MCP answers "probably a macro" from it
   unresolvedSites: Record<string, string[]>;
+  // uses of requiring-resolve, resolve and ns-resolve, and how many of them name a project var by a literal symbol (recorded as references)
+  dynamicResolve: { sites: number; literal: number };
 }
 
 const SITES_PER_NAME = 5;
@@ -128,7 +131,7 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     }
   }
 
-  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [], unresolvedSites: {} };
+  const stats: UsageStats = { notVars: 0, resolved: 0, unresolved: 0, unknown: 0, external: 0, topUnresolved: [], topUnknown: [], unresolvedSites: {}, dynamicResolve: { sites: 0, literal: 0 } };
   const unresolved = new Map<string, number>();
   const unknown = new Map<string, number>();
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
@@ -180,6 +183,12 @@ export function core(ctx: Context, owner: Owner): Rows & { stats: UsageStats } {
     link(owner({ ...u, row: u.nameRow, col: u.nameCol }), defId(full), rel.kind, rel.band, u, Object.keys(attrs).length ? attrs : undefined);
   };
   for (const u of ctx.analysis.varUses) usage(u);
+  for (const { use, full } of dynamicResolutions(ctx)) {
+    stats.dynamicResolve.sites++;
+    if (!full) continue;
+    stats.dynamicResolve.literal++;
+    link(owner({ ...use, row: use.nameRow, col: use.nameCol }), defId(full), 'references', 'heuristic', use, { via: use.name });
+  }
 
   stats.topUnresolved = top(unresolved);
   stats.topUnknown = top(unknown);

@@ -67,3 +67,90 @@ describe('git never runs a command the analyzed repository configures', () => {
     assert.equal(readFileSync(path.join(repo, '.git/config'), 'utf8').includes('fsmonitor'), true);
   });
 });
+
+// A submodule has its own config under .git/modules, which the top-level overrides do not reach: nothing atlas runs
+// may start git inside one.
+describe('git never runs a command a submodule configures', () => {
+  const sdir = mkdtempSync(path.join(tmpdir(), 'atlas-submod-'));
+  const upstream = path.join(sdir, 'upstream');
+  const top = path.join(sdir, 'top');
+  const smarks = path.join(sdir, 'marks');
+  const NAMES = ['fsmonitor', 'clean', 'process', 'smudge', 'hook'];
+  const sm = (name: string) => path.join(smarks, name);
+  const inTop = (...args: string[]) => execFileSync('git', ['-C', top, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'protocol.file.allow=always', ...args], { stdio: 'ignore' });
+  const subConfig = path.join(top, '.git/modules/sub/config');
+  before(() => {
+    mkdirSync(smarks);
+    mkdirSync(upstream);
+    writeFileSync(path.join(upstream, 'lib.clj'), '(ns lib)\n');
+    writeFileSync(path.join(upstream, '.gitattributes'), '*.clj filter=evil\n');
+    for (const args of [['init', '-q'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'u']]) execFileSync('git', ['-C', upstream, ...args], { stdio: 'ignore' });
+    mkdirSync(top);
+    writeFileSync(path.join(top, 'a.clj'), '(ns a)\n');
+    inTop('init', '-q');
+    inTop('submodule', 'add', '-q', upstream, 'sub');
+    inTop('add', '-A');
+    inTop('commit', '-qm', 'top');
+    const cfg = (k: string, v: string) => execFileSync('git', ['config', '-f', subConfig, k, v]);
+    cfg('core.fsmonitor', `touch ${sm('fsmonitor')}; echo`);
+    cfg('filter.evil.clean', `touch ${sm('clean')}; cat`);
+    cfg('filter.evil.process', `touch ${sm('process')}`);
+    cfg('filter.evil.smudge', `touch ${sm('smudge')}; cat`);
+    const hooks = path.join(top, '.git/modules/sub/hooks');
+    mkdirSync(hooks, { recursive: true });
+    writeFileSync(path.join(hooks, 'post-index-change'), `#!/bin/sh\ntouch ${sm('hook')}\n`, { mode: 0o755 });
+    const later = new Date(Date.now() + 5000);
+    utimesSync(path.join(top, 'sub/lib.clj'), later, later);
+  });
+  after(() => rmSync(sdir, { recursive: true, force: true }));
+  beforeEach(() => { for (const n of NAMES) rmSync(sm(n), { force: true }); });
+  const smarked = () => NAMES.filter((n) => existsSync(sm(n)));
+
+  it('snapshotOf (build and every MCP call) starts nothing, and a changed submodule file changes the snapshot', () => {
+    const before = snapshotOf(top, 'x');
+    assert.deepEqual(smarked(), []);
+    writeFileSync(path.join(top, 'sub/lib.clj'), '(ns lib) ; edited\n');
+    const after = snapshotOf(top, 'x');
+    assert.deepEqual(smarked(), []);
+    assert.notEqual(after.id, before.id);
+    assert.ok(after.dirty.some(([f]) => f === 'sub/lib.clj'));
+  });
+  it('the commit distance and the expected-file count start nothing', () => {
+    const sha = execFileSync('git', ['-C', top, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    gitDistance(top)(sha, sha);
+    trackedSources(top, listFiles(top));
+    assert.deepEqual(smarked(), []);
+  });
+});
+
+describe('a directory that is not a git checkout', () => {
+  it('is reported in one human line, without the git command line', () => {
+    const plain = mkdtempSync(path.join(tmpdir(), 'atlas-nogit-'));
+    writeFileSync(path.join(plain, 'a.clj'), '(ns a)\n');
+    const lines: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string) => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    try {
+      trackedSources(plain, listFiles(plain));
+    } finally {
+      process.stderr.write = write;
+      rmSync(plain, { recursive: true, force: true });
+    }
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^clojure-atlas: .* is not a git checkout \(git ls-files exited 128\); expected files = files listed\n$/);
+    assert.ok(!lines[0].includes('-c core') && !lines[0].includes('Command failed'));
+  });
+  it('a missing git is named as such', () => {
+    const saved = process.env.PATH;
+    process.env.PATH = '/nonexistent-dir';
+    try {
+      assert.throws(() => runGit(repo, ['rev-parse', 'HEAD']), /^Error: git is not installed or not on PATH$/);
+      assert.equal(git(repo, ['rev-parse', 'HEAD']), null);
+    } finally {
+      process.env.PATH = saved;
+    }
+  });
+  it('reports a timeout and a signal in words', () => {
+    assert.throws(() => runGit(repo, ['rev-parse', 'HEAD'], { timeoutMs: 1 }), /^Error: git rev-parse (timed out|exited \d+)$/);
+  });
+});

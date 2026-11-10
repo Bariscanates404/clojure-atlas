@@ -508,7 +508,10 @@ install, never from the analyzed repository. clj-kondo applies the project's `.c
 there are interpreted by clj-kondo itself, as in any editor that runs clj-kondo. The MCP server only reads the graph
 file and, with `--repo`, runs read-only git commands. Every git call ignores the repository's own settings that run
 commands (`core.fsmonitor`, filter drivers, hooks), never prompts, and has a timeout. Each clj-kondo run has a timeout
-too: a hook that never returns costs its batch (listed under DEGRADED), not the build.
+too: a hook that never returns costs its batch (listed under DEGRADED), not the build. Git never runs inside a
+submodule (whose own config clojure-atlas cannot switch off), so a submodule's files always count as changed. Both
+programs are started from an absolute path found on PATH, never from the analyzed directory, and the project's
+`:output` and `:analysis` clj-kondo settings are replaced by the ones the graph needs.
 
 ## Why TypeScript?
 

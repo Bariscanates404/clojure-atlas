@@ -138,6 +138,12 @@ function readFileList(root: string): string[] {
   return [...f.sources, ...f.edn, ...f.typescript, ...f.packageJsons];
 }
 
+// The submodules (gitlinks) of the tree, relative to `root`. `ls-files -s` reads the index and never enters one.
+export function submodulePaths(root: string): string[] {
+  const staged = git(root, ['ls-files', '-s', '-z', '--', '.']);
+  return (staged ?? '').split('\0').filter((e) => e.startsWith('160000 ')).map((e) => e.slice(e.indexOf('\t') + 1));
+}
+
 // The read files git ignores and does not track, which `git status` never lists. A tracked file is never one of them,
 // so only the untracked ones are put to check-ignore: asking about every file of a large repository costs seconds.
 export function ignoredAmong(root: string, files: readonly string[]): string[] {
@@ -165,9 +171,12 @@ export function snapshotOf(root: string, analyzer: string): Snapshot {
     sha = git(root, ['rev-parse', 'HEAD'])?.trim() || sha;
     const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
     ref = branch && branch !== 'HEAD' ? branch : null;
-    const status = git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', '.']);
+    // --ignore-submodules=all: a submodule has its own config, which would run its filters and fsmonitor inside it.
+    // Its state is therefore unknown to git here, and every file read under a submodule counts as dirty (hashed by
+    // content below), so an edit there still changes the snapshot.
+    const status = git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=all', '--', '.']);
     if (status === null) warnOnce(`git status failed in ${root}; the snapshot id follows the content of every file the build reads`);
-    const changed = changedPaths(status ?? '').filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
+    const changed = [...changedPaths(status ?? '').filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length)), ...submodulePaths(root)];
     const at = (rel: string) => path.join(root, rel);
     dirtyList = status === null ? analyzed : dirtyFiles(
       analyzed, changed, ignoredAmong(root, analyzed),

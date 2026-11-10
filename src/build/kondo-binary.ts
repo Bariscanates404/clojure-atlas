@@ -7,6 +7,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, w
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { inflateRawSync } from 'node:zlib';
+import { whichExecutable } from '../shared/executable.ts';
 
 export const KONDO_VERSION = '2025.10.23';
 
@@ -52,6 +53,8 @@ export interface KondoHost {
   assets: Record<string, [suffix: string, sha256: string]>;
   cacheDir: string;
   download: (url: string) => Promise<Buffer>;
+  // the absolute path of a program on PATH (never relative to the working directory, which Windows searches first), or null
+  resolve: (name: string) => string | null;
   // `<command> --version`, or null when the command cannot run
   version: (command: string) => string | null;
   warn: (message: string) => void;
@@ -72,10 +75,11 @@ function intact(target: string): boolean {
 export async function locateKondo(host: KondoHost): Promise<Kondo> {
   const exe = host.platform === 'win32' ? 'clj-kondo.exe' : 'clj-kondo';
   const fromPath = (why: string): Kondo => {
-    const version = host.version('clj-kondo');
-    if (version === null) throw new Error(`${why}, and there is no clj-kondo on PATH; install clj-kondo (https://github.com/clj-kondo/clj-kondo) and run again`);
-    host.warn(`${why}; using clj-kondo on PATH (${version})`);
-    return { command: 'clj-kondo', version };
+    const found = host.resolve(exe);
+    const version = found === null ? null : host.version(found);
+    if (found === null || version === null) throw new Error(`${why}, and there is no clj-kondo on PATH; install clj-kondo (https://github.com/clj-kondo/clj-kondo) and run again`);
+    host.warn(`${why}; using clj-kondo on PATH (${found}, ${version})`);
+    return { command: found, version };
   };
   const asset = host.assets[`${host.platform}-${host.arch}`];
   if (!asset) return fromPath(`clj-kondo ${KONDO_VERSION} has no native release for ${host.platform}-${host.arch}`);
@@ -135,6 +139,7 @@ export const HOST: KondoHost = {
   assets: ASSETS,
   cacheDir: path.join(cacheRoot(process.env, process.platform, homedir()), 'clojure-atlas'),
   download: downloader(DOWNLOAD_TIMEOUT_MS),
+  resolve: (name) => whichExecutable(name, [process.cwd()]),
   version: (command) => {
     try {
       return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();

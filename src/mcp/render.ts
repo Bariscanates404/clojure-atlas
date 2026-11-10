@@ -56,8 +56,8 @@ export const CHARS_PER_TOKEN = 4;
 const DETAIL_TOP = 5;
 const MAX_QUERY_CHARS = 80;
 
-const BAND_CODE: Record<string, string> = { static_proven: 'S', declared: 'D', heuristic: 'H', unknown: '?' };
-const LEGEND = 'legend: [S] static_proven  [D] declared  [H] heuristic (name or pattern match; the cited line is the evidence)  [?] unknown, not provable';
+const BAND_CODE: Record<string, string> = { static_proven: 'S', heuristic: 'H', unknown: '?' };
+const LEGEND = 'legend: [S] static_proven  [H] heuristic (name or pattern match; the cited line is the evidence)  [?] unknown, not provable';
 
 export function clampLimit(limit: number | undefined, format: ResponseFormat = 'concise'): number {
   const def = format === 'detailed' ? DEFAULT_LIMIT.detailed : DEFAULT_LIMIT.concise;
