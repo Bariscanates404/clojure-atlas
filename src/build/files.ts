@@ -1,6 +1,6 @@
 // The files a build reads: Clojure sources for kondo, .edn files for system configs, and the module roots
 // (directories with their own deps.edn, project.clj, ...) that name each file's component.
-import { readdirSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../shared/git.ts';
 
@@ -67,6 +67,17 @@ export function componentOf(moduleRoots: readonly string[], file: string): strin
 export interface Tracked {
   expected: number;
   unread: string[];
+  // why each unread file was left out
+  unreadWhy: Record<string, UnreadReason>;
+}
+
+// symlink: the walk does not follow links; deleted: tracked by git, gone from the working tree; otherwise the file sits
+// in a hidden path, node_modules or a module-root build folder
+export type UnreadReason = 'symlink' | 'deleted' | 'hidden-or-build-folder';
+
+function unreadReason(root: string, file: string): UnreadReason {
+  const st = lstatSync(path.join(root, file), { throwIfNoEntry: false });
+  return !st ? 'deleted' : st.isSymbolicLink() ? 'symlink' : 'hidden-or-build-folder';
 }
 
 const KONDO_CONFIG_DIR = /(^|\/)\.clj-kondo\//;
@@ -76,9 +87,10 @@ export function trackedSources(root: string, files: RepoFiles): Tracked {
     const out = runGit(root, ['ls-files', '-z', '--', '*.clj', '*.cljs', '*.cljc']);
     const tracked = out.split('\0').filter((f) => f && path.posix.basename(f) !== 'project.clj' && !KONDO_CONFIG_DIR.test(f));
     const seen = new Set([...files.sources, ...files.skippedLarge]);
-    return { expected: tracked.length, unread: tracked.filter((f) => !seen.has(f)).sort() };
+    const unread = tracked.filter((f) => !seen.has(f)).sort();
+    return { expected: tracked.length, unread, unreadWhy: Object.fromEntries(unread.map((f) => [f, unreadReason(root, f)])) };
   } catch (err) {
     process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message}); expected files = files listed\n`);
-    return { expected: files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length, unread: [] };
+    return { expected: files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length, unread: [], unreadWhy: {} };
   }
 }

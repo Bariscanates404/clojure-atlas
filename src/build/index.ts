@@ -38,7 +38,7 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
   }, {
     expected: tracked.expected, sources: files.sources.length, edn: files.edn.length,
     skipped_large: files.skippedLarge.length, skipped_large_names: files.skippedLarge,
-    unread: tracked.unread.length, unread_names: tracked.unread, timed_out: timedOut.length, timed_out_names: timedOut,
+    unread: tracked.unread.length, unread_names: tracked.unread, unread_why: tracked.unreadWhy, timed_out: timedOut.length, timed_out_names: timedOut,
   });
   doc.stats.build_ms = Date.now() - started;
   return doc;

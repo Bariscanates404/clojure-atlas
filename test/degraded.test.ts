@@ -16,8 +16,8 @@ import { callTool } from '../src/mcp/server.ts';
 import { fixtureDir } from './helpers/atlas-fixture.ts';
 import { graphOf } from './helpers/inline-graph.ts';
 
-const NO_LARGE = { files: 0, names: [] };
-const NONE = { timedOut: NO_LARGE, unread: NO_LARGE };
+const NO_LARGE = { files: 0, names: [], edn: 0 };
+const NONE = { timedOut: NO_LARGE, unread: NO_LARGE, recovered: NO_LARGE, unreadWhy: {} };
 const CORE = '(ns demo.core)\n(defn target [a] (inc a))\n(defn lonely [] 1)\n(defn user [] (target 1))\n';
 const BROKEN = '(ns demo.broken\n  (:require [demo.core :as c]))\n(defn oops [] (c/target 2)\n';
 
@@ -89,7 +89,7 @@ describe('degraded builds: answers', () => {
   });
 
   it('a clean graph says nothing', () => {
-    const clean = indexGraph({ ...doc, stats: { ...doc.stats, syntax_errors: { files: 0, errors: 0, names: [] }, dropped_edges: 0 } } as AtlasDocument);
+    const clean = indexGraph({ ...doc, stats: { ...doc.stats, syntax_errors: { files: 0, errors: 0, names: [], recovered: 0, recovered_names: [] }, dropped_edges: 0 } } as AtlasDocument);
     assert.doesNotMatch(callTool(clean, 'callers', { var: 'demo.core/target' }).text, /DEGRADED/);
     assert.doesNotMatch(callTool(clean, 'graph_info', {}).text, /DEGRADED/);
   });
@@ -120,7 +120,7 @@ describe('files over the size limit', () => {
   });
 
   it('are listed in the build log line, three names at most', () => {
-    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'] }, duplicates: [], ...NONE });
+    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edn: 0 }, duplicates: [], ...NONE });
     assert.match(line, /5 file\(s\) over 2 MB were skipped \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
   });
 });
@@ -195,5 +195,49 @@ describe('a name used elsewhere whose own file could not be parsed', () => {
     assert.match(t, /demo\.broken\/oops probably lives in src\/demo\/broken\.clj, which could not be parsed/);
     assert.match(t, /used at src\/demo\/user\.clj:3/);
     assert.doesNotMatch(t, /probably defined by a macro/);
+  });
+});
+
+describe('a file with syntax errors that clj-kondo still analyzed', () => {
+  // `1/0` is a reader error kondo reports and then recovers from: the namespace and every definition are in the graph
+  const RECOVERED = '(ns demo.rec)\n(defn h [] 1)\n(def m 1/0)\n(defn g [] (h))\n';
+  const USER = '(ns demo.user (:require [demo.rec :as r]))\n(defn u [] (r/h))\n';
+  let both: AtlasDocument;
+  before(async () => {
+    both = await graphOf({ 'src/demo/rec.clj': RECOVERED, 'src/demo/user.clj': USER, 'src/demo/broken.clj': BROKEN });
+  });
+  const ask2 = (tool: string, args: Record<string, unknown>) => callTool(indexGraph(both), tool, args).text;
+
+  it('is told apart from a file that produced nothing, in the graph stats', () => {
+    assert.deepEqual(both.stats.syntax_errors.names, ['src/demo/broken.clj', 'src/demo/rec.clj']);
+    assert.deepEqual(both.stats.syntax_errors.recovered_names, ['src/demo/rec.clj']);
+    assert.equal(both.stats.syntax_errors.recovered, 1);
+  });
+
+  it('keeps the spelling hint for a misspelt name and says some forms may be missing', () => {
+    const t = ask2('callers', { var: 'demo.rec/hh' });
+    assert.match(t, /check the spelling/);
+    assert.match(t, /demo\.rec\/hh may live in src\/demo\/rec\.clj, which has syntax errors; some forms may be missing/);
+    assert.doesNotMatch(t, /not a spelling problem/);
+    assert.doesNotMatch(t, /demo\.rec\/hh probably lives in/);
+  });
+
+  it('the DEGRADED line counts the unparsed file and the recovered one separately and says what each lost', () => {
+    const t = ask2('graph_info', {});
+    assert.match(t, /1 file\(s\) could not be parsed \(src\/demo\/broken\.clj\), so their definitions and calls are missing/);
+    assert.match(t, /1 file\(s\) have syntax errors but were analyzed \(src\/demo\/rec\.clj\); some forms in them may be missing/);
+  });
+
+  it('a graph with only a recovered file does not claim missing definitions', () => {
+    const only = { ...both, stats: { ...both.stats, syntax_errors: { ...both.stats.syntax_errors, files: 1, names: ['src/demo/rec.clj'] } } };
+    const t = callTool(indexGraph(only), 'graph_info', {}).text;
+    assert.doesNotMatch(t, /could not be parsed/);
+    assert.match(t, /^DEGRADED: 1 file\(s\) have syntax errors but were analyzed/m);
+  });
+
+  it('a name from the file that produced nothing is still blamed on that file, not on spelling', () => {
+    const t = ask2('callers', { var: 'demo.broken/oops' });
+    assert.match(t, /demo\.broken\/oops probably lives in src\/demo\/broken\.clj, which could not be parsed/);
+    assert.doesNotMatch(t, /check the spelling/);
   });
 });

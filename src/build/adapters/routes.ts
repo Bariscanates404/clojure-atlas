@@ -19,7 +19,7 @@ const libraryOf = (ns: string) => (ns === COMPOJURE ? 'compojure' : ns.startsWit
 
 interface Link {
   def: string;
-  // absent: the route's own file
+  // the file the form is written in; absent: the route's own file
   file?: string;
   line: number;
   // absent: the form itself names the definition; heuristic: it is an argument or one branch of what the route returns
@@ -114,7 +114,7 @@ function chainOf(ctx: Context, file: string, items: readonly Form[]): Chain {
     const head = unwrap(parts[0] ?? item);
     const def = head.t === 'symbol' ? ctx.defAt(file, head.row, head.col) : undefined;
     if (!def) continue;
-    out.links.push({ def, line: head.row, ...(item.t === 'list' ? { band: 'heuristic' as const } : {}) });
+    out.links.push({ def, file, line: head.row, ...(item.t === 'list' ? { band: 'heuristic' as const } : {}) });
     if (ctx.config.permissionMiddleware.includes(def) && parts[1]) out.permissions.push({ form: parts[1], file });
   }
   return out;
@@ -297,11 +297,15 @@ function mountsIn(ctx: Context, file: string, f: Form, fns: ReadonlyMap<string, 
   return u.t === 'vector' || u.t === 'list' || u.t === 'cond' ? flatChildren(u).flatMap((x) => mountsIn(ctx, file, x, fns)) : [];
 }
 
-function dataRoutes(ctx: Context, owner: Owner): Route[] {
-  const libs = new Map<string, Set<string>>();
-  for (const u of ctx.analysis.nsUses) if (DATA_LIBS.test(u.to)) libs.set(u.file, (libs.get(u.file) ?? new Set()).add(libraryOf(u.to)));
-  const files = new Map([...libs].map(([f, s]) => [f, [...s].sort().join(', ')]));
-  const fns = routeFunctions(ctx);
+// The route trees a data-routing build walks, with the route functions mounted so far and the forms already visited.
+interface Walker {
+  routes: Route[];
+  mounted: Set<string>;
+  visited: Set<string>;
+  nested: (f: Form, file: string, scope: Scope) => void;
+}
+
+function routeWalker(ctx: Context, fns: ReadonlyMap<string, RouteFn>): Walker {
   const out: Route[] = [];
   const mounted = new Set<string>();
   const visited = new Set<string>();
@@ -374,12 +378,12 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     } else if (u.t === 'vector' || u.t === 'list' || u.t === 'cond') for (const x of flatChildren(u)) nested(x, file, scope);
   };
 
-  const scopeAt = (file: string, base: string, guards: Guard[], checks: Check[], unknown: boolean): Scope =>
-    ({ prefix: '', guards, authz: NO_AUTHZ, checks, base, library: files.get(file) ?? '', stack: [], unknown });
-  const wrapping = wrappingOf(ctx);
+  return { routes: out, mounted, visited, nested };
+}
 
-  // (router routes {:data {:middleware [...]}}): router data applies to every route below it
-  // a router built in test code serves nothing
+// (router routes {:data {:middleware [...]}}): router data applies to every route below it; a router built in test code serves nothing
+function routerCalls(ctx: Context, files: ReadonlyMap<string, string>, walker: Walker, owner: Owner, scopeAt: ScopeAt): void {
+  const wrapping = wrappingOf(ctx);
   for (const call of ctx.analysis.varUses.filter((u) => ROUTERS.test(`${u.to}/${u.name}`) && files.has(u.file) && !isTestFile(u.file))) {
     const form = formAt(ctx.forms(call.file), call.row, call.col);
     const [routesArg, opts] = form ? kids(form).slice(1) : [];
@@ -389,16 +393,33 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
     const around = wrapping(call.file, form);
     const guards = [...wrapperGuards(around.wrappers).map((g) => ({ ...g, inheritedFrom: 'around the router' })), ...chains.flatMap((c) => c.links).map((l): Guard => ({ ...l, level: 'router-data', inheritedFrom: 'router :data' }))];
     const base = owner({ ...call, row: call.nameRow, col: call.nameCol }).replace(/^(definition|namespace):/, '');
-    nested(routesArg, call.file, scopeAt(call.file, base, guards, [...wrapperChecks(around.wrappers), ...chains.flatMap((c) => c.permissions)], around.unknown));
+    walker.nested(routesArg, call.file, scopeAt(call.file, base, guards, [...wrapperChecks(around.wrappers), ...chains.flatMap((c) => c.permissions)], around.unknown));
   }
-  // route trees no router call reaches stand where they are written, in files that use a routing library
-  // the ones another route function mounts come last: mounting them there marks them, so they stand alone only when nobody does
+}
+
+// Route trees no router call reaches stand where they are written, in files that use a routing library.
+// The ones another route function mounts come last: mounting them there marks them, so they stand alone only when nobody does.
+function standingTrees(ctx: Context, files: ReadonlyMap<string, string>, fns: ReadonlyMap<string, RouteFn>, walker: Walker, scopeAt: ScopeAt): void {
   const mountedByAnother = new Set([...fns].flatMap(([def, fn]) => fn.roots.flatMap((r) => mountsIn(ctx, fn.file, r, fns)).filter((m) => m !== def)));
   for (const [def, fn] of [...fns].sort(([a], [b]) => Number(mountedByAnother.has(a)) - Number(mountedByAnother.has(b)))) {
-    if (mounted.has(def) || !files.has(fn.file) || isTestFile(fn.file)) continue;
-    for (const r of fn.roots) if (!visited.has(`${fn.file}:${r.row}:${r.col}`)) nested(r, fn.file, scopeAt(fn.file, def, [], [], true));
+    if (walker.mounted.has(def) || !files.has(fn.file) || isTestFile(fn.file)) continue;
+    for (const r of fn.roots) if (!walker.visited.has(`${fn.file}:${r.row}:${r.col}`)) walker.nested(r, fn.file, scopeAt(fn.file, def, [], [], true));
   }
-  return out;
+}
+
+type ScopeAt = (file: string, base: string, guards: Guard[], checks: Check[], unknown: boolean) => Scope;
+
+function dataRoutes(ctx: Context, owner: Owner): Route[] {
+  const libs = new Map<string, Set<string>>();
+  for (const u of ctx.analysis.nsUses) if (DATA_LIBS.test(u.to)) libs.set(u.file, (libs.get(u.file) ?? new Set()).add(libraryOf(u.to)));
+  const files = new Map([...libs].map(([f, s]) => [f, [...s].sort().join(', ')]));
+  const fns = routeFunctions(ctx);
+  const walker = routeWalker(ctx, fns);
+  const scopeAt: ScopeAt = (file, base, guards, checks, unknown) =>
+    ({ prefix: '', guards, authz: NO_AUTHZ, checks, base, library: files.get(file) ?? '', stack: [], unknown });
+  routerCalls(ctx, files, walker, owner, scopeAt);
+  standingTrees(ctx, files, fns, walker, scopeAt);
+  return walker.routes;
 }
 
 // A handler that calls a declared permission fn with a keyword checks that permission (HEURISTIC, one level deep).
@@ -409,7 +430,7 @@ function handlerPermissions(ctx: Context): (handlers: readonly Link[], check: nu
     const call = formAt(ctx.forms(u.file), u.row, u.col);
     return (call ? kids(call).slice(1).map(unwrap) : [])
       .filter((k) => k.t === 'keyword')
-      .map((k) => ({ name: text(k) ?? '?', dynamic: false, check, checks: check, alternative: 1, alternatives: 1, allOf: 1, line: k.row }));
+      .map((k) => ({ name: text(k) ?? '?', dynamic: false, check, checks: check, alternative: 1, alternatives: 1, allOf: 1, file: u.file, line: k.row }));
   }));
 }
 
@@ -452,17 +473,17 @@ export const httpRoutes: Adapter = {
       const found = inHandlers(r.handlers, declared.reduce((m, p) => Math.max(m, p.check), 0) + 1);
       const checks = Math.max(0, ...[...declared, ...found].map((x) => x.check), ...declared.map((x) => x.checks));
       for (const p of [...declared, ...found]) {
-        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: r.file, line: p.line,
+        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: p.file, line: p.line,
           ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
         edges.push({
           from: id, to: permissionId(p.name), kind: 'requires_permission',
-          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file ?? r.file, line: p.line,
+          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file, line: p.line,
           attrs: { check: p.check, checks, alternative: p.alternative, alternatives: p.alternatives, all_of: p.allOf, ...(p.scope ? { tenant: p.scope } : {}) },
         });
       }
       if (r.authz.exempt) {
-        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.file, line: r.authz.exempt.line });
-        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.file, line: r.authz.exempt.line,
+        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.authz.exempt.file, line: r.authz.exempt.line });
+        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.authz.exempt.file, line: r.authz.exempt.line,
           attrs: { label: r.authz.exempt.reason } });
       }
     }

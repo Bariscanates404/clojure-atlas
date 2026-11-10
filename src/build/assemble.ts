@@ -9,6 +9,7 @@ import { makeOwner, type Adapter, type Context, type Rows } from './model.ts';
 
 // the unparsed files named in the graph; the count beside them stays exact
 const MAX_NAMED_FILES = 500;
+const EDN_FILE = /\.edn$/;
 
 export interface AdapterStats {
   detected: string | null;
@@ -22,10 +23,13 @@ export interface BuildStats {
     expected: number; sources: number; edn: number; skipped_large: number; skipped_large_names: string[];
     // tracked Clojure files the file walk left out (hidden or root build folders), and files whose clj-kondo run was killed
     unread: number; unread_names: string[]; timed_out: number; timed_out_names: string[];
+    // how many of the skipped_large files are .edn (data, not code), and why each unread file was left out
+    skipped_large_edn: number; unread_why?: Record<string, string>;
   };
   // namespaces defined in more than one file: one graph node stands for them all, and usages of them are heuristic
   duplicate_namespaces: { ns: string; files: string[] }[];
-  syntax_errors: { files: number; errors: number; names: string[] };
+  // names: every file kondo reported a syntax error in; recovered_names: those it still analyzed (their namespace or a definition is in the graph)
+  syntax_errors: { files: number; errors: number; names: string[]; recovered: number; recovered_names: string[] };
   definitions: number;
   usages: UsageStats;
   adapters: Record<string, AdapterStats>;
@@ -67,7 +71,7 @@ function signaturesOf(edges: readonly GraphEdge[]): Capability {
 // An edge has a line, not a column: two call sites on one line are told apart by what they carry (arity, arguments).
 const edgeKey = (e: GraphEdge) => `${e.from}\0${e.kind}\0${e.to}\0${e.file}\0${e.line ?? 0}\0${JSON.stringify(e.attrs ?? {})}`;
 
-export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: BuildStats['files']): AtlasDocument {
+export function assemble(ctx: Context, adapters: readonly Adapter[], source: GraphSource, files: Omit<BuildStats['files'], 'skipped_large_edn'>): AtlasDocument {
   const detected = new Map(adapters.map((a) => [a.name, a.detect(ctx)]));
   const active = adapters.filter((a) => detected.get(a.name) !== null);
   const owner = makeOwner(ctx, active.flatMap((a) => a.containers?.(ctx) ?? []));
@@ -118,6 +122,8 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     adapterStats[a.name] = { detected: detected.get(a.name) ?? null, nodes: rows?.nodes.length ?? 0, edges: rows?.edges.length ?? 0 };
   }
   const syntaxFiles = new Set(ctx.analysis.syntaxErrors.map((e) => e.file));
+  const analyzed = new Set([...ctx.analysis.nsDefs, ...ctx.analysis.varDefs].map((d) => d.file));
+  const recovered = [...syntaxFiles].filter((f) => analyzed.has(f)).sort(compareText);
   return {
     format: FORMAT,
     version: VERSION,
@@ -127,10 +133,13 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     edges: [...edges.values()].sort((a, b) => compareText(edgeKey(a), edgeKey(b))),
     stats: {
       files: {
-        ...files, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
+        ...files, skipped_large_edn: files.skipped_large_names.filter((f) => EDN_FILE.test(f)).length, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
         unread_names: files.unread_names.slice(0, MAX_NAMED_FILES), timed_out_names: files.timed_out_names.slice(0, MAX_NAMED_FILES),
       },
-      syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES) },
+      syntax_errors: {
+        files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES),
+        recovered: recovered.length, recovered_names: recovered.slice(0, MAX_NAMED_FILES),
+      },
       duplicate_namespaces: [...ctx.duplicateNs].map(([ns, files]) => ({ ns, files })).sort((a, b) => compareText(a.ns, b.ns)),
       definitions: ctx.defs.size,
       usages: base.stats,

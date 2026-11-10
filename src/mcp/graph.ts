@@ -12,7 +12,7 @@ const SUPPORTED_VERSIONS: readonly number[] = [1, 2];
 const MAX_GRAPH_BYTES = 256 * 1024 * 1024;
 const MAX_INFLATED_BYTES = 480 * 1024 * 1024;
 
-export const BANDS = ['static_proven', 'declared', 'heuristic', 'unknown'] as const;
+export const BANDS = ['static_proven', 'heuristic', 'unknown'] as const;
 export type Band = (typeof BANDS)[number];
 
 export interface GraphNode {

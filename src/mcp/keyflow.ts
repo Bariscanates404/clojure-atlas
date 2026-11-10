@@ -633,8 +633,7 @@ export function keySiblings(g: Graph, target: string, opts: { maxAbsent?: number
   const notes = capabilityNotes(g, ['key_tables']);
   const tables = resolveTables(g, target).sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
   if (!tables.length) {
-    const nf = notFound(g, 'key_siblings', target, title, 'literal table (3+ map rows)', ['key_tables'], 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
-    return { ...nf, notes: [...notes, ...nf.notes] };
+    return notFound(g, 'key_siblings', target, title, 'literal table (3+ map rows)', ['key_tables'], 'pass a repo-relative file, file:line, a key_table id or the var that holds the table');
   }
   const files = [...new Set(tables.map((t) => t.file ?? ''))];
   if (files.length > 1) {
