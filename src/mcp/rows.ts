@@ -3,7 +3,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { NOT_USED } from '../shared/capability.ts';
 import { capability, inEdges, compareText } from './graph.ts';
-import { degradation, skippedFor, strings, unparsedFor } from './degraded.ts';
+import { degradation, skippedFor, strings, unanalyzedFor, unparsedFor } from './degraded.ts';
 
 export interface Row {
   label: string;
@@ -124,7 +124,8 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
   const degraded = degradation(g.doc);
   const parseFailed = unparsedFor(degraded, query);
   const skipped = skippedFor(degraded, query);
-  const unparsed = [...parseFailed, ...skipped];
+  const { timedOut, unread } = unanalyzedFor(degraded, query);
+  const unparsed = [...parseFailed, ...skipped, ...timedOut, ...unread];
   const used = what === 'definition' ? usedUndefined(g, query) : [];
   const at = (sites: string[]) => sites.join(', ');
   return {
@@ -134,6 +135,8 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
       ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${MACRO_HINT}`),
       ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
       ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
+      ...(timedOut.length ? [`${query} probably lives in ${timedOut.join(', ')}, which was not analyzed because clj-kondo did not finish on it${NOT_SPELLING}`] : []),
+      ...(unread.length ? [`${query} probably lives in ${unread.join(', ')}, which git tracks but the build did not analyze${NOT_SPELLING}`] : []),
       ...capabilityNotes(g, caps), ...(note ? [note] : []),
     ],
     ...(unparsed.length ? { unparsed } : {}),

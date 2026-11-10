@@ -35,6 +35,27 @@ describe('degraded builds: what the graph carries', () => {
   });
 });
 
+describe('degraded builds: files never analyzed', () => {
+  const withFiles = (files: Partial<Record<string, unknown>>) => indexGraph({ ...doc, stats: { ...doc.stats, files: { ...doc.stats.files, ...files } } } as AtlasDocument);
+
+  it('a name that may live in a file kondo timed out on is not blamed on its spelling', () => {
+    const t = callTool(withFiles({ timed_out: 1, timed_out_names: ['src/demo/slow.clj'] }), 'callers', { var: 'demo.slow/thing' }).text;
+    assert.match(t, /demo\.slow\/thing probably lives in src\/demo\/slow\.clj, which was not analyzed because clj-kondo did not finish on it/);
+    assert.doesNotMatch(t, /check the spelling/);
+  });
+
+  it('a name that may live in a tracked file the build did not analyze is not blamed on its spelling', () => {
+    const t = callTool(withFiles({ unread: 1, unread_names: ['.build/demo/hidden.clj'] }), 'callers', { var: 'demo.hidden/thing' }).text;
+    assert.match(t, /demo\.hidden\/thing probably lives in \.build\/demo\/hidden\.clj, which git tracks but the build did not analyze/);
+    assert.doesNotMatch(t, /check the spelling/);
+  });
+
+  it('an unrelated name keeps the spelling answer', () => {
+    const t = callTool(withFiles({ timed_out: 1, timed_out_names: ['src/demo/slow.clj'] }), 'callers', { var: 'demo.other/thing' }).text;
+    assert.match(t, /check the spelling/);
+  });
+});
+
 describe('degraded builds: answers', () => {
   it('a found answer carries the DEGRADED line too (its callers may sit in the unparsed file)', () => {
     const t = ask('callers', { var: 'demo.core/target' }).text;
