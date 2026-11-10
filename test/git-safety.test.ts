@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync, mkdirSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { expectedSources, listFiles } from '../src/build/files.ts';
+import { trackedSources, listFiles } from '../src/build/files.ts';
 import { gitDistance } from '../src/mcp/staleness.ts';
 import { git, runGit, SAFE_GIT_CONFIG } from '../src/shared/git.ts';
 import { ignoredAmong, snapshotOf } from '../src/snapshot.ts';
@@ -51,7 +51,7 @@ describe('git never runs a command the analyzed repository configures', () => {
   });
   it('the commit distance and the expected-file count', () => {
     gitDistance(repo)(head, head);
-    expectedSources(repo, listFiles(repo));
+    trackedSources(repo, listFiles(repo));
     ignoredAmong(repo, ['src/a.clj', 'src/untracked.clj']);
     assert.deepEqual(marked(), []);
   });

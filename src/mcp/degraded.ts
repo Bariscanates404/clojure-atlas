@@ -13,6 +13,9 @@ export interface Degradation {
   large: { files: number; names: string[] };
   // namespaces defined in more than one file
   duplicates: string[];
+  // files whose clj-kondo run was killed for taking too long, and tracked Clojure files the build never looked at
+  timedOut: { files: number; names: string[] };
+  unread: { files: number; names: string[] };
 }
 
 const SHOWN = 3;
@@ -22,7 +25,7 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 interface Stats {
   syntax_errors?: { files?: unknown; names?: unknown };
   dropped_edges?: unknown;
-  files?: { skipped_large?: unknown; skipped_large_names?: unknown };
+  files?: { skipped_large?: unknown; skipped_large_names?: unknown; timed_out?: unknown; timed_out_names?: unknown; unread?: unknown; unread_names?: unknown };
   duplicate_namespaces?: unknown;
 }
 
@@ -33,10 +36,14 @@ export function degradation(doc: GraphDocument): Degradation | null {
   const edges = typeof stats?.dropped_edges === 'number' ? stats.dropped_edges : 0;
   const largeNames = strings(stats?.files?.skipped_large_names);
   const large = { files: typeof stats?.files?.skipped_large === 'number' ? stats.files.skipped_large : 0, names: largeNames };
+  const counted = (n: unknown, names: unknown) => ({ files: typeof n === 'number' ? n : 0, names: strings(names) });
+  const timedOut = counted(stats?.files?.timed_out, stats?.files?.timed_out_names);
+  const unread = counted(stats?.files?.unread, stats?.files?.unread_names);
   const duplicates = Array.isArray(stats?.duplicate_namespaces)
     ? stats.duplicate_namespaces.flatMap((d: unknown) => (typeof (d as { ns?: unknown })?.ns === 'string' ? [(d as { ns: string }).ns] : []))
     : [];
-  return files > 0 || edges > 0 || large.files > 0 || duplicates.length > 0 ? { files, names, edges, large, duplicates } : null;
+  return files > 0 || edges > 0 || large.files > 0 || duplicates.length > 0 || timedOut.files > 0 || unread.files > 0
+    ? { files, names, edges, large, duplicates, timedOut, unread } : null;
 }
 
 const listed = (names: readonly string[], total: number) => `${names.slice(0, SHOWN).join(', ')}${total > SHOWN ? ', ...' : ''}`;
@@ -50,6 +57,12 @@ export function degradedLine(d: Degradation): string {
   if (d.large.files) {
     const shown = d.large.names.length ? ` (${listed(d.large.names, d.large.files)})` : '';
     parts.push(`${d.large.files} file(s) over 2 MB were skipped${shown}, so their definitions and calls are missing`);
+  }
+  if (d.timedOut.files) {
+    parts.push(`${d.timedOut.files} file(s) were not analyzed because clj-kondo did not finish on them (${listed(d.timedOut.names, d.timedOut.files)}), so their definitions and calls are missing`);
+  }
+  if (d.unread.files) {
+    parts.push(`${d.unread.files} tracked Clojure file(s) were not analyzed, as they sit in a hidden or root build folder (${listed(d.unread.names, d.unread.files)}), so their definitions and calls are missing`);
   }
   if (d.duplicates.length) {
     const shown = listed(d.duplicates, d.duplicates.length);
@@ -70,6 +83,10 @@ const matching = (names: readonly string[], query: string): string[] => {
 // The unparsed files a name could live in: "demo.broken/oops" or "demo.broken" matches src/demo/broken.clj (also
 // with underscores for dashes), a repo path matches itself.
 export const unparsedFor = (d: Degradation | null, query: string): string[] => matching(d?.names ?? [], query);
+
+// The files a name could live in that were never analyzed: killed by the timeout, or tracked but outside the file walk.
+export const unanalyzedFor = (d: Degradation | null, query: string): { timedOut: string[]; unread: string[] } =>
+  ({ timedOut: matching(d?.timedOut.names ?? [], query), unread: matching(d?.unread.names ?? [], query) });
 
 // The same for the files skipped as too large.
 export const skippedFor = (d: Degradation | null, query: string): string[] => matching(d?.large.names ?? [], query);

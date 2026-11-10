@@ -60,13 +60,25 @@ export function componentOf(moduleRoots: readonly string[], file: string): strin
   return best;
 }
 
-// Clojure files git tracks, whatever directory they sit in; without git, the ones listed plus the large ones skipped.
-export function expectedSources(root: string, files: RepoFiles): number {
+// What git tracks of Clojure code against what the walk read. `.clj-kondo/` files (hooks, config) are configuration,
+// never project source: they are neither expected nor missing. `unread` are tracked sources the walk left out (a hidden
+// folder, or a build folder such as dist/ at the repo root); the large ones are counted as skipped, not unread.
+// Without git, only what the walk saw can be told.
+export interface Tracked {
+  expected: number;
+  unread: string[];
+}
+
+const KONDO_CONFIG_DIR = /(^|\/)\.clj-kondo\//;
+
+export function trackedSources(root: string, files: RepoFiles): Tracked {
   try {
     const out = runGit(root, ['ls-files', '-z', '--', '*.clj', '*.cljs', '*.cljc']);
-    return out.split('\0').filter((f) => f && path.posix.basename(f) !== 'project.clj').length;
+    const tracked = out.split('\0').filter((f) => f && path.posix.basename(f) !== 'project.clj' && !KONDO_CONFIG_DIR.test(f));
+    const seen = new Set([...files.sources, ...files.skippedLarge]);
+    return { expected: tracked.length, unread: tracked.filter((f) => !seen.has(f)).sort() };
   } catch (err) {
     process.stderr.write(`clojure-atlas: ${root} is not a git checkout (${(err as Error).message.split('\n')[0]}); expected files = files listed\n`);
-    return files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length;
+    return { expected: files.sources.length + files.skippedLarge.filter((f) => SOURCE_EXT.test(f)).length, unread: [] };
   }
 }
