@@ -241,3 +241,18 @@ describe('a file with syntax errors that clj-kondo still analyzed', () => {
     assert.doesNotMatch(t, /check the spelling/);
   });
 });
+
+describe('a name used elsewhere whose own file has syntax errors kondo recovered from', () => {
+  let rec: AtlasDocument;
+  before(async () => {
+    rec = await graphOf({ 'src/r/web.clj': '(ns r.web)\n(defn h [] 1)\n(def x 1/0)\n' });
+  });
+
+  it('names the file as the likelier cause and the macro as the other', () => {
+    const usages = { ...rec.stats.usages, unresolvedSites: { 'r.web/gone': ['src/r/use.clj:2'] } };
+    const withUse = { ...rec, stats: { ...rec.stats, usages } };
+    const t = callTool(indexGraph(withUse), 'callers', { var: 'r.web/gone' }).text;
+    assert.match(t, /r\.web\/gone may live in src\/r\/web\.clj, which has syntax errors/);
+    assert.match(t, /no definition was found: probably a form clj-kondo could not read in the file with syntax errors named below, or a macro clj-kondo cannot expand/);
+  });
+});
