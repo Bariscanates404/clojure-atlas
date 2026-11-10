@@ -2,7 +2,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AtlasDocument } from '../../src/build/assemble.ts';
-import { createRequire } from 'node:module';
 import { buildGraph } from '../../src/build/index.ts';
 import { readPlaywright } from '../../src/build/typescript.ts';
 
@@ -27,7 +26,6 @@ export function rowsText(doc: AtlasDocument): string {
 
 export const buildFixture = async (name: string): Promise<AtlasDocument> => buildGraph(fixtureDir(name));
 
-// A fixture whose Playwright side is read with this repo's TypeScript 5 (its own devDependency is TypeScript 7, which
-// has no compiler API).
-export const buildWithTypeScript5 = async (name: string): Promise<AtlasDocument> =>
-  buildGraph(fixtureDir(name), (root, pkgs, files) => readPlaywright(root, pkgs, files, () => createRequire(import.meta.url)('ts-api')));
+// A fixture built where the TypeScript in use has no compiler API (TypeScript 7 removed it).
+export const buildWithoutCompilerApi = async (name: string): Promise<AtlasDocument> =>
+  buildGraph(fixtureDir(name), (root, pkgs, files) => readPlaywright(root, pkgs, files, () => ({ version: '7.0.2' }) as never));
