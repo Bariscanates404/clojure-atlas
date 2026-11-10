@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build`, `.clojure-atlas/graph.json.gz` dosyasını yazar. integrant deposunda şunu yazdırır:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init`, yazacağı proje `.mcp.json` dosyasını gösterir ve yalnızca `--yes` ile yazar:
@@ -120,7 +120,7 @@ bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]
 Grafın hangi commit'i anlattığı, her adaptörün ne bulduğu ve band sayıları. Soru: integrant grafı neleri biliyor?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -227,9 +227,15 @@ Bir route'un sarmalanması okunamadığında bölüm "none" yerine bunu söyler 
 GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
 ```
 
-Compojure ve Ring middleware'i (`->`, `->>`, iç içe çağrılar, `wrap-routes`) HEURISTIC olarak okunur. reitit ve
-pedestal route verisindeki middleware (`:middleware`, `:interceptors`) route'un kendisinden okunur. İzin hükmü
-"not provable" (kanıtlanamaz) olur, çünkü bu proje `.clojure-atlas.edn` içinde bir yetkilendirme modeli tanımlamaz.
+Route tablosunun dışında sarılan middleware HEURISTIC olarak okunur: Ring sarmalayıcıları, `->`, `->>`, iç içe
+çağrılar, `wrap-routes` ve reitit'in `ring-handler`'ının dış sarmalayıcıları ile üçüncü argümandaki
+`{:middleware [...]}`. Orada bulunan bir izin middleware'i kontrol sayılır. reitit ve pedestal route verisindeki
+middleware (`:middleware`, `:interceptors`) route'un kendisinden okunur. Sarmalama tam okunamadığında route_authz
+şunu der: `no permission check found in what could be read (...); not provable that none exists`. Hiçbir router'ın
+ulaşmadığı bir route ağacında middleware UNKNOWN olarak gösterilir; bugün bu her pedestal route'tur, çünkü bir
+pedestal service map'inin interceptor'ları okunmaz. Graf'ın çözemediği bir handler `handler: not resolved (UNKNOWN)`
+olarak görünür. Burada izin hükmü "not provable" (kanıtlanamaz) olur, çünkü bu proje `.clojure-atlas.edn` içinde bir
+yetkilendirme modeli tanımlamaz.
 
 ### permission_routes
 
@@ -416,8 +422,21 @@ bildirilir. Bir dosyanın ayrıştırılamadığı ve bir namespace'in iki kez t
 
 ```
 DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
+note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+clj-kondo çalıştırması zaman aşımına uğramış bir dosyada ya da git'in izlediği ama build'in analiz etmediği bir
+dosyada olması muhtemel bir bulunamayan ad, o dosyayı aynı şekilde adlandırır.
+
+Kullanılan ama hiçbir yerde tanımlanmayan bir ad genellikle clj-kondo'nun açamadığı bir makroyla üretilir. Yanıt, adın
+nerede kullanıldığını ve neyin eklenmesi gerektiğini söyler. next.jdbc'den:
+
+```
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: use a fully qualified name (ns/name)
 ```
 
@@ -455,13 +474,13 @@ küçülür. Corpus bunların hiçbiri eklenmeden ölçülür.
 
 ## Benchmark
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md), corpus depoları hakkında 20 soru içerir. Beklenen her yanıt, araç olmadan,
+[docs/BENCHMARK.md](docs/BENCHMARK.md), corpus depoları hakkında 21 soru içerir. Beklenen her yanıt, araç olmadan,
 kaynakta elle kontrol edildi ve file:line bilgisi [bench/questions.json](bench/questions.json) içindedir.
 
 - **Positive soruları: 14 üzerinden 14 geçti.** Bir soru, yanıt beklenen her tanımı adlandırıp başka hiçbir şey
   adlandırmadığında geçer. Bulunan beklenen öğe: 40 üzerinden 40. Yanıtlanan öğe: 40.
-- **Absence soruları: 6 üzerinden 6 geçti.** Doğru yanıt, hiçbir şeyin olmadığıdır (*none*, *not-found* ya da
-  *capability-off*). Yanıt bu tür bir yokluğu belirtmeli ve hiçbir şey adlandırmamalıdır.
+- **Absence soruları: 7 üzerinden 7 geçti.** Doğru yanıt, hiçbir şeyin olmadığıdır (*none*, *not-found*,
+  *used-undefined* ya da *capability-off*). Yanıt bu tür bir yokluğu belirtmeli ve hiçbir şey adlandırmamalıdır.
 
 İlk on iki positive soru ilk koşudan önce sabitlendi ve ilk koşu 12 üzerinden 11 aldı. Iskalanan soru (`re-frame.alpha`
 üzerinden re-frame kayıtları) builder'da bir fixture ile düzeltildi ve soru olduğu gibi tutuldu. Sonradan iki soru eklendi: compojure middleware zinciri (q13) ve bir reitit
@@ -495,7 +514,10 @@ Build dosyaları okur. Yalnızca clj-kondo'yu (sabitlenmiş ikili dosyayı ya da
 komutunu çalıştırır; analiz edilen deponun kodunu Node, JVM ya da shell ile asla çalıştırmaz. TypeScript, analiz edilen
 depodan değil, clojure-atlas'ın kendi kurulumundan yüklenir. clj-kondo, projenin `.clj-kondo` config'ini uygular; orada
 bildirilen hook'ları clj-kondo'nun kendisi yorumlar, clj-kondo çalıştıran her editörde olduğu gibi. MCP sunucusu yalnızca
-graf dosyasını okur ve `--repo` ile salt okunur git komutları çalıştırır.
+graf dosyasını okur ve `--repo` ile salt okunur git komutları çalıştırır. Her git çağrısı, deponun kendi komut
+çalıştıran ayarlarını (`core.fsmonitor`, filter driver'ları, hook'lar) yok sayar, asla soru sormaz ve bir zaman aşımı
+vardır. Her clj-kondo çalıştırmasının da bir zaman aşımı vardır: hiç dönmeyen bir hook build'i değil, kendi batch'ini
+götürür (DEGRADED altında listelenir).
 
 ## Neden TypeScript?
 
@@ -523,6 +545,7 @@ TypeScript'i kendiniz yazabilirsiniz.
 - **Sarmalanması okunamayan middleware** `middleware: not extracted (UNKNOWN)` olarak bildirilir, "none" olarak değil.
 - **Ayrıştırılamayan dosyalar ve 2 MB'tan büyük dosyalar**: tanımları ve çağrıları graftan eksik kalır. Her yanıt bu durumda onları adlandıran bir
   `DEGRADED` satırı ile başlar.
+- **Pedestal service-map interceptor'ları** okunmaz, bu yüzden her pedestal route'un middleware'i UNKNOWN'dır.
 - **Route yetkilendirmesi** `.clojure-atlas.edn` gerektirir. Bu dosya olmadan route_authz "not provable" der ve
   permission_routes capability'yi absent olarak bildirir.
 - **Henüz desteklenmeyenler**: bidi route'ları, compojure-api, pedestal verbose map route'ları, malli registry'leri,

@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` 会写出 `.clojure-atlas/graph.json.gz`。在 integrant 仓库上的输出如下：
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` 会显示它将要写入的项目 `.mcp.json`，只有加上 `--yes` 才会真正写入：
@@ -120,7 +120,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 图描述的是哪个提交，每个适配器找到了什么，并附各 band 的数量。问题：integrant 的图知道什么？
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -226,10 +226,13 @@ next: tests_covering(target="POST /api/articles")
 GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
 ```
 
-compojure 和 Ring 的中间件（`->`、`->>`、嵌套调用、`wrap-routes`）按 HEURISTIC 读取。reitit 和 pedestal 路由数据中的中间件
-（`:middleware`、`:interceptors`）则直接从路由本身读取。权限结论是 “not provable”，
-因为该项目没有在 `.clojure-atlas.edn` 中声明任何授权模型。
-
+路由表之外包装的中间件按 HEURISTIC 读取：Ring 的包装、`->`、`->>`、嵌套调用、`wrap-routes`，以及 reitit 的
+`ring-handler` 的外层包装和第三个参数 `{:middleware [...]}`。在那里找到的权限中间件算作一次检查。reitit 和 pedestal
+路由数据中的中间件（`:middleware`、`:interceptors`）则直接从路由本身读取。当包装无法被完整读取时，route_authz 会说
+`no permission check found in what could be read (...); not provable that none exists`。没有任何路由器触及的路由树，
+其中间件显示为 UNKNOWN；目前每条 pedestal 路由都是如此，因为 pedestal service map 的 interceptor 不会被读取。图无法解析的
+handler 显示为 `handler: not resolved (UNKNOWN)`。这里的权限结论是 “not provable”，因为该项目没有在
+`.clojure-atlas.edn` 中声明任何授权模型。
 ### permission_routes
 
 所有检查某项权限的路由。问题：mount 中哪些路由要求 `:admin`？
@@ -405,8 +408,19 @@ tests to add: none (searched: changed definitions with no static test)
 
 ```
 DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
+note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+如果找不到的名称很可能位于 clj-kondo 运行超时的文件中，或位于 git 跟踪但构建未分析的文件中，回答会以同样的方式点出该文件。
+
+被使用但在任何地方都没有定义的名称，通常是由 clj-kondo 无法展开的宏生成的。回答会指出它在哪里被使用以及该添加什么。以 next.jdbc 为例：
+
+```
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: use a fully qualified name (ns/name)
 ```
 
@@ -445,12 +459,12 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs 和 usermanager。表�
 
 ## 基准测试
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) 包含 20 个关于 corpus 仓库的问题。每个预期答案都不借助工具、
+[docs/BENCHMARK.md](docs/BENCHMARK.md) 包含 21 个关于 corpus 仓库的问题。每个预期答案都不借助工具、
 在源码中手工核对过，其 file:line 记录在 [bench/questions.json](bench/questions.json) 中。
 
 - **肯定类问题：14 题全部通过。** 回答列出了所有预期的定义且没有其他内容，才算通过。
   找到的预期项：40 个中的 40 个；回答的项：40 个。
-- **无结果类问题：6 题全部通过。** 正确答案是“没有”（*none*、*not-found* 或 *capability-off*），
+- **无结果类问题：7 题全部通过。** 正确答案是“没有”（*none*、*not-found*、*used-undefined* 或 *capability-off*），
   回答必须明确说出这种无结果的类型，且不得列出任何内容。
 
 前十二道肯定类问题在首次运行之前就已确定，首次运行得分为 12 题中的 11 题。未通过的一题
@@ -482,7 +496,8 @@ compojure 中间件链（q13）和 reitit 前端路由（q14）。
 构建只读取文件。它只运行 clj-kondo（固定的二进制文件，或 PATH 上的那个）和 `git ls-files`，
 绝不会用 Node、JVM 或 shell 运行被分析仓库的代码。TypeScript 从 clojure-atlas 自己的安装中加载，
 绝不从被分析的仓库中加载。clj-kondo 会应用项目的 `.clj-kondo` 配置；其中声明的 hook 由 clj-kondo 自己解释，
-与任何运行 clj-kondo 的编辑器一样。MCP 服务器只读取图文件，指定 `--repo` 时运行只读的 git 命令。
+与任何运行 clj-kondo 的编辑器一样。MCP 服务器只读取图文件，指定 `--repo` 时运行只读的 git 命令。每次 git 调用都会忽略仓库自身那些会运行命令的设置（`core.fsmonitor`、filter driver、hook），
+从不弹出提示，并且有超时。每次 clj-kondo 运行同样有超时：一个永不返回的 hook 只会让它所在的批次失效（列在 DEGRADED 下），而不会让整个构建失败。
 
 ## 为什么用 TypeScript？
 
@@ -504,6 +519,7 @@ clj-kondo 完成；clojure-atlas 读取它的输出和源码形式，并构建�
   clj-kondo 才会展开它。添加其中之一并重新构建，其内部的使用就会重新成为 STATIC_PROVEN。
 - **包装无法读取的中间件**会报告为 `middleware: not extracted (UNKNOWN)`，而不是 “none”。
 - **无法解析的文件和超过 2 MB 的文件**：它们的定义和调用不在图中。此时每个回答都以一行 `DEGRADED` 开头，并列出这些文件。
+- **Pedestal service map 的 interceptor** 不会被读取，因此每条 pedestal 路由的中间件都是 UNKNOWN。
 - **路由授权**需要 `.clojure-atlas.edn`。没有它时，route_authz 回答 “not provable”，
   permission_routes 报告该 capability 为 absent。
 - **尚不支持**：bidi 路由、compojure-api、pedestal 的 verbose map 路由、malli 注册表、

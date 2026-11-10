@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` は `.clojure-atlas/graph.json.gz` を書き出します。integrant リポジトリでは次のように出力されます。
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` は書き込む予定のプロジェクトの `.mcp.json` を表示します。実際に書き込むのは `--yes` を付けたときだけです。
@@ -120,7 +120,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 グラフがどのコミットを表すか、各アダプタが何を見つけたかを、band ごとの件数付きで返します。質問: integrant のグラフは何を知っているか。
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -226,10 +226,15 @@ next: tests_covering(target="POST /api/articles")
 GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
 ```
 
-compojure と Ring のミドルウェア (`->`、`->>`、ネストした呼び出し、`wrap-routes`) は HEURISTIC として読み取ります。
-reitit と pedestal のルートデータ内のミドルウェア (`:middleware`、`:interceptors`) は、ルート自体から読み取ります。
-権限の判定は "not provable" です。このプロジェクトは `.clojure-atlas.edn` で認可モデルを宣言していないためです。
-
+ルートテーブルの外側でラップされたミドルウェアは HEURISTIC として読み取ります。Ring のラップ、`->`、`->>`、ネストした呼び出し、
+`wrap-routes`、そして reitit の `ring-handler` の外側のラップと第 3 引数の `{:middleware [...]}` です。そこで見つかった
+権限ミドルウェアはチェックとして数えます。reitit と pedestal のルートデータ内のミドルウェア
+(`:middleware`、`:interceptors`) は、ルート自体から読み取ります。ラップを最後まで読み取れなかった場合、route_authz は
+`no permission check found in what could be read (...); not provable that none exists` と答えます。どのルーターからも
+到達されないルートツリーは、そのミドルウェアが UNKNOWN と表示されます。現状ではすべての pedestal ルートがこれに当たります。
+pedestal の service map の interceptor は読み取らないためです。グラフが解決できないハンドラーは
+`handler: not resolved (UNKNOWN)` と表示されます。ここでの権限の判定は "not provable" です。このプロジェクトは
+`.clojure-atlas.edn` で認可モデルを宣言していないためです。
 ### permission_routes
 
 権限をチェックするすべてのルートです。質問: mount のどのルートが `:admin` を要求するか。
@@ -405,8 +410,21 @@ tests to add: none (searched: changed definitions with no static test)
 
 ```
 DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
+note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+clj-kondo の実行がタイムアウトしたファイル、または git が追跡しているのにビルドが解析しなかったファイルにありそうな
+見つからない名前も、同じようにそのファイルを挙げます。
+
+使われているのにどこにも定義されていない名前は、たいてい clj-kondo が展開できないマクロによって作られています。回答は
+それがどこで使われているかと、何を追加すべきかを示します。next.jdbc の例です。
+
+```
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: use a fully qualified name (ns/name)
 ```
 
@@ -445,13 +463,13 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 
 ## ベンチマーク
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) には、corpus のリポジトリに関する 20 の質問があります。
+[docs/BENCHMARK.md](docs/BENCHMARK.md) には、corpus のリポジトリに関する 21 の質問があります。
 期待される回答はそれぞれ、ツールを使わずにソースで手作業により確認しました。その file:line は
 [bench/questions.json](bench/questions.json) にあります。
 
 - **肯定の質問: 14 問中 14 問が合格。** 回答が期待される定義をすべて挙げ、それ以外を挙げなければ合格です。
   期待された項目の発見: 40 件中 40 件。回答された項目: 40 件。
-- **不在の質問: 6 問中 6 問が合格。** 正しい回答は「存在しない」(*none*、*not-found*、*capability-off*) であり、
+- **不在の質問: 7 問中 7 問が合格。** 正しい回答は「存在しない」(*none*、*not-found*、*used-undefined*、*capability-off*) であり、
   回答はその種類の不在を明示し、何も挙げてはいけません。
 
 最初の 12 問の肯定の質問は最初の実行の前に固定しました。最初の実行は 12 問中 11 問でした。外れた 1 問
@@ -486,7 +504,10 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 解析対象リポジトリのコードを Node、JVM、シェルで実行することはありません。TypeScript は clojure-atlas 自身の
 インストールから読み込まれ、解析対象リポジトリからは読み込まれません。clj-kondo はプロジェクトの `.clj-kondo` 設定を適用します。
 そこで宣言された hook は、clj-kondo を実行するどのエディタとも同じように、clj-kondo 自身が解釈します。MCP サーバーは
-グラフファイルを読み取るだけで、`--repo` を指定した場合は読み取り専用の git コマンドを実行します。
+グラフファイルを読み取るだけで、`--repo` を指定した場合は読み取り専用の git コマンドを実行します。git の呼び出しはすべて、
+リポジトリ自身の設定のうちコマンドを実行するもの (`core.fsmonitor`、filter driver、hook) を無視し、プロンプトを出さず、
+タイムアウトがあります。clj-kondo の各実行にもタイムアウトがあります。決して戻らない hook はそのバッチを失わせますが
+(DEGRADED に挙がります)、ビルド全体は失われません。
 
 ## なぜ TypeScript なのか
 
@@ -512,6 +533,7 @@ clj-kondo が行います。clojure-atlas はその出力とソースの形を�
 - **ラップを読み取れないミドルウェア**は、「none」ではなく `middleware: not extracted (UNKNOWN)` と報告されます。
 - **解析できないファイルと 2 MB を超えるファイル**: その定義と呼び出しはグラフに含まれません。その場合、すべての回答は、それらを挙げる
   `DEGRADED` 行で始まります。
+- **pedestal の service map の interceptor** は読み取らないため、すべての pedestal ルートのミドルウェアは UNKNOWN です。
 - **ルート認可**には `.clojure-atlas.edn` が必要です。ない場合、route_authz は "not provable" と答え、
   permission_routes はその capability を absent と報告します。
 - **未対応**: bidi ルート、compojure-api、pedestal の verbose map ルート、malli レジストリ、

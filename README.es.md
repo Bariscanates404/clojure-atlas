@@ -30,7 +30,7 @@ npx clojure-atlas init
 `build` escribe `.clojure-atlas/graph.json.gz`. En el repo de integrant imprime:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` muestra el `.mcp.json` del proyecto que escribiría y lo escribe solo con `--yes`:
@@ -122,7 +122,7 @@ Qué commit describe el grafo y qué encontró cada adaptador, con el número de
 de integrant?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -230,9 +230,15 @@ Cuando no se puede leer la envoltura de una ruta, la sección lo dice en lugar d
 GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
 ```
 
-El middleware de compojure y Ring (`->`, `->>`, llamadas anidadas, `wrap-routes`) se lee como HEURISTIC. El middleware
-de los datos de ruta de reitit y pedestal (`:middleware`, `:interceptors`) se lee de la propia ruta. El veredicto de
-permisos es "not provable", porque este proyecto no declara ningún modelo de autorización en `.clojure-atlas.edn`.
+El middleware envuelto fuera de la tabla de rutas se lee como HEURISTIC: envolturas de Ring, `->`, `->>`, llamadas
+anidadas, `wrap-routes`, y las envolturas externas y el `{:middleware [...]}` del tercer argumento del `ring-handler`
+de reitit. Un middleware de permisos encontrado ahí cuenta como una comprobación. El middleware de los datos de ruta
+de reitit y pedestal (`:middleware`, `:interceptors`) se lee de la propia ruta. Cuando la envoltura no pudo leerse por
+completo, route_authz dice `no permission check found in what could be read (...); not provable that none exists`. Un
+árbol de rutas que ningún router alcanza muestra su middleware como UNKNOWN; hoy eso ocurre con cada ruta de pedestal,
+porque los interceptors de un service map de pedestal no se leen. Un handler que el grafo no puede resolver aparece
+como `handler: not resolved (UNKNOWN)`. Aquí el veredicto de permisos es "not provable", porque este proyecto no
+declara ningún modelo de autorización en `.clojure-atlas.edn`.
 
 ### permission_routes
 
@@ -419,8 +425,21 @@ biff, donde un archivo no se puede parsear y un namespace está definido dos vec
 
 ```
 DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
+note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+Un nombre no encontrado que probablemente vive en un archivo cuya ejecución de clj-kondo agotó el tiempo, o en un
+archivo que git rastrea pero que el build no analizó, nombra ese archivo de la misma manera.
+
+Un nombre que se usa pero no se define en ningún sitio suele generarlo un macro que clj-kondo no puede expandir. La
+respuesta dice dónde se usa y qué añadir. De next.jdbc:
+
+```
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: use a fully qualified name (ns/name)
 ```
 
@@ -456,13 +475,13 @@ sus macros, o las nombra bajo `:lint-as` en `.clojure-atlas.edn`. El corpus se m
 
 ## Benchmark
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) tiene 20 preguntas sobre repos del corpus. Cada respuesta esperada se comprobó
+[docs/BENCHMARK.md](docs/BENCHMARK.md) tiene 21 preguntas sobre repos del corpus. Cada respuesta esperada se comprobó
 a mano en el código fuente, sin la herramienta, y su file:line está en [bench/questions.json](bench/questions.json).
 
 - **Preguntas positivas: 14 de 14 aprobadas.** Una pregunta se aprueba cuando la respuesta nombra todas las definiciones esperadas y
   nada más. Elementos esperados encontrados: 40 de 40; elementos respondidos: 40.
-- **Preguntas de ausencia: 6 de 6 aprobadas.** La respuesta correcta es que no hay nada (*none*, *not-found* o
-  *capability-off*), y la respuesta debe indicar ese tipo de ausencia y no nombrar nada.
+- **Preguntas de ausencia: 7 de 7 aprobadas.** La respuesta correcta es que no hay nada (*none*, *not-found*,
+  *used-undefined* o *capability-off*), y la respuesta debe indicar ese tipo de ausencia y no nombrar nada.
 
 Las primeras doce preguntas positivas se fijaron antes de la primera ejecución, que obtuvo 11 de 12. El fallo (registros de re-frame
 a través de `re-frame.alpha`) se corrigió en el constructor con un fixture, y la pregunta se mantuvo tal como estaba. Dos preguntas se añadieron después, para la cadena de middleware de compojure (q13) y una
@@ -495,7 +514,10 @@ El build lee archivos. Solo ejecuta clj-kondo (el binario fijado, o el del PATH)
 código del repo analizado con Node, una JVM o un shell. TypeScript se carga desde la propia instalación de clojure-atlas,
 nunca desde el repo analizado. clj-kondo aplica la config `.clj-kondo` del proyecto; los hooks declarados allí los
 interpreta el propio clj-kondo, como en cualquier editor que ejecute clj-kondo. El servidor MCP solo lee el archivo del
-grafo y, con `--repo`, ejecuta comandos git de solo lectura.
+grafo y, con `--repo`, ejecuta comandos git de solo lectura. Cada llamada a git ignora los ajustes del propio
+repositorio que ejecutan comandos (`core.fsmonitor`, filter drivers, hooks), nunca pide confirmación y tiene un tiempo
+límite. Cada ejecución de clj-kondo también tiene un tiempo límite: un hook que nunca termina cuesta su lote (listado
+bajo DEGRADED), no el build.
 
 ## ¿Por qué TypeScript?
 
@@ -524,6 +546,7 @@ TypeScript uno mismo.
   "none".
 - **Archivos que no se pueden parsear y archivos de más de 2 MB**: sus definiciones y llamadas faltan en el grafo. Cada respuesta empieza entonces
   con una línea `DEGRADED` que los nombra.
+- **Los interceptors de un service map de pedestal** no se leen, así que el middleware de cada ruta de pedestal es UNKNOWN.
 - **La autorización de rutas** necesita `.clojure-atlas.edn`. Sin él, route_authz dice "not provable" y
   permission_routes informa la capacidad como ausente.
 - **Aún no soportado**: rutas bidi, compojure-api, rutas de mapa verbosas de pedestal, registros de malli, sistemas integrant

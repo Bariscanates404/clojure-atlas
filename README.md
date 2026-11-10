@@ -28,7 +28,7 @@ npx clojure-atlas init
 `build` writes `.clojure-atlas/graph.json.gz`. On the integrant repo it prints:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.5 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 296 nodes, 1481 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.9 s -> .clojure-atlas/graph.json.gz
 ```
 
 `init` shows the project `.mcp.json` it would write and writes it only with `--yes`:
@@ -119,7 +119,7 @@ Which commit the graph describes, what each adapter found, with band counts. Que
 graph know?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:47:04.254Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T01:24:25.121Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -226,9 +226,15 @@ When the wrapping of a route cannot be read, the section says so instead of "non
 GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
 ```
 
-Compojure and Ring middleware (`->`, `->>`, nested calls, `wrap-routes`) is read at HEURISTIC. Middleware in reitit
-and pedestal route data (`:middleware`, `:interceptors`) is read from the route itself. The permission verdict is
-"not provable", because this project declares no authorization model in `.clojure-atlas.edn`.
+Middleware wrapped outside the route table is read at HEURISTIC: Ring wraps, `->`, `->>`, nested calls,
+`wrap-routes`, and the outer wraps and third-argument `{:middleware [...]}` of reitit's `ring-handler`. A
+permission middleware found there counts as a check. Middleware in reitit and pedestal route data
+(`:middleware`, `:interceptors`) is read from the route itself. When the wrapping could not be fully read,
+route_authz says `no permission check found in what could be read (...); not provable that none exists`. A route
+tree that no router reaches shows its middleware as UNKNOWN; today that is every pedestal route, because the
+interceptors of a pedestal service map are not read. A handler the graph cannot resolve shows as
+`handler: not resolved (UNKNOWN)`. Here the permission verdict is "not provable", because this project declares
+no authorization model in `.clojure-atlas.edn`.
 
 ### permission_routes
 
@@ -413,8 +419,21 @@ cannot be parsed and one namespace is defined twice:
 
 ```
 DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; 1 namespace(s) defined in more than one file (tasks) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
-CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"; used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found
+note: com.biffweb.sqlite.impl.execute/execute is used at libs/sqlite/src/com/biffweb/sqlite.clj:110, libs/sqlite/src/com/biffweb/sqlite.clj:121, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:23, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:30, libs/sqlite/src/com/biffweb/sqlite/impl/kv.clj:44 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
+
+A not-found name that probably lives in a file whose clj-kondo run timed out, or in a file git tracks but the
+build did not analyze, names that file the same way.
+
+A name that is used but defined nowhere is usually made by a macro clj-kondo cannot expand. The answer says where
+it is used and what to add. From next.jdbc:
+
+```
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
 note: use a fully qualified name (ns/name)
 ```
 
@@ -448,13 +467,13 @@ its macros, or names them under `:lint-as` in `.clojure-atlas.edn`. The corpus i
 
 ## Benchmark
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) has 20 questions about corpus repos. Each expected answer was checked by
+[docs/BENCHMARK.md](docs/BENCHMARK.md) has 21 questions about corpus repos. Each expected answer was checked by
 hand in the source, without the tool, and its file:line is in [bench/questions.json](bench/questions.json).
 
 - **Positive questions: 14 of 14 pass.** A question passes when the answer names every expected definition and
   nothing else. Expected items found: 40 of 40; items answered: 40.
-- **Absence questions: 6 of 6 pass.** The correct answer is that there is none (*none*, *not-found* or
-  *capability-off*), and the answer must state that kind of absence and name nothing.
+- **Absence questions: 7 of 7 pass.** The correct answer is that there is none (*none*, *not-found*,
+  *used-undefined* or *capability-off*), and the answer must state that kind of absence and name nothing.
 
 The first twelve positive questions were fixed before the first run, which scored 11 of 12. The miss (re-frame
 registrations through `re-frame.alpha`) was fixed in the builder with a fixture, and the question was kept as it
@@ -517,6 +536,7 @@ TypeScript yourself.
   "none".
 - **Unparsable files and files over 2 MB**: their definitions and calls are missing from the graph. Every answer
   then starts with a `DEGRADED` line naming them.
+- **Pedestal service-map interceptors** are not read, so the middleware of every pedestal route is UNKNOWN.
 - **Route authorization** needs `.clojure-atlas.edn`. Without it, route_authz says "not provable" and
   permission_routes reports the capability as absent.
 - **Not supported yet**: bidi routes, compojure-api, pedestal verbose map routes, malli registries, integrant
