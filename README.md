@@ -402,6 +402,8 @@ client routes yet. [Questions, results and methodology](docs/BENCHMARK.md).
 
 ## Contributing
 
+**Let's build our Clojure X-ray tool together!**
+
 A useful contribution can start with a tiny Clojure example: “this library connects these two things, and Atlas
 should see it.” Add a fixture and the expected graph rows, or help implement its adapter. Both are welcome.
 
