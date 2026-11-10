@@ -30,7 +30,8 @@ npx clojure-atlas init
 `build` は `.clojure-atlas/graph.json.gz` を書き出します。integrant リポジトリでは次のように出力されます。
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 1.1 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 `init` は書き込む予定のプロジェクトの `.mcp.json` を表示します。実際に書き込むのは `--yes` を付けたときだけです。
@@ -102,6 +103,7 @@ usage:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 プロジェクト自身の `.clj-kondo` 設定は尊重されます。プロジェクトルートに任意で `.clojure-atlas.edn` を置くと、
@@ -111,14 +113,16 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 ## ツール
 
 以下の例はすべて、[examples/](examples/) にあるグラフに対する `clojure-atlas mcp` の実際の出力です。
-省略した箇所にだけ印を付けています。`[S]`、`[H]`、`[?]` は band で、次のセクションで説明します。
+省略した箇所にだけ印を付けています。これらのグラフの一部はビルド時にいくつかのエッジが落ちたため、回答は `DEGRADED` 行で
+始まります (次のセクションを参照)。`[S]`、`[H]`、`[?]` は band で、次のセクションで説明します。
 
 ### graph_info
 
 グラフがどのコミットを表すか、各アダプタが何を見つけたかを、band ごとの件数付きで返します。質問: integrant のグラフは何を知っているか。
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-09T23:22:16.599Z: 295 nodes, 1473 edges
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -134,6 +138,7 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 定義の直接の呼び出し元です。質問: `integrant.core/dependent-keys` を呼ぶのは誰か。
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -147,13 +152,15 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 ```
 
 `include_references: true` を付けると、値としての使用、コールバック、登録済みハンドラ、マクロ展開、
-ディスパッチ候補、再束縛も一覧に含まれます。
+ディスパッチ候補、再束縛も一覧に含まれます。syntax-quote されたマクロ本体の中で名前が挙がった var (compojure の
+`defroutes` が `routes` を指す場合) は、呼び出しではなく HEURISTIC な参照です。
 
 ### blast_radius
 
 定義の推移的な依存元です。質問: `integrant.core/ref?` を変更すると何に影響するか。
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -175,12 +182,13 @@ deeper (25 S25)
 アリティ、分割代入されるキー、各呼び出し元が渡す値です。質問: `integrant.core/init` はどのように呼ばれているか。
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
 arities (2 S2)
-  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s); passes a map parameter on)
-  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s); passes a map parameter on)
+  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
+  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
 callers (38 S38)
   1. integrant.core/init: arity 2, arg0 symbol config (keys unknown)  src/integrant/core.cljc:655 [S]  fan-in 8
   2. integrant.core-test/fold-test: arity 1, arg0 symbol config (keys unknown)  test/integrant/core_test.cljc:649 [S]
@@ -192,27 +200,47 @@ diff モード (`base_graph`、または `added_keys` / `removed_keys` / `aritie
 
 ### route_authz
 
-バックエンドルートのハンドラ、ミドルウェアチェーン、権限チェックです。質問: usermanager で `GET /user/list` を処理するのは何か。
+バックエンドルートのハンドラ、ミドルウェアチェーン、権限チェックです。質問: polylith-realworld で `POST /api/articles` を処理するのは何か。それを包むミドルウェアは何か。
 
 ```
-ROUTE_AUTHZ GET /user/list — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [H1]
+ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): handler (1)
-  1. usermanager.controllers.user/get-users  src/usermanager/main.clj:132 [H]  entry: route GET /user/list @usermanager.main/my-handler, heuristic match
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware (outermost first): none (searched: guarded_by edges)
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): permissions: none (searched: requires_permission edges)
-[... trimmed ...]
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
+  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
+  [... trimmed ...]
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="POST /api/articles")
 ```
 
-ハンドラは見つかりますが、ヒューリスティックな一致としてだけです。権限の判定は "not provable" です。
-このプロジェクトは `.clojure-atlas.edn` で認可モデルを宣言していないためです。
+次のページにある 11 行目が認可ミドルウェアで、compojure の `wrap-routes` で適用されています。
+
+```
+  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
+```
+
+ルートのラップを読み取れない場合、セクションは「none」ではなくそう表示します (usermanager、`GET /user/list`)。
+
+```
+GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
+```
+
+compojure と Ring のミドルウェア (`->`、`->>`、ネストした呼び出し、`wrap-routes`) は HEURISTIC として読み取ります。
+reitit と pedestal のルートデータ内のミドルウェア (`:middleware`、`:interceptors`) は、ルート自体から読み取ります。
+権限の判定は "not provable" です。このプロジェクトは `.clojure-atlas.edn` で認可モデルを宣言していないためです。
 
 ### permission_routes
 
 権限をチェックするすべてのルートです。質問: mount のどのルートが `:admin` を要求するか。
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -224,6 +252,7 @@ searched: names, ids and kind-prefixed ids; check the spelling or pass the fully
 Datomic、datascript、XTDB の属性について、証明済みの読み手と書き手です。質問: mount のサンプルアプリで `:order/bid` を書くのは誰か。
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -241,6 +270,7 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 re-frame イベントのディスパッチ元とハンドラ、またはサブスクリプションのハンドラ、入力、購読元です。質問: re-frame の todomvc で `:delete-todo` をディスパッチするのは誰か。
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -279,6 +309,7 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 サンプルのリポジトリにはどれもブラウザテストがなく、回答もそう伝えます。質問: `mount.core/start` に到達するブラウザテストはどれか。
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -308,6 +339,7 @@ in tests: none
 リテラルのマップテーブルで、ほとんどの兄弟行が持つキーを欠いている行です。質問: re-frame の `test/re_frame/subs/alpha_test.cljs` のテーブルに、キーが欠けた行はあるか。
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -368,7 +400,20 @@ tests to add: none (searched: changed definitions with no static test)
 - **none**: 対象は存在し、それに関係するものがありません。`callers: none (searched: call edges into this definition)`。
 - **not found**: コードベースにそのようなものがありません。`no definition matches "integrant.core/stop"`。
 - **capability off**: グラフが答えられません。その種類の事実を扱うアダプタが、抽出するものを見つけられなかったか、設定されていません。
-  `capability route_authz is absent: an empty answer is not proof of absence`。
+  `capability route_authz is absent: an empty answer is not proof of absence`。その capability に依存するセクションは
+  `not extracted (route_authz is absent)` と表示され、「none」にはなりません。読み取れないミドルウェアチェーンは
+  `not extracted (UNKNOWN)` と表示されます。
+
+グラフ自体が不完全なとき、ビルドログ、graph_info、すべての回答は `DEGRADED` 行で始まります。clj-kondo が解析できなかった
+ファイルや、端が node でなかったために落ちたエッジがその対象です。解析されなかったファイルに存在すると思われる名前は、
+そのように報告されます。1 つのファイルを解析できなかった biff の例です。
+
+```
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
 
 見つからなかったという結果は、カバレッジについての記述として読んでください。存在しないことの証明ではありません。
 
@@ -405,17 +450,18 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 
 ## ベンチマーク
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) には、corpus のリポジトリに関する 18 の質問があります。
+[docs/BENCHMARK.md](docs/BENCHMARK.md) には、corpus のリポジトリに関する 20 の質問があります。
 期待される回答はそれぞれ、ツールを使わずにソースで手作業により確認しました。その file:line は
 [bench/questions.json](bench/questions.json) にあります。
 
-- **肯定の質問: 12 問中 12 問が合格。** 回答が期待される定義をすべて挙げ、それ以外を挙げなければ合格です。
-  期待された項目の発見: 28 件中 28 件。回答された項目: 28 件。
+- **肯定の質問: 14 問中 14 問が合格。** 回答が期待される定義をすべて挙げ、それ以外を挙げなければ合格です。
+  期待された項目の発見: 40 件中 40 件。回答された項目: 40 件。
 - **不在の質問: 6 問中 6 問が合格。** 正しい回答は「存在しない」(*none*、*not-found*、*capability-off*) であり、
   回答はその種類の不在を明示し、何も挙げてはいけません。
 
-肯定の質問は最初の実行の前に固定しました。最初の実行は 12 問中 11 問でした。外れた 1 問
+最初の 12 問の肯定の質問は最初の実行の前に固定しました。最初の実行は 12 問中 11 問でした。外れた 1 問
 (`re-frame.alpha` 経由の re-frame の登録) は、フィクスチャを付けてビルダー側で修正し、質問は元のまま残しました。
+後から 2 問を追加しました。compojure のミドルウェアチェーン (q13) と reitit のフロントエンドルート (q14) です。
 
 ## 要件
 
@@ -449,11 +495,13 @@ clj-kondo が行います。clojure-atlas はその出力とソースの形を�
   動的にしか読み書きされないマップキーは追跡しません。マルチメソッド、`resolve`/`apply`、HTTP フィクスチャ経由で
   コードに到達するテストは数えません。
 - **ヒューリスティックな部分**: マルチメソッドとプロトコルのディスパッチ (`may_dispatch_to`)、一部の compojure ハンドラ
-  (`heuristic match` と表示)、スレッドされたキースロット、transact や query の呼び出し外にあるクエリリテラル、
-  ミドルウェアファクトリの呼び出し、key_siblings の finding。
-- **ラップして適用される compojure ミドルウェア** (`wrap-routes`、routes の var に対する `->`) はルートに関連付けられないため、
-  route_authz はそれらに対して `middleware (outermost first): none` と報告します。ミドルウェアチェーンは
-  reitit と pedestal のルートデータ (`:middleware`、`:interceptors`) から読み取ります。
+  (`heuristic match` と表示)、compojure と Ring のミドルウェアチェーン、ミドルウェアファクトリの呼び出し、
+  reitit を require していない namespace にある reitit のフロントエンドルート表 (プロジェクト内のどこかで
+  `reitit.frontend` が使われていれば読み取ります)、syntax-quote されたマクロ本体で名前が挙がった var、
+  スレッドされたキースロット、transact や query の呼び出し外にあるクエリリテラル、key_siblings の finding。
+- **ラップを読み取れないミドルウェア**は、「none」ではなく `middleware: not extracted (UNKNOWN)` と報告されます。
+- **解析できないファイル**: その定義と呼び出しはグラフに含まれません。その場合、すべての回答は、それらを挙げる
+  `DEGRADED` 行で始まります。
 - **ルート認可**には `.clojure-atlas.edn` が必要です。ない場合、route_authz は "not provable" と答え、
   permission_routes はその capability を absent と報告します。
 - **未対応**: bidi ルート、compojure-api、pedestal の verbose map ルート、malli レジストリ、

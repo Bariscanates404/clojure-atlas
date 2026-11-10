@@ -30,7 +30,8 @@ npx clojure-atlas init
 `build` 会写出 `.clojure-atlas/graph.json.gz`。在 integrant 仓库上的输出如下：
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 1.1 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 `init` 会显示它将要写入的项目 `.mcp.json`，只有加上 `--yes` 才会真正写入：
@@ -102,6 +103,7 @@ usage:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 项目自己的 `.clj-kondo` 配置会被采用。项目根目录下可选的 `.clojure-atlas.edn` 用于补充通用适配器无法猜到的信息：
@@ -111,14 +113,16 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 ## 工具
 
 下面的每个示例都是 `clojure-atlas mcp` 在 [examples/](examples/) 中某个图上的真实输出，
-只在标注处做了截断。`[S]`、`[H]` 和 `[?]` 是 band，将在下一节说明。
+只在标注处做了截断。其中一些图在构建时丢弃了少量边，因此它们的回答以一行 `DEGRADED` 开头（见下一节）。
+`[S]`、`[H]` 和 `[?]` 是 band，将在下一节说明。
 
 ### graph_info
 
 图描述的是哪个提交，每个适配器找到了什么，并附各 band 的数量。问题：integrant 的图知道什么？
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-09T23:22:16.599Z: 295 nodes, 1473 edges
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -134,6 +138,7 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 某个定义的直接调用者。问题：谁调用 `integrant.core/dependent-keys`？
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -147,13 +152,15 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 ```
 
 加上 `include_references: true` 后，还会列出值引用、回调、已注册的处理器、宏展开、
-分派候选和重新绑定。
+分派候选和重新绑定。在带 syntax-quote 的宏体中被点名的 var（compojure 的 `defroutes` 点名 `routes`）是
+HEURISTIC 引用，而不是调用。
 
 ### blast_radius
 
 某个定义的传递依赖方。问题：修改 `integrant.core/ref?` 会影响到哪里？
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -175,12 +182,13 @@ deeper (25 S25)
 参数个数（arity）、解构的键，以及每个调用者传入的内容。问题：`integrant.core/init` 是如何被调用的？
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
 arities (2 S2)
-  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s); passes a map parameter on)
-  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s); passes a map parameter on)
+  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
+  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
 callers (38 S38)
   1. integrant.core/init: arity 2, arg0 symbol config (keys unknown)  src/integrant/core.cljc:655 [S]  fan-in 8
   2. integrant.core-test/fold-test: arity 1, arg0 symbol config (keys unknown)  test/integrant/core_test.cljc:649 [S]
@@ -192,20 +200,39 @@ callers (38 S38)
 
 ### route_authz
 
-后端路由的处理器、中间件链和权限检查。问题：usermanager 中谁处理 `GET /user/list`？
+后端路由的处理器、中间件链和权限检查。问题：polylith-realworld 中谁处理 `POST /api/articles`，哪些中间件包裹着它？
 
 ```
-ROUTE_AUTHZ GET /user/list — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [H1]
+ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): handler (1)
-  1. usermanager.controllers.user/get-users  src/usermanager/main.clj:132 [H]  entry: route GET /user/list @usermanager.main/my-handler, heuristic match
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware (outermost first): none (searched: guarded_by edges)
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): permissions: none (searched: requires_permission edges)
-[... trimmed ...]
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
+  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
+  [... trimmed ...]
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="POST /api/articles")
 ```
 
-处理器找到了，但只是启发式匹配。权限结论是 “not provable”，
+第 11 行在下一页，是授权中间件，通过 compojure 的 `wrap-routes` 应用：
+
+```
+  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
+```
+
+当路由的包装无法读取时，该部分会明确说明，而不是写 “none”（usermanager，`GET /user/list`）：
+
+```
+GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
+```
+
+compojure 和 Ring 的中间件（`->`、`->>`、嵌套调用、`wrap-routes`）按 HEURISTIC 读取。reitit 和 pedestal 路由数据中的中间件
+（`:middleware`、`:interceptors`）则直接从路由本身读取。权限结论是 “not provable”，
 因为该项目没有在 `.clojure-atlas.edn` 中声明任何授权模型。
 
 ### permission_routes
@@ -213,6 +240,7 @@ GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): 
 所有检查某项权限的路由。问题：mount 中哪些路由要求 `:admin`？
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -224,6 +252,7 @@ searched: names, ids and kind-prefixed ids; check the spelling or pass the fully
 某个 Datomic、datascript 或 XTDB 属性的已证明读取方和写入方。问题：在 mount 的示例应用中谁写入 `:order/bid`？
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -241,6 +270,7 @@ next: tests_for(symbol=":order/bid")  blast_radius(var="app.nyse/add-order")
 re-frame 事件的分发方和处理器，或订阅的处理器、输入和订阅方。问题：在 re-frame 的 todomvc 中谁分发 `:delete-todo`？
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -280,6 +310,7 @@ next: blast_radius(var="usermanager.model.user-manager/get-user-by-id", depth=2)
 示例仓库都没有这类测试，回答中也会这样说明。问题：哪些浏览器测试会到达 `mount.core/start`？
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -310,6 +341,7 @@ in tests: none
 `test/re_frame/subs/alpha_test.cljs` 表中是否有行缺少某个键？
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -370,7 +402,18 @@ tests to add: none (searched: changed definitions with no static test)
 - **none**：该对象存在，但没有任何东西与它相关。`callers: none (searched: call edges into this definition)`。
 - **not found**：代码库中没有这个对象。`no definition matches "integrant.core/stop"`。
 - **capability off**：图无法回答，因为负责该类事实的适配器没有找到可提取的内容，或未被配置。
-  `capability route_authz is absent: an empty answer is not proof of absence`。
+  `capability route_authz is absent: an empty answer is not proof of absence`。依赖它的部分会显示为
+  `not extracted (route_authz is absent)`，绝不会是 “none”。无法读取的中间件链显示为 `not extracted (UNKNOWN)`。
+
+当图本身不完整时，构建日志、graph_info 和每个回答都以一行 `DEGRADED` 开头：可能是 clj-kondo 无法解析的文件，也可能是因
+一端不是节点而被丢弃的边。很可能位于未解析文件中的名字会被如此说明。下面是 biff 的例子，其中有一个文件无法解析：
+
+```
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
 
 请把未命中理解为对覆盖范围的陈述，而不是某物不存在的证明。
 
@@ -407,16 +450,17 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs 和 usermanager。表�
 
 ## 基准测试
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) 包含 18 个关于 corpus 仓库的问题。每个预期答案都不借助工具、
+[docs/BENCHMARK.md](docs/BENCHMARK.md) 包含 20 个关于 corpus 仓库的问题。每个预期答案都不借助工具、
 在源码中手工核对过，其 file:line 记录在 [bench/questions.json](bench/questions.json) 中。
 
-- **肯定类问题：12 题全部通过。** 回答列出了所有预期的定义且没有其他内容，才算通过。
-  找到的预期项：28 个中的 28 个；回答的项：28 个。
+- **肯定类问题：14 题全部通过。** 回答列出了所有预期的定义且没有其他内容，才算通过。
+  找到的预期项：40 个中的 40 个；回答的项：40 个。
 - **无结果类问题：6 题全部通过。** 正确答案是“没有”（*none*、*not-found* 或 *capability-off*），
   回答必须明确说出这种无结果的类型，且不得列出任何内容。
 
-肯定类问题在首次运行之前就已确定，首次运行得分为 12 题中的 11 题。未通过的一题
-（通过 `re-frame.alpha` 的 re-frame 注册）已用 fixture 在构建器中修复，该问题保持原样。
+前十二道肯定类问题在首次运行之前就已确定，首次运行得分为 12 题中的 11 题。未通过的一题
+（通过 `re-frame.alpha` 的 re-frame 注册）已用 fixture 在构建器中修复，该问题保持原样。之后又新增了两题，分别针对
+compojure 中间件链（q13）和 reitit 前端路由（q14）。
 
 ## 要求
 
@@ -448,10 +492,11 @@ clj-kondo 完成；clojure-atlas 读取它的输出和源码形式，并构建�
 - **仅静态分析。** 在运行时才解析的 var（`resolve`、`requiring-resolve`、由数据选择的函数）不会被追踪。
   只以动态方式读写的 map 键不会被追踪。通过多方法、`resolve`/`apply` 或 HTTP fixture 到达代码的测试不计入。
 - **启发式部分**：多方法和协议的分派（`may_dispatch_to`）、部分 compojure 处理器（显示为 `heuristic match`）、
-  线程化的键槽位、transact 或 query 调用之外的查询字面量、中间件工厂调用、key_siblings 的 finding。
-- **通过包装应用的 compojure 中间件**（`wrap-routes`、对 routes var 使用 `->`）不会附加到路由上，
-  因此 route_authz 对它们报告 `middleware (outermost first): none`。中间件链从
-  reitit 和 pedestal 的路由数据（`:middleware`、`:interceptors`）中读取。
+  compojure 和 Ring 的中间件链、中间件工厂调用、未 require reitit 的命名空间中的 reitit 前端路由表（只要项目中任何地方
+  使用了 `reitit.frontend` 就会读取）、在 syntax-quote 宏体中被点名的 var、线程化的键槽位、transact 或 query 调用之外的
+  查询字面量、key_siblings 的 finding。
+- **包装无法读取的中间件**会报告为 `middleware: not extracted (UNKNOWN)`，而不是 “none”。
+- **无法解析的文件**：它们的定义和调用不在图中。此时每个回答都以一行 `DEGRADED` 开头，并列出这些文件。
 - **路由授权**需要 `.clojure-atlas.edn`。没有它时，route_authz 回答 “not provable”，
   permission_routes 报告该 capability 为 absent。
 - **尚不支持**：bidi 路由、compojure-api、pedestal 的 verbose map 路由、malli 注册表、

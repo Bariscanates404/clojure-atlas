@@ -13,7 +13,7 @@ npx clojure-atlas coverage examples/compojure.json.gz
 | [integrant.json.gz](integrant.json.gz) | [weavejester/integrant](https://github.com/weavejester/integrant) | system library, .cljc | 21 KB |
 | [compojure.json.gz](compojure.json.gz) | [weavejester/compojure](https://github.com/weavejester/compojure) | ring routing library | 13 KB |
 | [usermanager.json.gz](usermanager.json.gz) | [seancorfield/usermanager-example](https://github.com/seancorfield/usermanager-example) | ring + compojure + component web app | 7 KB |
-| [polylith-realworld.json.gz](polylith-realworld.json.gz) | [furkan3ayraktar/clojure-polylith-realworld-example-app](https://github.com/furkan3ayraktar/clojure-polylith-realworld-example-app) | Polylith REST backend | 49 KB |
+| [polylith-realworld.json.gz](polylith-realworld.json.gz) | [furkan3ayraktar/clojure-polylith-realworld-example-app](https://github.com/furkan3ayraktar/clojure-polylith-realworld-example-app) | Polylith REST backend | 51 KB |
 | [mount.json.gz](mount.json.gz) | [tolitius/mount](https://github.com/tolitius/mount) | mount, with Datomic/datascript example apps | 32 KB |
 | [re-frame.json.gz](re-frame.json.gz) | [day8/re-frame](https://github.com/day8/re-frame) | re-frame, ClojureScript | 117 KB |
 
@@ -30,7 +30,9 @@ git clone https://github.com/tolitius/mount /tmp/mount && git -C /tmp/mount chec
 git clone https://github.com/day8/re-frame /tmp/re-frame && git -C /tmp/re-frame checkout 1a1bf1df6570b17a148ebce70d500ec2da393cdc && npx clojure-atlas build /tmp/re-frame -o examples/re-frame.json.gz
 ```
 
-A rebuilt graph has the same nodes and edges; only the build time stamp differs.
+A rebuilt graph has the same nodes and edges; only the build time stamp differs. integrant, mount and re-frame
+drop a few edges at build time (8, 1 and 2) because one end is not a node, so their answers start with a
+`DEGRADED` line.
 
 ## Transcripts
 
@@ -41,6 +43,7 @@ Real server output over these graphs, trimmed where marked.
 `callers {"var": "integrant.core/dependent-keys"}`
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -59,6 +62,7 @@ grep hits that mix calls, docstrings and keywords.
 `callers {"var": "integrant.core/stop"}`
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/stop — no definition matches "integrant.core/stop"
 note: use a fully qualified name (ns/name)
 searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name
@@ -90,23 +94,30 @@ breaks exactly these three sites, and no test touches it.
 `callers {"var": "compojure.core/routes"}`
 
 ```
-CALLERS compojure.core/routes — 7 direct caller(s) in 1 component(s)
-counts: callers=7 [S7]
+CALLERS compojure.core/routes — 4 direct caller(s) in 1 component(s)
+counts: callers=4 [S4]
+note: 3 more definition(s) reference it without calling it (value use, callback, handler, macro, dispatch, rebinding): pass include_references=true to list them
 definition (1)
   1. compojure.core/routes  src/compojure/core.clj:187 [S]
-callers (7 S7)
+callers (4 S4)
   1. compojure.core-test/route-async-test  test/compojure/core_test.clj:368 [S]
   2. compojure.core-test/route-middleware-test  test/compojure/core_test.clj:283 [S]
   3. compojure.core-test/routes-test  test/compojure/core_test.clj:150 [S]
-  4. compojure.core/context  src/compojure/core.clj:318 [S]
-  5. compojure.core/defroutes  src/compojure/core.clj:207 [S]
-  6. compojure.core/let-routes  src/compojure/core.clj:327 [S]
-  7. compojure.middleware-test/canonical-redirect-test  test/compojure/middleware_test.clj:11 [S]
+  4. compojure.middleware-test/canonical-redirect-test  test/compojure/middleware_test.clj:11 [S]
 next: blast_radius(var="compojure.core/routes", depth=2)  tests_for(symbol="compojure.core/routes")
 ```
 
-Why it matters: the callers include macros (`defroutes`, `context`, `let-routes`), so a change to `routes` reaches
-every route table built with them.
+With `include_references: true` the other three appear, at HEURISTIC:
+
+```
+  5. compojure.core/context  src/compojure/core.clj:318 [H]  heuristic match
+  6. compojure.core/defroutes  src/compojure/core.clj:207 [H]  heuristic match
+  7. compojure.core/let-routes  src/compojure/core.clj:327 [H]  heuristic match
+```
+
+Why it matters: the macros `defroutes`, `context` and `let-routes` name `routes` inside syntax-quoted code, so
+they do not call it themselves; the code they expand into does. The answer keeps the four real calls apart from
+the three macro references, and says where to find the rest.
 
 ### usermanager
 
@@ -176,23 +187,38 @@ component, and which tests to run.
 
 ```
 ROUTE_AUTHZ DELETE /api/articles/:slug — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [S1]
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
 DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
   1. clojure.realworld.rest-api.handler/delete-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:33 [S]  entry: route DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes
-DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first): none (searched: guarded_by edges)
-[... trimmed ...]
+DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  [... trimmed ...]
+  9. ring.logger.timbre/wrap-with-logger  bases/rest-api/src/clojure/realworld/rest_api/api.clj:53 [H]  heuristic match  (#8 wrapper)
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="DELETE /api/articles/:slug")
 ```
 
-Why it matters: the route-to-handler link is proven. Note the limit as well: `private-routes` is wrapped with
-`wrap-authorization` through compojure's `wrap-routes` in a separate def, and that is not followed, so
-"middleware: none" here means "not found by this graph". See Limits in the main README.
+The next page (`section: "middleware", offset: 10`):
+
+```
+  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
+```
+
+Why it matters: an agent changing an authenticated endpoint sees the whole chain in order, including
+`wrap-auth-user` and `wrap-authorization`, which `app-routes` applies with compojure's `wrap-routes` in a separate
+def. The chain is HEURISTIC, so the agent opens the cited lines before relying on it. Permissions say
+"not extracted", not "none", because the project declares no authorization model.
 
 ### mount
 
 `attribute_usage {"attr": ":order/bid"}`
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -211,6 +237,7 @@ not keyword matches.
 `callers {"var": "mount.core/unpound"}`
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS mount.core/unpound — 0 direct caller(s) in 0 component(s)
 definition (1)
   1. mount.core/unpound  src/mount/core.cljc:43 [S]
@@ -226,6 +253,7 @@ agent can tell the two apart.
 `event_flow {"name": ":todos"}`
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :todos — :todos: 1 handler(s), 1 input subscription(s), 5 subscriber(s)
 counts: handler=1 [S1]  handler reads subscriptions=1 [S1]  subscribed by=5 [S5]
 note: events: switched on by re-frame.core
@@ -249,6 +277,7 @@ subscribers, including the `:<-` chains, before changing the shape of `:todos`.
 `key_siblings {"target": "test/re_frame/subs/alpha_test.cljs"}`
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code

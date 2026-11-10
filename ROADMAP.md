@@ -8,7 +8,6 @@ project is used. Each item lands with a fixture and the coverage and benchmark t
 - bidi routes.
 - compojure-api routes.
 - pedestal verbose map routes (table routes are supported).
-- compojure middleware applied by wrapping a routes var (`wrap-routes`, `->`), attached to the routes it wraps.
 - malli registries (schemas held by a def are supported).
 - integrant systems without refs.
 - Windows: a pinned clj-kondo binary exists, but the build and server have not been verified on Windows.
