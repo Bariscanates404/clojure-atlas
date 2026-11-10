@@ -45,7 +45,7 @@ node namespace:shop.routes-test [namespace] test/shop/routes_test.clj:1
 node namespace:shop.web [namespace] src/shop/web.clj:1
 node permission::admin [permission] src/shop/routes.clj:9
 node permission::audit [permission] src/shop/routes.clj:11
-node permission::delete-order [permission] src/shop/routes.clj:6
+node permission::delete-order [permission] src/shop/handlers.clj:6
 node permission::edit-catalog [permission] src/shop/catalog.clj:14
 node permission::export [permission] src/shop/catalog.clj:16
 node permission::read-catalog [permission] src/shop/catalog.clj:12
@@ -167,7 +167,7 @@ edge namespace:shop.web -defines-> definition:shop.web/GET* static_proven src/sh
 edge route:DELETE /api/orders/:id @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:22 {"order":1,"level":"route","inherited_from":"/api"}
 edge route:DELETE /api/orders/:id @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
 edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::audit static_proven src/shop/routes.clj:11 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":2}
-edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::delete-order heuristic src/shop/routes.clj:6 {"check":2,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
+edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::delete-order heuristic src/shop/handlers.clj:6 {"check":2,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
 edge route:DELETE /api/orders/:id @shop.routes/app -requires_permission-> permission::write-orders static_proven src/shop/routes.clj:11 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":2}
 edge route:DELETE /api/orders/:id @shop.routes/app -routes_to-> definition:shop.handlers/delete-order static_proven src/shop/routes.clj:10
 edge route:GET /admin @shop.routes/admin-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/routes.clj:17

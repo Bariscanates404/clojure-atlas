@@ -19,7 +19,7 @@ const libraryOf = (ns: string) => (ns === COMPOJURE ? 'compojure' : ns.startsWit
 
 interface Link {
   def: string;
-  // absent: the route's own file
+  // the file the form is written in; absent: the route's own file
   file?: string;
   line: number;
   // absent: the form itself names the definition; heuristic: it is an argument or one branch of what the route returns
@@ -114,7 +114,7 @@ function chainOf(ctx: Context, file: string, items: readonly Form[]): Chain {
     const head = unwrap(parts[0] ?? item);
     const def = head.t === 'symbol' ? ctx.defAt(file, head.row, head.col) : undefined;
     if (!def) continue;
-    out.links.push({ def, line: head.row, ...(item.t === 'list' ? { band: 'heuristic' as const } : {}) });
+    out.links.push({ def, file, line: head.row, ...(item.t === 'list' ? { band: 'heuristic' as const } : {}) });
     if (ctx.config.permissionMiddleware.includes(def) && parts[1]) out.permissions.push({ form: parts[1], file });
   }
   return out;
@@ -409,7 +409,7 @@ function handlerPermissions(ctx: Context): (handlers: readonly Link[], check: nu
     const call = formAt(ctx.forms(u.file), u.row, u.col);
     return (call ? kids(call).slice(1).map(unwrap) : [])
       .filter((k) => k.t === 'keyword')
-      .map((k) => ({ name: text(k) ?? '?', dynamic: false, check, checks: check, alternative: 1, alternatives: 1, allOf: 1, line: k.row }));
+      .map((k) => ({ name: text(k) ?? '?', dynamic: false, check, checks: check, alternative: 1, alternatives: 1, allOf: 1, file: u.file, line: k.row }));
   }));
 }
 
@@ -452,17 +452,17 @@ export const httpRoutes: Adapter = {
       const found = inHandlers(r.handlers, declared.reduce((m, p) => Math.max(m, p.check), 0) + 1);
       const checks = Math.max(0, ...[...declared, ...found].map((x) => x.check), ...declared.map((x) => x.checks));
       for (const p of [...declared, ...found]) {
-        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: r.file, line: p.line,
+        nodes.push({ id: permissionId(p.name), kind: 'permission', name: p.name, file: p.file, line: p.line,
           ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
         edges.push({
           from: id, to: permissionId(p.name), kind: 'requires_permission',
-          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file ?? r.file, line: p.line,
+          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file, line: p.line,
           attrs: { check: p.check, checks, alternative: p.alternative, alternatives: p.alternatives, all_of: p.allOf, ...(p.scope ? { tenant: p.scope } : {}) },
         });
       }
       if (r.authz.exempt) {
-        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.file, line: r.authz.exempt.line });
-        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.file, line: r.authz.exempt.line,
+        nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.authz.exempt.file, line: r.authz.exempt.line });
+        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.authz.exempt.file, line: r.authz.exempt.line,
           attrs: { label: r.authz.exempt.reason } });
       }
     }

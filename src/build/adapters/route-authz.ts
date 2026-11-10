@@ -15,14 +15,15 @@ export interface Permission {
   allOf: number;
   scope?: string;
   line: number;
-  // where the permission is written when that is not the route's file, and whether it is a guess: a wrapper around the routing table
-  file?: string;
+  // the file the permission is cited in, with line: where it is written, which is not always the route's file
+  file: string;
+  // a guess: a wrapper around the routing table
   guessed?: boolean;
 }
 
 export interface Authz {
   permissions: Permission[];
-  exempt?: { reason: string; line: number };
+  exempt?: { reason: string; file: string; line: number };
 }
 
 export const NO_AUTHZ: Authz = { permissions: [] };
@@ -64,7 +65,7 @@ export function permissionsOf(ctx: Context, at: Located, check: number, scope: s
   const one = (x: Form, alternative: number, alternatives: number, allOf: number): Permission => {
     const v = unwrap(x);
     return { name: text(v) ?? `(runtime ${v.t})`, dynamic: v.t !== 'keyword', check, checks: check, alternative, alternatives, allOf,
-      ...(scope ? { scope } : {}), line: x.row };
+      ...(scope ? { scope } : {}), file: at.file, line: x.row };
   };
   if (u.t === 'set') return flatChildren(u).map((x, i, all) => one(x, i + 1, all.length, 1));
   if (u.t === 'vector') return flatChildren(u).map((x, _i, all) => one(x, 1, 1, all.length));
@@ -104,7 +105,7 @@ export function routeDataAuthz(ctx: Context, file: string, data: Form | undefine
     if (!m) continue;
     // an exemption beside checks is kept with them: the MCP shows the checks and lists the exemption
     const reason = cfg.exempt ? entry(m.map, cfg.exempt) : undefined;
-    if (reason) exempt = { reason: text(unwrap(reason)) ?? '?', line: value.row };
+    if (reason) exempt = { reason: text(unwrap(reason)) ?? '?', file, line: value.row };
     // the check itself, then the alternative map that also satisfies it
     const check = permissions.reduce((n, p) => Math.max(n, p.check), 0) + 1;
     const alt = cfg.alternative ? entry(m.map, cfg.alternative) : undefined;
@@ -121,7 +122,7 @@ export function routeDataAuthz(ctx: Context, file: string, data: Form | undefine
   // cited at the route's own authz entry: a constant or helper may live in another file
   const checks = permissions.reduce((n, p) => Math.max(n, p.check), 0);
   if (!permissions.length && !exempt) return undefined;
-  return { permissions: permissions.map((p) => ({ ...p, checks, line: value.row })), ...(exempt ? { exempt } : {}) };
+  return { permissions: permissions.map((p) => ({ ...p, checks, file, line: value.row })), ...(exempt ? { exempt } : {}) };
 }
 
 // Short source-like text of a scope form, for the edge attribute.
