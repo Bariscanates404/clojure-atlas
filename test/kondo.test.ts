@@ -242,6 +242,15 @@ describe('analyze', () => {
     await assert.rejects(analyze(path.join(cache, 'no-such-kondo'), cache, ['a.clj'], {}), /cannot run .*no-such-kondo: spawn .* ENOENT/);
     const silent = path.join(cache, 'silent-kondo');
     writeFileSync(silent, '#!/bin/sh\necho "WARNING: noise" >&2\necho "it broke" >&2\nexit 7\n', { mode: 0o755 });
-    await assert.rejects(analyze(silent, cache, ['a.clj', 'b.clj'], {}), /clj-kondo exited 7 without analysis on 2 file\(s\) from a\.clj: it broke$/);
+    await assert.rejects(analyze(silent, cache, ['a.clj', 'b.clj'], {}), /clj-kondo exited 7 without analysis on 2 file\(s\) from a\.clj: stderr: it broke$/);
+  });
+
+  it('puts what kondo printed to stdout into the reason, and says so when it printed nothing', async () => {
+    const chatty = path.join(cache, 'chatty-kondo');
+    writeFileSync(chatty, '#!/bin/sh\necho "hook says hello"\nexit 0\n', { mode: 0o755 });
+    await assert.rejects(analyze(chatty, cache, ['a.clj'], {}), /clj-kondo exited 0 without analysis on 1 file\(s\) from a\.clj: stdout: hook says hello$/);
+    const mute = path.join(cache, 'mute-kondo');
+    writeFileSync(mute, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    await assert.rejects(analyze(mute, cache, ['a.clj'], {}), /from a\.clj: no output$/);
   });
 });

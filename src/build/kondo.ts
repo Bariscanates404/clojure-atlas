@@ -49,7 +49,29 @@ export function chunkFiles(files: readonly string[], maxFiles = CHUNK, maxChars 
   return chunks;
 }
 
-function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>): Promise<Analysis> {
+// A run that did not finish in time: kondo was killed, its files have no analysis.
+class TimedOut extends Error {}
+
+const head = (text: string, max = 300): string => text.replace(/\s+/g, ' ').trim().slice(0, max);
+
+// The analysis kondo prints is one JSON document that starts with its findings. A hook (project code kondo runs) can
+// print to stdout before it, even without a newline, so the document is looked for from the end: the last place the
+// text from there to the end parses.
+const JSON_START = '{"findings":';
+
+export function analysisJson(text: string): Record<string, unknown> | null {
+  for (let at = text.lastIndexOf(JSON_START); at >= 0; at = text.lastIndexOf(JSON_START, at - 1)) {
+    try {
+      return JSON.parse(text.slice(at)) as Record<string, unknown>;
+    } catch {
+      // noise that happens to contain the marker; an earlier start may be the document
+    }
+    if (at === 0) break;
+  }
+  return null;
+}
+
+function runChunk(cmd: string, root: string, files: string[], lintAs: Record<string, string>, timeoutMs: number): Promise<Analysis> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, ['--repro', '--cache', 'false', '--parallel', '--config', config(lintAs), '--lint', ...files], {
       cwd: root,
@@ -57,32 +79,67 @@ function runChunk(cmd: string, root: string, files: string[], lintAs: Record<str
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, timeoutMs);
     child.stdout.on('data', (d: Buffer) => out.push(d));
     child.stderr.on('data', (d: Buffer) => err.push(d));
-    child.on('error', (err) => reject(new Error(`cannot run ${cmd}: ${err.message}`)));
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      reject(new Error(`cannot run ${cmd}: ${e.message}`));
+    });
     child.on('close', (code) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        reject(new TimedOut(`clj-kondo did not finish within ${Math.round(timeoutMs / 1000)} s on ${files.length} file(s) from ${files[0]} (a hook that never returns?)`));
+        return;
+      }
       // kondo exits 2 or 3 when it reports warnings or errors; the JSON is complete either way
       const text = Buffer.concat(out).toString('utf8');
-      if (!text.trim().startsWith('{')) {
-        const why = Buffer.concat(err).toString('utf8').split('\n').filter((l) => l.trim() && !l.startsWith('WARNING')).slice(0, 3).join(' | ');
+      const json = analysisJson(text);
+      if (!json) {
+        const stderr = Buffer.concat(err).toString('utf8').split('\n').filter((l) => l.trim() && !l.startsWith('WARNING')).slice(0, 3).join(' | ');
+        const why = [stderr && `stderr: ${head(stderr)}`, text.trim() && `stdout: ${head(text)}`].filter(Boolean).join('; ') || 'no output';
         reject(new Error(`clj-kondo exited ${code} without analysis on ${files.length} file(s) from ${files[0]}: ${why}`));
         return;
       }
-      resolve(normalize(JSON.parse(text) as Record<string, unknown>));
+      resolve(normalize(json));
     });
   });
 }
 
-export async function analyze(cmd: string, root: string, files: string[], lintAs: Record<string, string>): Promise<Analysis> {
-  const chunks = chunkFiles(files);
+export interface AnalyzeOptions {
+  // per run; by default 60 s, or one second per file when that is more
+  timeoutMs?: number;
+  maxFilesPerRun?: number;
+}
+
+export interface Analyzed {
+  analysis: Analysis;
+  // files of runs that were killed for taking too long: no analysis for them
+  timedOut: string[];
+}
+
+export async function analyze(cmd: string, root: string, files: string[], lintAs: Record<string, string>, opts: AnalyzeOptions = {}): Promise<Analyzed> {
+  const chunks = chunkFiles(files, opts.maxFilesPerRun);
   const lanes = Math.max(1, Math.min(chunks.length, Math.floor(availableParallelism() / 2)));
   const results: Analysis[] = new Array(chunks.length);
+  const timedOut: string[] = [];
   let nextChunk = 0;
   await Promise.all(Array.from({ length: lanes }, async () => {
     while (nextChunk < chunks.length) {
       const k = nextChunk++;
-      results[k] = await runChunk(cmd, root, chunks[k], lintAs);
+      const chunk = chunks[k];
+      try {
+        results[k] = await runChunk(cmd, root, chunk, lintAs, opts.timeoutMs ?? Math.max(60_000, chunk.length * 1000));
+      } catch (e) {
+        if (!(e instanceof TimedOut)) throw e;
+        process.stderr.write(`clojure-atlas: ${e.message}; those files are left out\n`);
+        timedOut.push(...chunk);
+      }
     }
   }));
-  return concat(results);
+  return { analysis: concat(results.filter((r) => r !== undefined)), timedOut: timedOut.sort() };
 }

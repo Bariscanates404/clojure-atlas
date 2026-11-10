@@ -1,5 +1,5 @@
 // A build never executes code from the analyzed repository: its node_modules/typescript (or one in a parent
-// directory) is not required, however it is named, and the Playwright side says why it was skipped.
+// directory) is not required, however it is named: the Playwright side is read with the typescript clojure-atlas ships with.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,15 +30,15 @@ describe('untrusted repositories', () => {
       const { repo, marker } = untrustedRepo(parent);
       const out = readPlaywright(repo, ['package.json'], ['e2e/a.spec.ts']);
       assert.equal(existsSync(marker), false, 'the repo typescript was executed');
-      assert.equal(out.projects.length, 0);
-      assert.match(out.skipped.join(';'), /clojure-atlas's own install/);
+      assert.equal(out.projects.length, 1, 'the page was read with the typescript of clojure-atlas itself');
+      assert.deepEqual(out.skipped, []);
     });
   }
 
-  it('a whole build leaves the capability absent and runs nothing from the repo', async () => {
+  it('a whole build reads the browser tests with its own typescript and runs nothing from the repo', async () => {
     const { repo, marker } = untrustedRepo(false);
     const doc = await buildGraph(repo);
     assert.equal(existsSync(marker), false);
-    assert.equal(doc.capabilities.find((c) => c.name === 'browser_tests')?.status, 'absent');
+    assert.equal(doc.capabilities.find((c) => c.name === 'browser_tests')?.status, 'available');
   });
 });

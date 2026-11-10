@@ -18,7 +18,11 @@ export interface AdapterStats {
 
 export interface BuildStats {
   // expected: Clojure files the repo tracks (build output and dependencies included); sources: the ones analyzed
-  files: { expected: number; sources: number; edn: number; skipped_large: number; skipped_large_names: string[] };
+  files: {
+    expected: number; sources: number; edn: number; skipped_large: number; skipped_large_names: string[];
+    // tracked Clojure files the file walk left out (hidden or root build folders), and files whose clj-kondo run was killed
+    unread: number; unread_names: string[]; timed_out: number; timed_out_names: string[];
+  };
   // namespaces defined in more than one file: one graph node stands for them all, and usages of them are heuristic
   duplicate_namespaces: { ns: string; files: string[] }[];
   syntax_errors: { files: number; errors: number; names: string[] };
@@ -122,7 +126,10 @@ export function assemble(ctx: Context, adapters: readonly Adapter[], source: Gra
     nodes: [...nodes.values()].sort((a, b) => compareText(a.id, b.id)),
     edges: [...edges.values()].sort((a, b) => compareText(edgeKey(a), edgeKey(b))),
     stats: {
-      files: { ...files, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES) },
+      files: {
+        ...files, skipped_large_names: files.skipped_large_names.slice(0, MAX_NAMED_FILES),
+        unread_names: files.unread_names.slice(0, MAX_NAMED_FILES), timed_out_names: files.timed_out_names.slice(0, MAX_NAMED_FILES),
+      },
       syntax_errors: { files: syntaxFiles.size, errors: ctx.analysis.syntaxErrors.length, names: [...syntaxFiles].sort(compareText).slice(0, MAX_NAMED_FILES) },
       duplicate_namespaces: [...ctx.duplicateNs].map(([ns, files]) => ({ ns, files })).sort((a, b) => compareText(a.ns, b.ns)),
       definitions: ctx.defs.size,

@@ -17,6 +17,7 @@ import { fixtureDir } from './helpers/atlas-fixture.ts';
 import { graphOf } from './helpers/inline-graph.ts';
 
 const NO_LARGE = { files: 0, names: [] };
+const NONE = { timedOut: NO_LARGE, unread: NO_LARGE };
 const CORE = '(ns demo.core)\n(defn target [a] (inc a))\n(defn lonely [] 1)\n(defn user [] (target 1))\n';
 const BROKEN = '(ns demo.broken\n  (:require [demo.core :as c]))\n(defn oops [] (c/target 2)\n';
 
@@ -98,7 +99,7 @@ describe('files over the size limit', () => {
   });
 
   it('are listed in the build log line, three names at most', () => {
-    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'] }, duplicates: [] });
+    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'] }, duplicates: [], ...NONE });
     assert.match(line, /5 file\(s\) over 2 MB were skipped \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
   });
 });
@@ -110,15 +111,15 @@ describe('degradation helpers', () => {
   });
 
   it('lists the first three files and the dropped edges', () => {
-    const line = degradedLine({ files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edges: 670, large: NO_LARGE, duplicates: [] });
+    const line = degradedLine({ files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edges: 670, large: NO_LARGE, duplicates: [], ...NONE });
     assert.match(line, /5 file\(s\) could not be parsed \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
     assert.match(line, /670 edge\(s\) dropped because an end was not a node/);
-    assert.match(degradedLine({ files: 0, names: [], edges: 2, large: NO_LARGE, duplicates: [] }), /^DEGRADED: 2 edge\(s\) dropped/);
-    assert.match(degradedLine({ files: 2, names: [], edges: 0, large: NO_LARGE, duplicates: [] }), /^DEGRADED: 2 file\(s\) could not be parsed, so/);
+    assert.match(degradedLine({ files: 0, names: [], edges: 2, large: NO_LARGE, duplicates: [], ...NONE }), /^DEGRADED: 2 edge\(s\) dropped/);
+    assert.match(degradedLine({ files: 2, names: [], edges: 0, large: NO_LARGE, duplicates: [], ...NONE }), /^DEGRADED: 2 file\(s\) could not be parsed, so/);
   });
 
   it('matches a namespace to a path with dashes as underscores, and a path to itself', () => {
-    const d = { files: 2, names: ['src/my_app/core_x.cljc', 'docs/a.clj'], edges: 0, large: NO_LARGE, duplicates: [] };
+    const d = { files: 2, names: ['src/my_app/core_x.cljc', 'docs/a.clj'], edges: 0, large: NO_LARGE, duplicates: [], ...NONE };
     assert.deepEqual(unparsedFor(d, 'my-app.core-x/f'), ['src/my_app/core_x.cljc']);
     assert.deepEqual(unparsedFor(d, 'docs/a.clj'), ['docs/a.clj']);
     assert.deepEqual(unparsedFor(d, 'other.ns/f'), []);
@@ -140,7 +141,7 @@ describe('dropped edges', () => {
     };
     const empty = { nsDefs: [], nsUses: [], varDefs: [], varUses: [], keywords: [], protocolImpls: [], syntaxErrors: [] };
     const ctx = createContext(empty, EMPTY_CONFIG, { projects: [], skipped: [] }, new Map(), [], () => undefined);
-    const d = assemble(ctx, [adapter], { sha: 'a' }, { expected: 0, sources: 0, edn: 0, skipped_large: 0, skipped_large_names: [] });
+    const d = assemble(ctx, [adapter], { sha: 'a' }, { expected: 0, sources: 0, edn: 0, skipped_large: 0, skipped_large_names: [], unread: 0, unread_names: [], timed_out: 0, timed_out_names: [] });
     assert.equal(d.stats.dropped_edges, 2);
     assert.match(callTool(indexGraph(d), 'graph_info', {}).text, /DEGRADED: 2 edge\(s\) dropped because an end was not a node/);
   });
