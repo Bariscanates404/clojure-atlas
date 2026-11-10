@@ -34,65 +34,101 @@ type Climb = Wrapper[] | null;
 const fullName = (u: VarUse) => `${u.to}/${u.name}`;
 const ownerOf = (u: VarUse) => (u.fromVar ? `${u.from}/${u.fromVar}` : u.from);
 
-export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrapping {
+// a project function applying its first parameter is a middleware
+function appliesHandler(ctx: Context, full: string): boolean {
+  const d = ctx.defs.get(full);
+  const form = d && formAt(ctx.forms(d.file), d.row, d.col);
+  const xs = form ? kids(form).map(unwrap) : [];
+  const param = xs.find((x, i) => i >= 2 && x.t === 'vector');
+  const first = param && param.t === 'vector' ? unwrap(param.children[0] ?? param) : undefined;
+  const name = first && first.t === 'symbol' ? first.text : undefined;
+  return !!name && [...walk(xs.slice(3))].some((f) => f.t === 'list' && f.children[0] && textOf(unwrap(f.children[0])) === name);
+}
+
+const isMiddleware = (ctx: Context, u: VarUse): boolean => /^wrap-/.test(u.name) || /^ring\.middleware\./.test(u.to)
+  || (u.to === 'compojure.handler' && ['site', 'api'].includes(u.name)) || appliesHandler(ctx, fullName(u));
+
+function useOf(ctx: Context, file: string, f: Form | undefined): VarUse | undefined {
+  const u = f && unwrap(f);
+  const use = u && u.t === 'symbol' ? ctx.useAt(file, u.row, u.col) : undefined;
+  return use && use.to !== UNKNOWN_NS ? use : undefined;
+}
+
+const wrapper = (ctx: Context, use: VarUse, file: string, line: number, arg?: Form): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)),
+  ...(arg && ctx.config.permissionMiddleware.includes(fullName(use)) ? { permission: { form: arg, file } } : {}) });
+
+function headName(ctx: Context, file: string, f: Form): string {
+  const use = useOf(ctx, file, f);
+  return use ? fullName(use) : '';
+}
+
+// a threading step: a symbol, or a call whose head is the middleware; wrap-routes names it in its argument
+function stepOf(ctx: Context, file: string, step: Form): Wrapper | undefined {
+  const s = unwrap(step);
+  const head = s.t === 'list' ? unwrap(s.children[0] ?? s) : s;
+  const use = useOf(ctx, file, head);
+  if (!use) return undefined;
+  if (use.to === COMPOJURE && use.name === 'wrap-routes' && s.t === 'list') {
+    const arg = useOf(ctx, file, s.children[1]);
+    return arg ? wrapper(ctx, arg, file, unwrap(s.children[1]).row, s.children[2]) : undefined;
+  }
+  return isMiddleware(ctx, use) ? wrapper(ctx, use, file, head.row, s.t === 'list' ? s.children[1] : undefined) : undefined;
+}
+
+// an element of a :middleware vector: a symbol, or a vector or call whose head is the middleware and whose next element is its argument
+function itemOf(ctx: Context, file: string, f: Form): Wrapper | undefined {
+  const item = unwrap(f);
+  const parts = item.t === 'vector' || item.t === 'list' ? flatChildren(item) : [item];
+  const head = unwrap(parts[0] ?? item);
+  const use = useOf(ctx, file, head);
+  return use ? wrapper(ctx, use, file, head.row, parts[1]) : undefined;
+}
+
+// ring-handler's options map: its :middleware wraps the whole handler, innermost last in the vector; null when unreadable
+function optionsWrappers(ctx: Context, file: string, opts: Form | undefined): Wrapper[] | null {
+  if (!opts) return [];
+  const o = unwrap(opts);
+  if (o.t !== 'map') return null;
+  const mw = entry(o, ':middleware');
+  const v = mw && unwrap(mw);
+  if (!v) return [];
+  const items = v.t === 'vector' ? flatChildren(v).map((x) => itemOf(ctx, file, x)) : [];
+  return v.t === 'vector' && items.every((x) => x) ? items.flatMap((x) => (x ? [x] : [])).reverse() : null;
+}
+
+// What one step up the tree adds to the wrappers met so far: a middleware, nothing (routes combined, a router handed to a
+// lookup), or the end of the climb. `undefined` means the climb goes on from the parent; null a way that cannot be followed.
+function absorb(ctx: Context, file: string, parent: Form & { children: Form[] }, index: number, wrappers: Wrapper[]): Climb[] | undefined {
+  const head = unwrap(parent.children[0] ?? parent);
+  const use = useOf(ctx, file, head);
+  if (!use) return [null];
+  if (CORE_NS.test(use.to) && (use.name === '->' || use.name === '->>')) {
+    const steps = parent.children.slice(2).map((s) => stepOf(ctx, file, s));
+    if (index !== 1 || steps.some((s) => !s)) return [null];
+    wrappers.push(...steps.flatMap((s) => (s ? [s] : [])));
+  } else if (use.to === COMPOJURE && (use.name === 'routes' || (use.name === 'context' && index >= 3))) {
+    // combining routes adds no middleware
+  } else if (use.to === COMPOJURE && use.name === 'wrap-routes') {
+    const arg = index === 1 ? useOf(ctx, file, parent.children[2]) : undefined;
+    if (!arg) return [null];
+    wrappers.push(wrapper(ctx, arg, file, unwrap(parent.children[2]).row, parent.children[3]));
+  } else if (index === 1 && fullName(use) === RING_HANDLER) {
+    const own = optionsWrappers(ctx, file, parent.children[3]);
+    if (!own) return [null];
+    wrappers.push(...own);
+  } else if (index === 1 && /^reitit\./.test(use.to)) {
+    // the router handed to a lookup (match-by-name, routes): it serves nothing there
+    return [];
+  } else if (index === 1 && isMiddleware(ctx, use)) wrappers.push(wrapper(ctx, use, file, head.row, parent.children[2]));
+  else if (index === 1 && SERVER.test(use.to)) return [wrappers];
+  else return [null];
+  return undefined;
+}
+
+// The ways up from a value to the top of the program, memoised per definition.
+function climber(ctx: Context): (file: string, from: Form) => Climb[] {
   const uses = groupBy(ctx.analysis.varUses.filter((u) => !isTestFile(u.file)), fullName);
   const defAt = new Map([...ctx.defs].map(([full, d]) => [`${d.file}:${d.row}:${d.col}`, { full, routes: /(^|\/)defroutes$/.test(d.definedBy ?? '') }]));
-
-  // a project function applying its first parameter is a middleware
-  const appliesHandler = (full: string): boolean => {
-    const d = ctx.defs.get(full);
-    const form = d && formAt(ctx.forms(d.file), d.row, d.col);
-    const xs = form ? kids(form).map(unwrap) : [];
-    const param = xs.find((x, i) => i >= 2 && x.t === 'vector');
-    const first = param && param.t === 'vector' ? unwrap(param.children[0] ?? param) : undefined;
-    const name = first && first.t === 'symbol' ? first.text : undefined;
-    return !!name && [...walk(xs.slice(3))].some((f) => f.t === 'list' && f.children[0] && textOf(unwrap(f.children[0])) === name);
-  };
-  const isMiddleware = (u: VarUse) => /^wrap-/.test(u.name) || /^ring\.middleware\./.test(u.to) || (u.to === 'compojure.handler' && ['site',
-    'api'].includes(u.name)) || appliesHandler(fullName(u));
-
-  const useOf = (file: string, f: Form | undefined): VarUse | undefined => {
-    const u = f && unwrap(f);
-    const use = u && u.t === 'symbol' ? ctx.useAt(file, u.row, u.col) : undefined;
-    return use && use.to !== UNKNOWN_NS ? use : undefined;
-  };
-  const wrapper = (use: VarUse, file: string, line: number, arg?: Form): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)),
-    ...(arg && ctx.config.permissionMiddleware.includes(fullName(use)) ? { permission: { form: arg, file } } : {}) });
-  const headName = (file: string, f: Form): string => {
-    const use = useOf(file, f);
-    return use ? fullName(use) : '';
-  };
-  // a threading step: a symbol, or a call whose head is the middleware; wrap-routes names it in its argument
-  const stepOf = (file: string, step: Form): Wrapper | undefined => {
-    const s = unwrap(step);
-    const head = s.t === 'list' ? unwrap(s.children[0] ?? s) : s;
-    const use = useOf(file, head);
-    if (!use) return undefined;
-    if (use.to === COMPOJURE && use.name === 'wrap-routes' && s.t === 'list') {
-      const arg = useOf(file, s.children[1]);
-      return arg ? wrapper(arg, file, unwrap(s.children[1]).row, s.children[2]) : undefined;
-    }
-    return isMiddleware(use) ? wrapper(use, file, head.row, s.t === 'list' ? s.children[1] : undefined) : undefined;
-  };
-  // an element of a :middleware vector: a symbol, or a vector or call whose head is the middleware and whose next element is its argument
-  const itemOf = (file: string, f: Form): Wrapper | undefined => {
-    const item = unwrap(f);
-    const parts = item.t === 'vector' || item.t === 'list' ? flatChildren(item) : [item];
-    const head = unwrap(parts[0] ?? item);
-    const use = useOf(file, head);
-    return use ? wrapper(use, file, head.row, parts[1]) : undefined;
-  };
-  // ring-handler's options map: its :middleware wraps the whole handler, innermost last in the vector; null when unreadable
-  const optionsWrappers = (file: string, opts: Form | undefined): Wrapper[] | null => {
-    if (!opts) return [];
-    const o = unwrap(opts);
-    if (o.t !== 'map') return null;
-    const mw = entry(o, ':middleware');
-    const v = mw && unwrap(mw);
-    if (!v) return [];
-    const items = v.t === 'vector' ? flatChildren(v).map((x) => itemOf(file, x)) : [];
-    return v.t === 'vector' && items.every((x) => x) ? items.flatMap((x) => (x ? [x] : [])).reverse() : null;
-  };
 
   // from a value up to the top: the wrappers met, innermost first, then those around the definition holding the value
   const climb = (file: string, from: Form, stack: readonly string[]): Climb[] => {
@@ -108,35 +144,14 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
         return outcomes(holder.full, stack).map((o) => (o ? [...wrappers, ...o] : null));
       }
       if (parent.t !== 'list') return [null];
-      const head = unwrap(parent.children[0] ?? parent);
-      const use = useOf(file, head);
       if (index === 0) {
         // a handler called with a request ends the climb; a function called for the routes it returns goes on
-        if (parent.children.length > 1 && !/defn/.test(ctx.defs.get(headName(file, cur))?.definedBy ?? '')) return [wrappers];
+        if (parent.children.length > 1 && !/defn/.test(ctx.defs.get(headName(ctx, file, cur))?.definedBy ?? '')) return [wrappers];
         cur = parent;
         continue;
       }
-      if (!use) return [null];
-      if (CORE_NS.test(use.to) && (use.name === '->' || use.name === '->>')) {
-        const steps = parent.children.slice(2).map((s) => stepOf(file, s));
-        if (index !== 1 || steps.some((s) => !s)) return [null];
-        wrappers.push(...steps.flatMap((s) => (s ? [s] : [])));
-      } else if (use.to === COMPOJURE && (use.name === 'routes' || (use.name === 'context' && index >= 3))) {
-        // combining routes adds no middleware
-      } else if (use.to === COMPOJURE && use.name === 'wrap-routes') {
-        const arg = index === 1 ? useOf(file, parent.children[2]) : undefined;
-        if (!arg) return [null];
-        wrappers.push(wrapper(arg, file, unwrap(parent.children[2]).row, parent.children[3]));
-      } else if (index === 1 && fullName(use) === RING_HANDLER) {
-        const own = optionsWrappers(file, parent.children[3]);
-        if (!own) return [null];
-        wrappers.push(...own);
-      } else if (index === 1 && /^reitit\./.test(use.to)) {
-        // the router handed to a lookup (match-by-name, routes): it serves nothing there
-        return [];
-      } else if (index === 1 && isMiddleware(use)) wrappers.push(wrapper(use, file, head.row, parent.children[2]));
-      else if (index === 1 && SERVER.test(use.to)) return [wrappers];
-      else return [null];
+      const ended = absorb(ctx, file, parent, index, wrappers);
+      if (ended) return ended;
       cur = parent;
     }
   };
@@ -167,8 +182,13 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
     return found.length ? found : [[]];
   }
 
+  return (file, from) => climb(file, from, []);
+}
+
+export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrapping {
+  const climb = climber(ctx);
   return (file, route) => {
-    const found = climb(file, route, []);
+    const found = climb(file, route);
     const chains = found.filter((c): c is Wrapper[] => c !== null);
     const same = new Set(chains.map((c) => c.map((w) => w.def).join(' '))).size <= 1;
     const out: Wrapping = found.length === chains.length && same

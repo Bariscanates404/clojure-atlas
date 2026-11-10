@@ -81,66 +81,75 @@ export function selectorsIn(css: string): Selector[] {
   return out;
 }
 
-function readProject(ts: Ts, root: string, dir: string, files: readonly string[]): PlaywrightProject {
-  const abs = (f: string) => path.join(root, f);
-  const configPath = ts.findConfigFile(abs(dir), ts.sys.fileExists);
-  const options = configPath
-    ? ts.getParsedCommandLineOfConfigFile(configPath, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined })?.options ?? {}
-    : { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, allowJs: false };
-  const program = ts.createProgram(files.map(abs), { ...options, noEmit: true });
-  const checker = program.getTypeChecker();
-  const rel = (sf: Node) => path.relative(root, sf.fileName).split(path.sep).join('/');
-  const lineOf = (sf: Node, pos: number) => sf.getLineAndCharacterOfPosition(pos).line + 1;
-  const literal = (n: Node): string | undefined => (n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) ? n.text : undefined);
+// What reading one project needs from the compiler: the program and the helpers that turn its nodes into repo paths and lines.
+interface Reader {
+  ts: Ts;
+  files: readonly string[];
+  program: Node;
+  checker: Node;
+  rel: (sf: Node) => string;
+  lineOf: (sf: Node, pos: number) => number;
+  literal: (n: Node) => string | undefined;
+}
 
+// The members of a page object class and whether its code locates elements: the locators and sibling members each one names.
+function classMembers(r: Reader, sf: Node, n: Node): { members: PageObjectMember[]; locates: boolean } {
+  const { ts, lineOf, literal } = r;
+  const names = new Set<string>(n.members.map((m: Node) => m.name?.getText?.(sf)).filter(Boolean));
+  const members: PageObjectMember[] = [];
+  let locates = false;
+  // the locators and sibling members a piece of code names
+  const inspect = (root: Node) => {
+    const selectors: Selector[] = [];
+    const uses = new Set<string>();
+    const scan = (x: Node): void => {
+      if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression)) {
+        const fn = x.expression.name.text;
+        if (LOCATOR_FNS.test(fn)) locates = true;
+        const arg = literal(x.arguments[0]);
+        if (arg !== undefined && (fn === 'locator' || fn === '$' || fn === '$$')) selectors.push(...selectorsIn(arg));
+        if (arg !== undefined && fn === 'getByTestId') selectors.push({ kind: 'testid', value: arg });
+      }
+      if (ts.isPropertyAccessExpression(x) && x.expression.kind === ts.SyntaxKind.ThisKeyword && names.has(x.name.text)) uses.add(x.name.text);
+      ts.forEachChild(x, scan);
+    };
+    scan(root);
+    return { selectors, uses };
+  };
+  const added = (name: string, line: number, endLine: number, found: { selectors: Selector[]; uses: Set<string> }) => {
+    const own = members.find((m) => m.name === name);
+    if (!own) members.push({ name, line, endLine, selectors: found.selectors, uses: [...found.uses].sort() });
+    else {
+      own.selectors.push(...found.selectors);
+      own.uses = [...new Set([...own.uses, ...found.uses])].sort();
+    }
+  };
+  for (const m of n.members) {
+    if (!m.name || !(ts.isPropertyDeclaration(m) || ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))) continue;
+    added(m.name.getText(sf), lineOf(sf, m.getStart(sf)), lineOf(sf, m.getEnd()), inspect(m));
+  }
+  // this.x = page.locator(...) in the constructor belongs to member x
+  for (const ctor of n.members.filter(ts.isConstructorDeclaration)) {
+    const assigned = (x: Node): void => {
+      const left = ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.EqualsToken ? x.left : undefined;
+      if (left && ts.isPropertyAccessExpression(left) && left.expression.kind === ts.SyntaxKind.ThisKeyword) added(left.name.text,
+        lineOf(sf, x.getStart(sf)), lineOf(sf, x.getEnd()), inspect(x.right));
+      ts.forEachChild(x, assigned);
+    };
+    if (ctor.body) assigned(ctor.body);
+  }
+  return { members, locates };
+}
+
+// The classes of the page object files that locate elements, or are the base of one that does.
+function pageObjectsOf(r: Reader): PageObject[] {
+  const { ts, files, program, rel, lineOf } = r;
   const classes0: (PageObject & { locates: boolean })[] = [];
   for (const sf of program.getSourceFiles()) {
     if (!files.includes(rel(sf)) || TEST_FILE.test(sf.fileName)) continue;
     const visit = (n: Node): void => {
       if (ts.isClassDeclaration(n) && n.name) {
-        const names = new Set<string>(n.members.map((m: Node) => m.name?.getText?.(sf)).filter(Boolean));
-        const members: PageObjectMember[] = [];
-        let locates = false;
-        // the locators and sibling members a piece of code names
-        const inspect = (root: Node) => {
-          const selectors: Selector[] = [];
-          const uses = new Set<string>();
-          const scan = (x: Node): void => {
-            if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression)) {
-              const fn = x.expression.name.text;
-              if (LOCATOR_FNS.test(fn)) locates = true;
-              const arg = literal(x.arguments[0]);
-              if (arg !== undefined && (fn === 'locator' || fn === '$' || fn === '$$')) selectors.push(...selectorsIn(arg));
-              if (arg !== undefined && fn === 'getByTestId') selectors.push({ kind: 'testid', value: arg });
-            }
-            if (ts.isPropertyAccessExpression(x) && x.expression.kind === ts.SyntaxKind.ThisKeyword && names.has(x.name.text)) uses.add(x.name.text);
-            ts.forEachChild(x, scan);
-          };
-          scan(root);
-          return { selectors, uses };
-        };
-        const added = (name: string, line: number, endLine: number, found: { selectors: Selector[]; uses: Set<string> }) => {
-          const own = members.find((m) => m.name === name);
-          if (!own) members.push({ name, line, endLine, selectors: found.selectors, uses: [...found.uses].sort() });
-          else {
-            own.selectors.push(...found.selectors);
-            own.uses = [...new Set([...own.uses, ...found.uses])].sort();
-          }
-        };
-        for (const m of n.members) {
-          if (!m.name || !(ts.isPropertyDeclaration(m) || ts.isMethodDeclaration(m) || ts.isGetAccessorDeclaration(m))) continue;
-          added(m.name.getText(sf), lineOf(sf, m.getStart(sf)), lineOf(sf, m.getEnd()), inspect(m));
-        }
-        // this.x = page.locator(...) in the constructor belongs to member x
-        for (const ctor of n.members.filter(ts.isConstructorDeclaration)) {
-          const assigned = (x: Node): void => {
-            const left = ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.EqualsToken ? x.left : undefined;
-            if (left && ts.isPropertyAccessExpression(left) && left.expression.kind === ts.SyntaxKind.ThisKeyword) added(left.name.text,
-              lineOf(sf, x.getStart(sf)), lineOf(sf, x.getEnd()), inspect(x.right));
-            ts.forEachChild(x, assigned);
-          };
-          if (ctor.body) assigned(ctor.body);
-        }
+        const { members, locates } = classMembers(r, sf, n);
         const base = n.heritageClauses?.find((h: Node) => h.token === ts.SyntaxKind.ExtendsKeyword)?.types?.[0]?.expression?.getText(sf);
         classes0.push({ name: n.name.text, file: rel(sf), line: lineOf(sf, n.getStart(sf)), ...(base ? { base } : {}), members, locates });
       }
@@ -148,10 +157,14 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
     };
     visit(sf);
   }
-
   // a page object locates elements, or is the class one extends
   const bases = new Set(classes0.filter((c) => c.locates && c.base).map((c) => c.base));
-  const pageObjects: PageObject[] = classes0.filter((c) => c.locates || bases.has(c.name)).map(({ locates: _, ...c }) => c);
+  return classes0.filter((c) => c.locates || bases.has(c.name)).map(({ locates: _, ...c }) => c);
+}
+
+// The page object member an expression names: through the class that declares the property, or a destructured binding.
+function memberResolver(r: Reader, pageObjects: readonly PageObject[]): { memberOf: (access: Node) => string | undefined; boundMember: (id: Node) => string | undefined } {
+  const { ts, checker } = r;
   const classes = new Map(pageObjects.map((p) => [p.name, new Set(p.members.map((m) => m.name))]));
   // the class that declares a property, which for an inherited one is its base class; named by the declaration itself,
   // since the symbol of `export default class X` is called "default"
@@ -168,36 +181,63 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
     const name = (decl.propertyName ?? decl.name).getText();
     return pageMember(declaringClass(checker.getPropertyOfType(checker.getTypeAtLocation(decl.parent), name)), name);
   };
-  // expect(x), expect.soft(x) or expect.poll(x)
-  const isExpectCall = (n: Node): boolean => {
-    if (!ts.isCallExpression(n)) return false;
-    const callee = n.expression;
-    if (ts.isIdentifier(callee)) return callee.text === 'expect';
-    return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'expect' && ['soft',
-      'poll'].includes(callee.name.text);
-  };
-  // expect(<member access or its call>).not?.toX(...): the matcher
-  const matcherOf = (n: Node): string | undefined => {
-    let x = n;
-    while (x.parent && !isExpectCall(x.parent)) {
-      if (ts.isBlock(x.parent) || ts.isSourceFile(x.parent)) return undefined;
-      x = x.parent;
-    }
-    let up = x.parent?.parent;
-    while (up && ts.isPropertyAccessExpression(up)) {
-      if (up.name.text !== 'not' && up.name.text !== 'soft') return up.name.text;
-      up = up.parent;
-    }
-    return x.parent ? 'expect' : undefined;
-  };
+  return { memberOf, boundMember };
+}
 
-  // a title as written: a template keeps its literal parts, ${…} for each runtime part
-  const titleOf = (n: Node): string | undefined => {
-    if (!n) return undefined;
-    if (ts.isTemplateExpression(n)) return n.head.text + n.templateSpans.map((sp: Node) => `\${…}${sp.literal.text}`).join('');
-    // test.skip(({ browserName }) => ..., 'reason') takes a condition where a title would stand
-    return ts.isArrowFunction(n) || ts.isFunctionExpression(n) ? undefined : literal(n) ?? '<dynamic title>';
+// expect(x), expect.soft(x) or expect.poll(x)
+function isExpectCall(ts: Ts, n: Node): boolean {
+  if (!ts.isCallExpression(n)) return false;
+  const callee = n.expression;
+  if (ts.isIdentifier(callee)) return callee.text === 'expect';
+  return ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === 'expect' && ['soft',
+    'poll'].includes(callee.name.text);
+}
+
+// expect(<member access or its call>).not?.toX(...): the matcher
+function matcherOf(ts: Ts, n: Node): string | undefined {
+  let x = n;
+  while (x.parent && !isExpectCall(ts, x.parent)) {
+    if (ts.isBlock(x.parent) || ts.isSourceFile(x.parent)) return undefined;
+    x = x.parent;
+  }
+  let up = x.parent?.parent;
+  while (up && ts.isPropertyAccessExpression(up)) {
+    if (up.name.text !== 'not' && up.name.text !== 'soft') return up.name.text;
+    up = up.parent;
+  }
+  return x.parent ? 'expect' : undefined;
+}
+
+// a title as written: a template keeps its literal parts, ${…} for each runtime part
+function titleOf(r: Reader, n: Node): string | undefined {
+  const { ts, literal } = r;
+  if (!n) return undefined;
+  if (ts.isTemplateExpression(n)) return n.head.text + n.templateSpans.map((sp: Node) => `\${…}${sp.literal.text}`).join('');
+  // test.skip(({ browserName }) => ..., 'reason') takes a condition where a title would stand
+  return ts.isArrowFunction(n) || ts.isFunctionExpression(n) ? undefined : literal(n) ?? '<dynamic title>';
+}
+
+// The page object members a test body names, each with the matcher it is asserted with.
+function refsIn(r: Reader, sf: Node, body: Node, resolve: ReturnType<typeof memberResolver>): TestRef[] {
+  const { ts, lineOf } = r;
+  const refs: TestRef[] = [];
+  const scan = (x: Node): void => {
+    if (ts.isPropertyAccessExpression(x) || ts.isIdentifier(x)) {
+      const member = ts.isIdentifier(x) ? resolve.boundMember(x) : resolve.memberOf(x);
+      if (member) {
+        const matcher = matcherOf(ts, x);
+        refs.push({ member, line: lineOf(sf, x.getStart(sf)), ...(matcher ? { matcher } : {}) });
+      }
+    }
+    ts.forEachChild(x, scan);
   };
+  scan(body);
+  return refs;
+}
+
+// The tests of the spec files, with the page object members each one names.
+function testsOf(r: Reader, resolve: ReturnType<typeof memberResolver>): BrowserTest[] {
+  const { ts, files, program, rel, lineOf } = r;
   const tests: BrowserTest[] = [];
   for (const sf of program.getSourceFiles()) {
     if (!files.includes(rel(sf)) || !TEST_FILE.test(sf.fileName)) continue;
@@ -212,26 +252,14 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
           root = root.expression;
         }
         const head = ts.isIdentifier(root) ? root.text : undefined;
-        const title = titleOf(n.arguments[0]);
+        const title = titleOf(r, n.arguments[0]);
         const body = n.arguments.find((a: Node) => ts.isArrowFunction(a) || ts.isFunctionExpression(a));
         if (head && TEST_FNS.has(head) && title !== undefined && body && props.includes('describe')) {
           ts.forEachChild(body, (c: Node) => visit(c, [...describe, title]));
           return;
         }
         if (head && TEST_FNS.has(head) && title !== undefined && body && !props.some((p) => SKIP_TEST_PROPS.has(p))) {
-          const refs: TestRef[] = [];
-          const scan = (x: Node): void => {
-            if (ts.isPropertyAccessExpression(x) || ts.isIdentifier(x)) {
-              const member = ts.isIdentifier(x) ? boundMember(x) : memberOf(x);
-              if (member) {
-                const matcher = matcherOf(x);
-                refs.push({ member, line: lineOf(sf, x.getStart(sf)), ...(matcher ? { matcher } : {}) });
-              }
-            }
-            ts.forEachChild(x, scan);
-          };
-          scan(body);
-          tests.push({ file: rel(sf), line: lineOf(sf, n.getStart(sf)), endLine: lineOf(sf, n.getEnd()), title, describe, refs });
+          tests.push({ file: rel(sf), line: lineOf(sf, n.getStart(sf)), endLine: lineOf(sf, n.getEnd()), title, describe, refs: refsIn(r, sf, body, resolve) });
           return;
         }
       }
@@ -239,7 +267,24 @@ function readProject(ts: Ts, root: string, dir: string, files: readonly string[]
     };
     visit(sf, []);
   }
-  return { dir, typescript: ts.version, pageObjects, tests };
+  return tests;
+}
+
+function readProject(ts: Ts, root: string, dir: string, files: readonly string[]): PlaywrightProject {
+  const abs = (f: string) => path.join(root, f);
+  const configPath = ts.findConfigFile(abs(dir), ts.sys.fileExists);
+  const options = configPath
+    ? ts.getParsedCommandLineOfConfigFile(configPath, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined })?.options ?? {}
+    : { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, allowJs: false };
+  const program = ts.createProgram(files.map(abs), { ...options, noEmit: true });
+  const r: Reader = {
+    ts, files, program, checker: program.getTypeChecker(),
+    rel: (sf) => path.relative(root, sf.fileName).split(path.sep).join('/'),
+    lineOf: (sf, pos) => sf.getLineAndCharacterOfPosition(pos).line + 1,
+    literal: (n) => (n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) ? n.text : undefined),
+  };
+  const pageObjects = pageObjectsOf(r);
+  return { dir, typescript: ts.version, pageObjects, tests: testsOf(r, memberResolver(r, pageObjects)) };
 }
 
 // The compiler is resolved from this package's own location, so a clone's node_modules (or a parent directory of it) is
