@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGraph, type Graph } from '../src/mcp/graph.ts';
 import { TOOLS } from '../src/mcp/server.ts';
-import { score, staleGraph, type Question, type Score } from './scoring.ts';
+import { GRAPH_NODES, score, scoreNodes, staleGraph, type Question, type Score } from './scoring.ts';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const [corpusDir] = process.argv.slice(2);
@@ -27,6 +27,7 @@ const graphOf = (repo: string): Graph => {
 };
 
 const rows: [Question, Score][] = questions.map((q) => {
+  if (q.tool === GRAPH_NODES) return [q, scoreNodes(q, graphOf(q.repo))];
   const tool = TOOLS.find((t) => t.name === q.tool);
   if (!tool) throw new Error(`${q.id}: no tool ${q.tool}`);
   return [q, score(q, tool.run(graphOf(q.repo), q.args, {}))];

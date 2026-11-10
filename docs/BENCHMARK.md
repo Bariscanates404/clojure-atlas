@@ -1,13 +1,13 @@
 # Benchmark
 
-18 questions about public corpus repos, each answered by one MCP tool on the graph
+20 questions about public corpus repos, each answered by one MCP tool on the graph
 `scripts/coverage.ts` builds at the sha pinned in [corpus.json](../corpus.json). The expected answers were
 verified by hand in the source, without the tool; each one's file:line is in
 [bench/questions.json](../bench/questions.json). Measured by `node bench/score.ts <corpus-dir>`; every number below
 comes from that run, and the run refuses a graph built by another clojure-atlas version than the code it scores.
 
-**Positive questions: 12 of 12 pass.** A question passes when the answer names every
-expected definition and nothing else. Expected items found: 28 of 28; items answered: 28.
+**Positive questions: 14 of 14 pass.** A question passes when the answer names every
+expected definition and nothing else. Expected items found: 40 of 40; items answered: 40.
 
 **Absence questions: 6 of 6 pass.** The correct answer is that there is none. One passes only
 when the answer states that kind of absence and names nothing: *none* (the thing exists, nothing relates to it, the
@@ -35,6 +35,8 @@ The builder was fixed, with a fixture; the question was kept as it was.
 | q10 | pedestal | route_authz | Which handler var does the route GET /admin reach? | 1 | 1 | - | - | yes |
 | q11 | usermanager | tests_for | Which deftests exercise usermanager.model.user-manager/get-user-by-id? | 2 | 2 | - | - | yes |
 | q12 | compojure | key_flow | Which definitions produce or consume the :compojure/path request key? | 3 | 3 | - | - | yes |
+| q13 | polylith-realworld | route_authz | Which middleware wraps the route POST /api/articles (compojure wrap-routes and the -> chains around it)? | 11 | 11 | - | - | yes |
+| q14 | logseq | graph_nodes | Which client route path is named :settings in the frontend route table? | 1 | 1 | - | - | yes |
 
 ## Absence questions
 

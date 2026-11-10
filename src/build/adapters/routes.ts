@@ -7,6 +7,7 @@ import type { VarUse } from '../analysis.ts';
 import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
 import { CORE_NS, defId, groupBy, type Adapter, type Context, type Owner } from '../model.ts';
 import { entries, entry, isRoute, isRouteGroup, joinPath, keywordOf } from './route-data.ts';
+import { wrappingOf } from './ring-wrap.ts';
 
 const COMPOJURE = 'compojure.core';
 const COMPOJURE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'ANY']);
@@ -26,6 +27,8 @@ interface Link {
 interface Guard extends Link {
   level: string;
   inheritedFrom?: string;
+  // a library var: no project definition stands for it
+  library?: boolean;
 }
 
 interface Permission {
@@ -57,12 +60,15 @@ export interface Route {
   handlers: Link[];
   guards: Guard[];
   authz: Authz;
+  // the middleware around the route could not be read
+  middlewareUnknown?: boolean;
 }
 
 const NO_AUTHZ: Authz = { permissions: [] };
 
 export const routeId = (r: Pick<Route, 'method' | 'path' | 'base' | 'mount'>) => `route:${r.method} ${r.path} @${r.base}${r.mount}`;
 const permissionId = (name: string) => `permission:${name}`;
+const libraryMiddlewareId = (full: string) => `library_middleware:${full}`;
 const exemptionId = (reason: string) => `authz_exemption:${reason}`;
 
 
@@ -314,12 +320,15 @@ function compojureRoutes(ctx: Context): Route[] {
     const mounts = uses.flatMap((u) => mountsOf(ownerOf(u), [...stack, base]).map((m) => m + contextsAt(u.file, u.row, u.col)));
     return [...new Set(mounts)];
   };
+  const wrapping = wrappingOf(ctx);
   return found.flatMap(({ u, method, path }) => {
     const form = formAt(ctx.forms(u.file), u.row, u.col);
     const handlers = form && kids(form).length > 3 ? returnedCall(ctx, u.file, kids(form)[kids(form).length - 1]) : [];
     const base = ownerOf(u);
     const local = contextsAt(u.file, u.row, u.col);
-    return mountsOf(base, []).map((mount): Route => ({ method, path, mount: mount + local, base, file: u.file, line: u.row, library: 'compojure', handlers, guards: [], authz: NO_AUTHZ }));
+    const { wrappers, unknown } = form ? wrapping(u.file, form) : { wrappers: [], unknown: true };
+    const guards = wrappers.map((w): Guard => ({ def: w.def, line: w.line, band: 'heuristic', level: 'wrapper', ...(w.library ? { library: true } : {}) }));
+    return mountsOf(base, []).map((mount): Route => ({ method, path, mount: mount + local, base, file: u.file, line: u.row, library: 'compojure', handlers, guards, authz: NO_AUTHZ, ...(unknown ? { middlewareUnknown: true } : {}) }));
   });
 }
 
@@ -531,11 +540,12 @@ export const httpRoutes: Adapter = {
       const component = ctx.componentOf(r.file);
       nodes.push({
         id, kind: 'route', name: `${r.method} ${r.mount}${r.path} @${r.base}`, file: r.file, line: r.line, ...(component ? { component } : {}),
-        attrs: { method: r.method.toLowerCase(), path: r.path, full_path: `${r.mount}${r.path}`, base: r.base, mount: r.mount, library: r.library, ...(competing > 1 ? { conflict: competing } : {}) },
+        attrs: { method: r.method.toLowerCase(), path: r.path, full_path: `${r.mount}${r.path}`, base: r.base, mount: r.mount, library: r.library, ...(competing > 1 ? { conflict: competing } : {}), ...(r.middlewareUnknown ? { middleware: 'unknown' } : {}) },
       });
       for (const h of r.handlers) edges.push({ from: id, to: defId(h.def), kind: 'routes_to', band: bandOf(h.band), file: r.file, line: h.line });
+      for (const g of r.guards.filter((x) => x.library)) nodes.push({ id: libraryMiddlewareId(g.def), kind: 'library_middleware', name: g.def, file: r.file, line: g.line });
       r.guards.forEach((g, order) => edges.push({
-        from: id, to: defId(g.def), kind: 'guarded_by', band: bandOf(g.band), file: r.file, line: g.line,
+        from: id, to: g.library ? libraryMiddlewareId(g.def) : defId(g.def), kind: 'guarded_by', band: bandOf(g.band), file: r.file, line: g.line,
         attrs: { order, level: g.level, ...(g.inheritedFrom ? { inherited_from: g.inheritedFrom } : {}) },
       }));
       const declared = r.authz.permissions;

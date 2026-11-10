@@ -188,6 +188,51 @@
     }
   },
   {
+    "id": "q13",
+    "repo": "polylith-realworld",
+    "question": "Which middleware wraps the route POST /api/articles (compojure wrap-routes and the -> chains around it)?",
+    "tool": "route_authz",
+    "args": {"route": "POST /api/articles"},
+    "sections": ["middleware"],
+    "expected": [
+      "clojure.realworld.rest-api.middleware/wrap-auth-user",
+      "clojure.realworld.rest-api.middleware/wrap-authorization",
+      "clojure.realworld.rest-api.middleware/wrap-cors",
+      "clojure.realworld.rest-api.middleware/wrap-exceptions",
+      "ring.logger.timbre/wrap-with-logger",
+      "ring.middleware.json/wrap-json-params",
+      "ring.middleware.json/wrap-json-response",
+      "ring.middleware.keyword-params/wrap-keyword-params",
+      "ring.middleware.multipart-params/wrap-multipart-params",
+      "ring.middleware.nested-params/wrap-nested-params",
+      "ring.middleware.params/wrap-params"
+    ],
+    "evidence": {
+      "clojure.realworld.rest-api.middleware/wrap-auth-user": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:46",
+      "clojure.realworld.rest-api.middleware/wrap-authorization": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:45",
+      "clojure.realworld.rest-api.middleware/wrap-cors": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:61",
+      "clojure.realworld.rest-api.middleware/wrap-exceptions": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:59",
+      "ring.logger.timbre/wrap-with-logger": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:53",
+      "ring.middleware.json/wrap-json-params": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:57",
+      "ring.middleware.json/wrap-json-response": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:60",
+      "ring.middleware.keyword-params/wrap-keyword-params": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:54",
+      "ring.middleware.multipart-params/wrap-multipart-params": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:56",
+      "ring.middleware.nested-params/wrap-nested-params": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:58",
+      "ring.middleware.params/wrap-params": "bases/rest-api/src/clojure/realworld/rest_api/api.clj:55"
+    }
+  },
+  {
+    "id": "q14",
+    "repo": "logseq",
+    "question": "Which client route path is named :settings in the frontend route table?",
+    "tool": "graph_nodes",
+    "args": {"kind": "client_route", "attrs": {"name": ":settings"}},
+    "expected": ["/settings"],
+    "evidence": {
+      "/settings": "src/main/frontend/routes.cljs:68"
+    }
+  },
+  {
     "id": "a01",
     "repo": "mount",
     "question": "Which definitions call mount.core/unpound?",
