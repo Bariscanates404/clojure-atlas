@@ -449,7 +449,7 @@ Sie misst weder den gesamten verstandenen Code noch das gesamte extrahierte Fram
 | Integrant | 442 | 0 | 100.0% | 0 |
 | DataScript † | 4,392 | 496 | 89.9% | 1,255 |
 | day-of-datomic † | 84 | 29 | 74.3% | 1 |
-| **All 26 repos** | | | **median 100.0%; 24 of 26 at 99.3% or more** | |
+| **Alle 26 Repos** | | | **Median 100.0%; 24 von 26 bei 99.3% oder mehr** | |
 
 † [docs/COVERAGE.md](docs/COVERAGE.md#repos-under-95-resolution-rate-or-with-unknown-namespace-usages-above-5-of-resolved)
 

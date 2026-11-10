@@ -449,7 +449,7 @@ No mide todo el código comprendido, todo el comportamiento de framework extraí
 | Integrant | 442 | 0 | 100.0% | 0 |
 | DataScript † | 4,392 | 496 | 89.9% | 1,255 |
 | day-of-datomic † | 84 | 29 | 74.3% | 1 |
-| **All 26 repos** | | | **median 100.0%; 24 of 26 at 99.3% or more** | |
+| **Los 26 repositorios** | | | **mediana 100.0%; 24 de 26 con 99.3% o más** | |
 
 † [docs/COVERAGE.md](docs/COVERAGE.md#repos-under-95-resolution-rate-or-with-unknown-namespace-usages-above-5-of-resolved)
 
