@@ -179,6 +179,15 @@ export function capabilityNotes(g: Graph, names: string[]): string[] {
   return notes;
 }
 
+// Dynamic resolution the build saw: a var reached by a symbol built at runtime is not followed, so a caller found that way is not listed.
+export function dynamicResolveNote(g: Graph): string[] {
+  const seen = (g.doc as { stats?: { usages?: { dynamicResolve?: { sites?: unknown; literal?: unknown } } } }).stats?.usages?.dynamicResolve;
+  const sites = typeof seen?.sites === 'number' ? seen.sites : 0;
+  const literal = typeof seen?.literal === 'number' ? seen.literal : 0;
+  return sites ? [`dynamic resolution (requiring-resolve, resolve, ns-resolve) is used at ${sites} site(s), ${literal} naming a project var by a literal symbol `
+    + '(HEURISTIC references); a symbol built at runtime is not followed, so a caller reached that way is not listed'] : [];
+}
+
 export function unknownNote(rows: Row[]): string[] {
   const n = rows.filter((r) => r.band === 'unknown').length;
   return n ? [`${n} row(s) are UNKNOWN: the producer could not decide them; they are boundaries, not absence`] : [];

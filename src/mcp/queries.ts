@@ -4,7 +4,7 @@
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
 import { BANDS, capability, inEdges, outEdges, weakest, compareText } from './graph.ts';
 import {
-  ambiguous, call, capabilityNotes, countBy, edgeRow, gated, MACRO_HINT, nodeRow, notFound, resolve, unknownNote,
+  ambiguous, call, capabilityNotes, countBy, dynamicResolveNote, edgeRow, gated, MACRO_HINT, nodeRow, notFound, resolve, unknownNote,
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
@@ -51,7 +51,7 @@ export function callers(g: Graph, query: string, opts: { includeReferences?: boo
   const kinds = opts.includeReferences ? DEPENDENCY_KINDS : (['calls'] as const);
   const rows = callerRows(g, inEdges(g, target.id, kinds)).map((r) => ({ ...r, cross: !!r.component && r.component !== target.component }));
   rows.sort((a, b) => compareText(a.file ?? '', b.file ?? '') || (a.line ?? 0) - (b.line ?? 0));
-  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows)];
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows), ...dynamicResolveNote(g)];
   if (!opts.includeReferences) {
     const called = new Set(rows.map((r) => r.id));
     const referencing = new Set(inEdges(g, target.id, DEPENDENCY_KINDS).map((e) => e.from).filter((from) => !called.has(from)));
@@ -161,7 +161,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   }
   const shallow = rows.filter((r) => (r.depth ?? 0) <= SHALLOW_DEPTH);
   const deeper = rows.filter((r) => (r.depth ?? 0) > SHALLOW_DEPTH);
-  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows), ...(capped ? fractionNote(depth, max) : [])];
+  const notes = [...capabilityNotes(g, ['definitions']), ...unknownNote(rows), ...dynamicResolveNote(g), ...(capped ? fractionNote(depth, max) : [])];
   if (rows.length) {
     notes.push(countLine('by depth', byDepth, false, byDepth.size));
     notes.push(countLine('by component', byComp, true));
