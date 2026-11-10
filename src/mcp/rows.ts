@@ -132,11 +132,14 @@ export function notFound(g: Graph, name: string, query: string, title: string, w
   const unparsed = [...parseFailed, ...skipped, ...timedOut, ...unread];
   const used = what === 'definition' ? usedUndefined(g, query) : [];
   const at = (sites: string[]) => sites.join(', ');
+  const cause = unparsed.length ? 'its definition is probably in the file named below'
+    : recovered.length ? `probably a form clj-kondo could not read in the file with syntax errors named below, or a ${MACRO_HINT.replace(/^probably defined by a /, '')}`
+    : MACRO_HINT;
   return {
     name, query, title, found: false, matches: [], sections: [], next: [],
     verdict: `no ${what} matches ${JSON.stringify(query)}${used.length ? `; used at ${used.map(([, s]) => at(s)).join('; ')} but no definition was found` : ''}`,
     notes: [
-      ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${unparsed.length ? 'its definition is probably in the file named below' : MACRO_HINT}`),
+      ...used.map(([full, sites]) => `${full} is used at ${at(sites)} but no definition was found: ${cause}`),
       ...(parseFailed.length ? [`${query} probably lives in ${parseFailed.join(', ')}, which could not be parsed${NOT_SPELLING}`] : []),
       ...(recovered.length ? [`${query} may live in ${recovered.join(', ')}, which has syntax errors; some forms may be missing, so besides a spelling problem a form kondo could not read is possible`] : []),
       ...(skipped.length ? [`${query} probably lives in ${skipped.join(', ')}, which is over 2 MB and was skipped${NOT_SPELLING}`] : []),
