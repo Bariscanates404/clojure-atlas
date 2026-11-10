@@ -132,9 +132,9 @@ describe('render: shape', () => {
 });
 
 describe('render: ranking', () => {
-  const bands: Row['band'][] = ['unknown', 'heuristic', 'declared', 'static_proven'];
+  const bands: Row['band'][] = ['unknown', 'heuristic', 'static_proven'];
   it('band first', () => {
-    assert.deepEqual(rankRows(bands.map((b, i) => row(i, { band: b }))).map((x) => x.band), ['static_proven', 'declared', 'heuristic', 'unknown']);
+    assert.deepEqual(rankRows(bands.map((b, i) => row(i, { band: b }))).map((x) => x.band), ['static_proven', 'heuristic', 'unknown']);
   });
   it('then depth', () => assert.deepEqual(rankRows([row(1, { depth: 3 }), row(2, { depth: 1 }), row(3, { depth: 2 })]).map((x) => x.depth), [1, 2, 3]));
   it('then entry point', () => assert.deepEqual(rankRows([row(1), row(2, { entry: 'route' })]).map((x) => x.label), ['r2', 'r1']));
@@ -156,7 +156,7 @@ describe('render: ranking', () => {
   ];
   for (const [extra, expected] of whyCases) it(`why ${JSON.stringify(extra)}`, () => assert.equal(why(row(0, extra)), expected));
 
-  const mixCases: [Row['band'][], string][] = [[[], ''], [['static_proven'], 'S1'], [['unknown', 'static_proven', 'heuristic', 'heuristic', 'declared'], 'S1 D1 H2 ?1']];
+  const mixCases: [Row['band'][], string][] = [[[], ''], [['static_proven'], 'S1'], [['unknown', 'static_proven', 'heuristic', 'heuristic'], 'S1 H2 ?1']];
   for (const [bs, expected] of mixCases) it(`band mix ${expected || 'empty'}`, () => assert.equal(bandMix(bs.map((b, i) => row(i, { band: b }))), expected));
 
   const whereCases: [Pick<Row, 'file' | 'line'>, string][] = [
@@ -294,12 +294,12 @@ describe('render: every row line of a real query is cited', () => {
   it('callers with mixed bands', () => {
     const g = new GraphBuilder();
     const t = g.def('t/t');
-    for (let i = 0; i < 30; i++) g.edge(g.def(`c/f${i}`, `components/c${i % 3}`), 'calls', t, { band: BANDS[i % 3] });
+    for (let i = 0; i < 30; i++) g.edge(g.def(`c/f${i}`, `components/c${i % 3}`), 'calls', t, { band: BANDS[i % 2] });
     g.edge(g.def('c/unk'), 'calls', t, { band: 'unknown' });
     const text = render(callers(g.build(), 't/t'), { limit: 500, maxTokens: 100000 });
     const lines = rowLines(text);
     assert.equal(lines.length, 31, '30 callers and the definition row');
-    for (const l of lines) assert.match(l, /\S+(:\d+)? \[(S|D|H|\?)\]/);
+    for (const l of lines) assert.match(l, /\S+(:\d+)? \[(S|H|\?)\]/);
     assert.match(text, /UNKNOWN: c\/unk at src\/site.x:\d+/);
   });
 });
