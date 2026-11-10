@@ -24,7 +24,7 @@ A personal project by **Barış Can Ateş** · MIT licensed · Built on [clj-kon
 English | [Türkçe](README.tr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
 [Capabilities](#what-you-can-do) · [Map contracts](#contracts-down-to-map-keys) · [Supported stack](#languages-and-ecosystem-support) · [Examples](#see-it-in-action) ·
-[Quick start](#quick-start) · [Coverage](#coverage) · [Full guide](docs/GUIDE.md)
+[Quick start](#quick-start) · [Coverage](#coverage) · [How it is tested](#how-atlas-is-tested) · [Full guide](docs/GUIDE.md)
 
 ## What you can do
 
@@ -215,6 +215,57 @@ The connection is through an event keyword, so callers of a named function alone
 </details>
 
 <details>
+<summary><strong>See the middleware in front of an endpoint, and what Atlas could not check</strong></summary>
+
+From polylith-realworld, where the routes are wrapped by Ring middleware in a separate definition:
+
+```text
+route_authz {"route": "POST /api/articles"}
+```
+
+```text
+ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
+note: capability route_authz is absent: an empty answer is not proof of absence
+[... trimmed ...]
+  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
+[... trimmed ...]
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+```
+
+The handler is proven; the eleven wrappers are found in order but marked `[H]`, because middleware composition
+is runtime code. The project declares no permission rules, so Atlas says **not extracted** instead of claiming
+the route has no permission check.
+
+</details>
+
+<details>
+<summary><strong>An honest miss: a name that is used but never defined</strong></summary>
+
+From next.jdbc, where a macro generates helper functions clj-kondo cannot expand:
+
+```text
+callers {"var": "next.jdbc.types/as-other"}
+```
+
+```text
+CALLERS next.jdbc.types/as-other — no definition matches "next.jdbc.types/as-other"; used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found
+note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/next/jdbc_test.clj:559 but no definition was found: probably defined by a macro clj-kondo cannot expand; add :lint-as for the macro in .clj-kondo/config.edn
+note: use a fully qualified name (ns/name)
+```
+
+Instead of "not found, check the spelling", the answer shows where the name is used and how to make it visible.
+With a `:lint-as` entry for the macro, the same question returns a proven definition
+([project configuration](docs/GUIDE.md#project-configuration)).
+
+</details>
+
+<details>
 <summary><strong>Turn changed lines into review context and related tests</strong></summary>
 
 From polylith-realworld:
@@ -399,6 +450,23 @@ The recorded benchmark passes **14/14 positive questions** and **7/7 absence que
 checked by hand against source. It is a small regression benchmark, not a general accuracy estimate. Thirteen
 positive answers use MCP tools; the client-route question reads graph nodes directly because no tool lists
 client routes yet. [Questions, results and methodology](docs/BENCHMARK.md).
+
+## How Atlas is tested
+
+A tool that agents trust must not invent relationships. Before this release, the code went through:
+
+| Check | Result |
+|---|---|
+| Automated tests | **831**, all passing; each fixed bug has a test that failed before the fix |
+| Source line coverage | **99.75%**; CI fails below 98% |
+| Bug hunts | One reviewer per module searched for wrong answers with runnable reproductions; **85** proven bugs found and fixed |
+| Independent reviews | **Six** rounds by reviewers who had not written the code, scoring correctness, cleanliness, rules and tests per module, until every module scored at least 4 of 5 |
+| Real repositories | **26** public projects build with no crash and **0** dropped edges (previously 690 on six of them) |
+| Untrusted repositories | Hostile fixtures check that Git settings, filter drivers, submodules, project TypeScript, odd file names and hanging clj-kondo hooks run nothing and hang nothing; executable lookup skips the repository directory (unit-tested; Windows itself is untested) |
+| Ground truth | The [benchmark](docs/BENCHMARK.md) above: 14 positive and 7 absence questions, answers checked by hand |
+
+The absence questions matter most: they check that Atlas says "not found", "not extracted" or "degraded" where
+that is the truth, instead of an empty list that reads like "none".
 
 ## Contributing
 
