@@ -30,7 +30,8 @@ npx clojure-atlas init
 `build`, `.clojure-atlas/graph.json.gz` dosyasını yazar. integrant deposunda şunu yazdırır:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 1.1 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 `init`, yazacağı proje `.mcp.json` dosyasını gösterir ve yalnızca `--yes` ile yazar:
@@ -101,6 +102,7 @@ Kodu değiştirdikten sonra grafı yeniden oluşturun. Sunulan graf kendini gün
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 Projenin kendi `.clj-kondo` yapılandırması dikkate alınır. Proje kökündeki isteğe bağlı `.clojure-atlas.edn`, genel
@@ -110,14 +112,16 @@ anahtarları olan `:route-authz`, `:permission-middleware` ve `:permission-fns`.
 ## Araçlar
 
 Aşağıdaki her örnek, [examples/](examples/) içindeki bir graf üzerinde `clojure-atlas mcp` çıktısıdır. Yalnızca
-işaretlenen yerlerde kısaltılmıştır. `[S]`, `[H]` ve `[?]` band'lerdir ve sonraki bölümde açıklanır.
+işaretlenen yerlerde kısaltılmıştır. Bu graflardan bazıları build sırasında birkaç edge'i düşürdü, bu yüzden yanıtları
+bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]` band'lerdir ve sonraki bölümde açıklanır.
 
 ### graph_info
 
 Grafın hangi commit'i anlattığı, her adaptörün ne bulduğu ve band sayıları. Soru: integrant grafı neleri biliyor?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-09T23:22:16.599Z: 295 nodes, 1473 edges
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -133,6 +137,7 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 Bir tanımın doğrudan çağıranları. Soru: `integrant.core/dependent-keys` fonksiyonunu kim çağırıyor?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -146,13 +151,15 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 ```
 
 `include_references: true` ile değer kullanımlarını, callback'leri, kayıtlı handler'ları, makro açılımlarını,
-dispatch adaylarını ve rebinding'leri de listeler.
+dispatch adaylarını ve rebinding'leri de listeler. Syntax-quote'lu bir makro gövdesinde adı geçen bir var (compojure'ın
+`routes` adını veren `defroutes`'u) çağrı değil, HEURISTIC bir referanstır.
 
 ### blast_radius
 
 Bir tanımın geçişli bağımlıları. Soru: `integrant.core/ref?` üzerindeki bir değişiklik nelere ulaşabilir?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -174,12 +181,13 @@ deeper (25 S25)
 Arity'ler, destructure edilen anahtarlar ve her çağıranın ne verdiği. Soru: `integrant.core/init` nasıl çağrılıyor?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
 arities (2 S2)
-  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s); passes a map parameter on)
-  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s); passes a map parameter on)
+  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
+  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
 callers (38 S38)
   1. integrant.core/init: arity 2, arg0 symbol config (keys unknown)  src/integrant/core.cljc:655 [S]  fan-in 8
   2. integrant.core-test/fold-test: arity 1, arg0 symbol config (keys unknown)  test/integrant/core_test.cljc:649 [S]
@@ -191,28 +199,48 @@ Diff modunda (`base_graph`, ya da `added_keys` / `removed_keys` / `arities`) bir
 
 ### route_authz
 
-Bir backend route'unun handler'ı, middleware zinciri ve izin kontrolü. Soru: usermanager'da `GET /user/list` isteğini ne
-karşılıyor?
+Bir backend route'unun handler'ı, middleware zinciri ve izin kontrolü. Soru: polylith-realworld'de `POST /api/articles` isteğini ne
+karşılıyor ve hangi middleware onu sarıyor?
 
 ```
-ROUTE_AUTHZ GET /user/list — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [H1]
+ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): handler (1)
-  1. usermanager.controllers.user/get-users  src/usermanager/main.clj:132 [H]  entry: route GET /user/list @usermanager.main/my-handler, heuristic match
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware (outermost first): none (searched: guarded_by edges)
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): permissions: none (searched: requires_permission edges)
-[... trimmed ...]
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
+  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
+  [... trimmed ...]
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="POST /api/articles")
 ```
 
-Handler bulunur, ancak yalnızca heuristic bir eşleşme olarak. İzin hükmü "not provable" (kanıtlanamaz) olur, çünkü bu
-proje `.clojure-atlas.edn` içinde bir yetkilendirme modeli tanımlamaz.
+On birinci satır, sonraki sayfada, compojure'ın `wrap-routes` ile uygulanan yetkilendirme middleware'idir:
+
+```
+  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
+```
+
+Bir route'un sarmalanması okunamadığında bölüm "none" yerine bunu söyler (usermanager, `GET /user/list`):
+
+```
+GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
+```
+
+Compojure ve Ring middleware'i (`->`, `->>`, iç içe çağrılar, `wrap-routes`) HEURISTIC olarak okunur. reitit ve
+pedestal route verisindeki middleware (`:middleware`, `:interceptors`) route'un kendisinden okunur. İzin hükmü
+"not provable" (kanıtlanamaz) olur, çünkü bu proje `.clojure-atlas.edn` içinde bir yetkilendirme modeli tanımlamaz.
 
 ### permission_routes
 
 Bir izni kontrol eden her route. Soru: mount içinde hangi route'lar `:admin` ister?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -225,6 +253,7 @@ Bir Datomic, datascript veya XTDB niteliğinin kanıtlanmış okuyucuları ve ya
 `:order/bid` niteliğini kim yazıyor?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -243,6 +272,7 @@ Bir re-frame event'inin dispatch edenleri ve handler'ı ya da bir subscription'�
 Soru: re-frame'in todomvc örneğinde `:delete-todo` event'ini kim dispatch ediyor?
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -283,6 +313,7 @@ kendi TypeScript'i ile okunur). Örnek depoların hiçbirinde bunlar yoktur ve y
 testleri `mount.core/start` fonksiyonuna ulaşıyor?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -314,6 +345,7 @@ Literal bir map tablosunun, kardeş satırların çoğunda bulunan bir anahtarı
 `test/re_frame/subs/alpha_test.cljs` tablosunda anahtarı eksik bir satır var mı?
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -376,7 +408,20 @@ Boş bir yanıt hiçbir zaman çıplak bir boş liste değildir. Şu biçimlerde
 - **none**: şey vardır ve hiçbir şey onunla ilişkili değildir. `callers: none (searched: call edges into this definition)`.
 - **not found**: kod tabanında böyle bir şey yoktur. `no definition matches "integrant.core/stop"`.
 - **capability off**: graf yanıtlayamaz, çünkü o tür olgunun adaptörü çıkaracak bir şey bulamadı ya da
-  yapılandırılmadı. `capability route_authz is absent: an empty answer is not proof of absence`.
+  yapılandırılmadı. `capability route_authz is absent: an empty answer is not proof of absence`. Buna bağlı bir bölüm
+  `not extracted (route_authz is absent)` yazar, asla "none" yazmaz. Okunamayan bir middleware zinciri `not extracted (UNKNOWN)`
+  yazar.
+
+Grafın kendisi eksik olduğunda, build günlüğü, graph_info ve her yanıt bir `DEGRADED` satırı ile başlar: clj-kondo'nun
+ayrıştıramadığı bir dosya ya da bir ucu node olmadığı için düşürülen edge'ler. Büyük olasılıkla ayrıştırılamayan bir
+dosyada duran bir ad bu şekilde bildirilir. Bir dosyanın ayrıştırılamadığı biff'ten:
+
+```
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
 
 Bir ıskayı, bir şeyin var olmadığının kanıtı olarak değil, kapsama hakkında bir ifade olarak okuyun.
 
@@ -412,16 +457,17 @@ küçülür. Corpus bunların hiçbiri eklenmeden ölçülür.
 
 ## Benchmark
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md), corpus depoları hakkında 18 soru içerir. Beklenen her yanıt, araç olmadan,
+[docs/BENCHMARK.md](docs/BENCHMARK.md), corpus depoları hakkında 20 soru içerir. Beklenen her yanıt, araç olmadan,
 kaynakta elle kontrol edildi ve file:line bilgisi [bench/questions.json](bench/questions.json) içindedir.
 
-- **Positive soruları: 12 üzerinden 12 geçti.** Bir soru, yanıt beklenen her tanımı adlandırıp başka hiçbir şey
-  adlandırmadığında geçer. Bulunan beklenen öğe: 28 üzerinden 28. Yanıtlanan öğe: 28.
+- **Positive soruları: 14 üzerinden 14 geçti.** Bir soru, yanıt beklenen her tanımı adlandırıp başka hiçbir şey
+  adlandırmadığında geçer. Bulunan beklenen öğe: 40 üzerinden 40. Yanıtlanan öğe: 40.
 - **Absence soruları: 6 üzerinden 6 geçti.** Doğru yanıt, hiçbir şeyin olmadığıdır (*none*, *not-found* ya da
   *capability-off*). Yanıt bu tür bir yokluğu belirtmeli ve hiçbir şey adlandırmamalıdır.
 
-Positive sorular ilk koşudan önce sabitlendi ve ilk koşu 12 üzerinden 11 aldı. Iskalanan soru (`re-frame.alpha`
-üzerinden re-frame kayıtları) builder'da bir fixture ile düzeltildi ve soru olduğu gibi tutuldu.
+İlk on iki positive soru ilk koşudan önce sabitlendi ve ilk koşu 12 üzerinden 11 aldı. Iskalanan soru (`re-frame.alpha`
+üzerinden re-frame kayıtları) builder'da bir fixture ile düzeltildi ve soru olduğu gibi tutuldu. Sonradan iki soru eklendi: compojure middleware zinciri (q13) ve bir reitit
+frontend route'u (q14).
 
 ## Gereksinimler
 
@@ -456,11 +502,13 @@ TypeScript'i kendiniz yazabilirsiniz.
   fonksiyon) izlenmez. Yalnızca dinamik olarak okunan ya da yazılan bir map anahtarı izlenmez. Koda multimethod'lar,
   `resolve`/`apply` ya da HTTP fixture'ları üzerinden ulaşan testler sayılmaz.
 - **Heuristic kısımlar**: multimethod ve protocol dispatch (`may_dispatch_to`), bazı compojure handler'ları
-  (`heuristic match` olarak gösterilir), threaded anahtar slotları, transact ya da query çağrısı dışındaki query
-  literal'leri, middleware factory çağrıları, key_siblings bulguları.
-- **Sarmalayarak uygulanan compojure middleware'i** (`wrap-routes`, bir routes var'ı üzerinde `->`) route'lara
-  bağlanmaz, bu yüzden route_authz bunlar için `middleware (outermost first): none` bildirir. Middleware zincirleri
-  reitit ve pedestal route verisinden (`:middleware`, `:interceptors`) okunur.
+  (`heuristic match` olarak gösterilir), compojure ve Ring middleware zincirleri, middleware factory çağrıları, reitit
+  gerektirmeyen namespace'lerdeki reitit frontend route tabloları (projede herhangi bir yerde `reitit.frontend`
+  kullanılıyorsa okunur), syntax-quote'lu makro gövdelerinde adı geçen var'lar, threaded anahtar slotları, transact ya da
+  query çağrısı dışındaki query literal'leri, key_siblings bulguları.
+- **Sarmalanması okunamayan middleware** `middleware: not extracted (UNKNOWN)` olarak bildirilir, "none" olarak değil.
+- **Ayrıştırılamayan dosyalar**: tanımları ve çağrıları graftan eksik kalır. Her yanıt bu durumda onları adlandıran bir
+  `DEGRADED` satırı ile başlar.
 - **Route yetkilendirmesi** `.clojure-atlas.edn` gerektirir. Bu dosya olmadan route_authz "not provable" der ve
   permission_routes capability'yi absent olarak bildirir.
 - **Henüz desteklenmeyenler**: bidi route'ları, compojure-api, pedestal verbose map route'ları, malli registry'leri,

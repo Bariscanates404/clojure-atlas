@@ -28,7 +28,8 @@ npx clojure-atlas init
 `build` writes `.clojure-atlas/graph.json.gz`. On the integrant repo it prints:
 
 ```
-clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 1.1 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: 7 files, 138 definitions, 295 nodes, 1473 edges; resolution rate of var usages in recognized project namespaces 100.0% (442 of 442), 0 usages in an unknown namespace; 0.6 s -> .clojure-atlas/graph.json.gz
+clojure-atlas: DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 `init` shows the project `.mcp.json` it would write and writes it only with `--yes`:
@@ -100,6 +101,7 @@ Rebuild the graph after you change code. A served graph does not update itself:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ```
 
 The project's own `.clj-kondo` config is honored. An optional `.clojure-atlas.edn` in the project root adds what
@@ -109,7 +111,8 @@ keys `:route-authz`, `:permission-middleware` and `:permission-fns`.
 ## Tools
 
 Every example below is real output of `clojure-atlas mcp` over a graph in [examples/](examples/), trimmed only
-where marked. `[S]`, `[H]` and `[?]` are the bands, explained in the next section.
+where marked. Some of these graphs dropped a few edges at build time, so their answers start with a `DEGRADED`
+line (see the next section). `[S]`, `[H]` and `[?]` are the bands, explained in the next section.
 
 ### graph_info
 
@@ -117,7 +120,8 @@ Which commit the graph describes, what each adapter found, with band counts. Que
 graph know?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-09T23:22:16.599Z: 295 nodes, 1473 edges
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T00:19:25.361Z: 295 nodes, 1473 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -133,6 +137,7 @@ config c77762fd2fd2 from .clj-kondo/config.edn
 Direct callers of a definition. Question: who calls `integrant.core/dependent-keys`?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 CALLERS integrant.core/dependent-keys — 4 direct caller(s) in 1 component(s)
 counts: callers=4 [S4]
 definition (1)
@@ -146,13 +151,15 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 ```
 
 With `include_references: true` it also lists value uses, callbacks, registered handlers, macro expansions,
-dispatch candidates and rebindings.
+dispatch candidates and rebindings. A var named inside a syntax-quoted macro body (compojure's `defroutes` naming
+`routes`) is a HEURISTIC reference, not a call.
 
 ### blast_radius
 
 Transitive dependents of a definition. Question: what can a change to `integrant.core/ref?` reach?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 BLAST_RADIUS integrant.core/ref? — 31 caller(s) over 6 depth(s) in 1 component(s)
 counts: affected=6 [S6]  deeper=25 [S25]
 note: by depth: 1=4 2=2 3=8 4=11 5=3 6=3
@@ -174,12 +181,13 @@ deeper (25 S25)
 Arities, destructured keys and what each caller passes. Question: how is `integrant.core/init` called?
 
 ```
+DEGRADED: 8 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
 findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
 arities (2 S2)
-  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s); passes a map parameter on)
-  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s); passes a map parameter on)
+  1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
+  2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
 callers (38 S38)
   1. integrant.core/init: arity 2, arg0 symbol config (keys unknown)  src/integrant/core.cljc:655 [S]  fan-in 8
   2. integrant.core-test/fold-test: arity 1, arg0 symbol config (keys unknown)  test/integrant/core_test.cljc:649 [S]
@@ -191,28 +199,48 @@ affects.
 
 ### route_authz
 
-Handler, middleware chain and permission check of a backend route. Question: what serves `GET /user/list` in
-usermanager?
+Handler, middleware chain and permission check of a backend route. Question: what serves `POST /api/articles` in
+polylith-realworld, and which middleware wraps it?
 
 ```
-ROUTE_AUTHZ GET /user/list — not provable: route authz not in this graph
-counts: route=1 [S1]  handler=1 [H1]
+ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): handler (1)
-  1. usermanager.controllers.user/get-users  src/usermanager/main.clj:132 [H]  entry: route GET /user/list @usermanager.main/my-handler, heuristic match
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware (outermost first): none (searched: guarded_by edges)
-GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): permissions: none (searched: requires_permission edges)
-[... trimmed ...]
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
+  1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
+  1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
+  2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
+  [... trimmed ...]
+  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
+  +1 more (next page: offset=10 section="middleware")
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="POST /api/articles")
 ```
 
-The handler is found, but only as a heuristic match. The permission verdict is "not provable", because this
-project declares no authorization model in `.clojure-atlas.edn`.
+The eleventh row, on the next page, is the authorization middleware, applied with compojure's `wrap-routes`:
+
+```
+  11. clojure.realworld.rest-api.middleware/wrap-authorization  bases/rest-api/src/clojure/realworld/rest_api/api.clj:45 [H]  heuristic match  (#10 wrapper)
+```
+
+When the wrapping of a route cannot be read, the section says so instead of "none" (usermanager, `GET /user/list`):
+
+```
+GET /user/list @usermanager.main/my-handler (base usermanager.main/my-handler): middleware: not extracted (UNKNOWN)
+```
+
+Compojure and Ring middleware (`->`, `->>`, nested calls, `wrap-routes`) is read at HEURISTIC. Middleware in reitit
+and pedestal route data (`:middleware`, `:interceptors`) is read from the route itself. The permission verdict is
+"not provable", because this project declares no authorization model in `.clojure-atlas.edn`.
 
 ### permission_routes
 
 Every route that checks a permission. Question: which routes in mount require `:admin`?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
 note: capability route_authz is absent: an empty answer is not proof of absence
 note: use the exact permission name, with its namespace if it has one
@@ -225,6 +253,7 @@ Proven readers and writers of a Datomic, datascript or XTDB attribute. Question:
 example app?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 ATTRIBUTE_USAGE :order/bid — 2 proven writer(s), 0 uncertain; 0 proven reader(s), 0 uncertain
 counts: writers=2 [S2]
 note: data_attributes: switched on by datascript, datomic
@@ -243,6 +272,7 @@ Dispatchers and handler of a re-frame event, or handler, inputs and subscribers 
 dispatches `:delete-todo` in re-frame's todomvc?
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 EVENT_FLOW :delete-todo — :delete-todo: dispatched from 2 site(s), 1 handler(s), fires 0 event(s) and 0 request(s)
 counts: dispatched by=2 [S2]  handler=1 [S1]
 note: events: switched on by re-frame.core
@@ -283,6 +313,7 @@ definition, selector or route. None of the example repos has them, and the answe
 tests reach `mount.core/start`?
 
 ```
+DEGRADED: 1 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 TESTS_COVERING mount.core/start — 0 browser test(s) in 0 spec file(s)
 note: capability selectors is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
 note: capability browser_tests is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence
@@ -314,6 +345,7 @@ Rows of a literal map table that lack a key most sibling rows have. Question: is
 `test/re_frame/subs/alpha_test.cljs` table missing a key?
 
 ```
+DEGRADED: 2 edge(s) dropped because an end was not a node; an empty or missing answer may be a gap in the graph, not absence
 KEY_SIBLINGS test/re_frame/subs/alpha_test.cljs — 2 row(s) lack a key their siblings have, in 1 table(s) with 5 map rows
 counts: findings=2 [H2]  tables=1 [S1]
 note: key_tables: switched on by map literals in code
@@ -376,7 +408,20 @@ An empty answer is never a bare empty list. It takes one of these forms:
 - **none**: the thing exists and nothing relates to it. `callers: none (searched: call edges into this definition)`.
 - **not found**: the codebase has no such thing. `no definition matches "integrant.core/stop"`.
 - **capability off**: the graph cannot answer, because the adapter for that kind of fact found nothing to extract
-  or was not configured. `capability route_authz is absent: an empty answer is not proof of absence`.
+  or was not configured. `capability route_authz is absent: an empty answer is not proof of absence`. A section
+  that depends on it reads `not extracted (route_authz is absent)`, never "none". A middleware chain that cannot be
+  read reads `not extracted (UNKNOWN)`.
+
+When the graph itself is incomplete, the build log, graph_info and every answer start with a `DEGRADED` line: a
+file clj-kondo could not parse, or edges dropped because one end was not a node. A name that probably lives in an
+unparsed file is reported as such. From biff, where one file cannot be parsed:
+
+```
+DEGRADED: 1 file(s) could not be parsed (libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj), so their definitions and calls are missing; an empty or missing answer may be a gap in the graph, not absence
+CALLERS com.biffweb.sqlite.impl.execute/execute — no definition matches "com.biffweb.sqlite.impl.execute/execute"
+note: com.biffweb.sqlite.impl.execute/execute probably lives in libs/sqlite/src/com/biffweb/sqlite/impl/execute.clj, which could not be parsed: its definitions are not in the graph, so this is not a spelling problem
+note: use a fully qualified name (ns/name)
+```
 
 Read a miss as a statement about coverage, not as proof that something does not exist.
 
@@ -408,16 +453,17 @@ its macros, or names them under `:lint-as` in `.clojure-atlas.edn`. The corpus i
 
 ## Benchmark
 
-[docs/BENCHMARK.md](docs/BENCHMARK.md) has 18 questions about corpus repos. Each expected answer was checked by
+[docs/BENCHMARK.md](docs/BENCHMARK.md) has 20 questions about corpus repos. Each expected answer was checked by
 hand in the source, without the tool, and its file:line is in [bench/questions.json](bench/questions.json).
 
-- **Positive questions: 12 of 12 pass.** A question passes when the answer names every expected definition and
-  nothing else. Expected items found: 28 of 28; items answered: 28.
+- **Positive questions: 14 of 14 pass.** A question passes when the answer names every expected definition and
+  nothing else. Expected items found: 40 of 40; items answered: 40.
 - **Absence questions: 6 of 6 pass.** The correct answer is that there is none (*none*, *not-found* or
   *capability-off*), and the answer must state that kind of absence and name nothing.
 
-The positive questions were fixed before the first run, which scored 11 of 12. The miss (re-frame registrations
-through `re-frame.alpha`) was fixed in the builder with a fixture, and the question was kept as it was.
+The first twelve positive questions were fixed before the first run, which scored 11 of 12. The miss (re-frame
+registrations through `re-frame.alpha`) was fixed in the builder with a fixture, and the question was kept as it
+was. Two questions were added later, for the compojure middleware chain (q13) and a reitit frontend route (q14).
 
 ## Requirements
 
@@ -450,12 +496,15 @@ TypeScript yourself.
 - **Static only.** A var resolved at runtime (`resolve`, `requiring-resolve`, a function chosen by data) is not
   followed. A map key read or written only dynamically is not tracked. Tests that reach code through
   multimethods, `resolve`/`apply` or HTTP fixtures are not counted.
-- **Heuristic parts**: multimethod and protocol dispatch (`may_dispatch_to`), some compojure handlers (shown as `heuristic match`),
-  threaded key slots, query literals outside a transact or query call, middleware factory calls, key_siblings
-  findings.
-- **Compojure middleware applied by wrapping** (`wrap-routes`, `->` over a routes var) is not attached to the
-  routes, so route_authz reports `middleware (outermost first): none` for them. Middleware chains are read from
-  reitit and pedestal route data (`:middleware`, `:interceptors`).
+- **Heuristic parts**: multimethod and protocol dispatch (`may_dispatch_to`), some compojure handlers (shown as
+  `heuristic match`), compojure and Ring middleware chains, middleware factory calls, reitit frontend route tables
+  in namespaces that do not require reitit (read when `reitit.frontend` is used anywhere in the project), vars
+  named in syntax-quoted macro bodies, threaded key slots, query literals outside a transact or query call,
+  key_siblings findings.
+- **Middleware whose wrapping cannot be read** is reported as `middleware: not extracted (UNKNOWN)`, not as
+  "none".
+- **Unparsable files**: their definitions and calls are missing from the graph. Every answer then starts with a
+  `DEGRADED` line naming them.
 - **Route authorization** needs `.clojure-atlas.edn`. Without it, route_authz says "not provable" and
   permission_routes reports the capability as absent.
 - **Not supported yet**: bidi routes, compojure-api, pedestal verbose map routes, malli registries, integrant
