@@ -8,6 +8,8 @@ import {
   type QueryResult, type Row, type Section,
 } from './rows.ts';
 import { changeKeyRows, changeSignatureRows, WEAK_PATTERN_ABSENT } from './keyflow.ts';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { isTestFile } from '../shared/testfile.ts';
 
 export { entryOf, resolve, type QueryResult, type Row, type Section } from './rows.ts';
@@ -850,7 +852,26 @@ export interface ChangeOptions {
   deleted?: readonly string[];
   // files the change adds, against a graph that predates them: new, so their lack of nodes says nothing
   added?: readonly string[];
+  // the working clone (--repo): a file on disk there exists even when the graph holds no node of it
+  repoDir?: string;
 }
+
+export const CHANGE_FORMAT = '"file", "file:12" or "file:10-20,30-41"';
+
+// A spec is a repo-relative file, optionally followed by :line, :from-to or a comma list of those.
+const validSpec = (spec: string): boolean => {
+  const s = spec.trim();
+  return s !== '' && (!s.includes(':') || /^[^:].*:(?:\d+(?:-\d+)?)(?:,\d+(?:-\d+)?)*$/.test(s));
+};
+
+const NOT_CHECKED = 'not checked: no such file in the graph';
+
+const onDisk = (repoDir: string | undefined, file: string): boolean => {
+  if (repoDir === undefined) return false;
+  const full = path.resolve(repoDir, file);
+  const rel = path.relative(path.resolve(repoDir), full);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel) && existsSync(full);
+};
 
 // A file's language family: a graph that indexes one Clojure (or one JS/TS) dialect is taken to cover the others.
 const FAMILIES: Record<string, string> = { '.clj': 'clj', '.cljs': 'clj', '.cljc': 'clj', '.bb': 'clj', '.ts': 'js', '.tsx': 'js', '.js': 'js', '.jsx': 'js',
@@ -979,8 +1000,18 @@ function coverageNotes(g: Graph, changes: Change[], changed: GraphNode[], added:
   return { uncovered: uncovered.length, notes };
 }
 
+function badSpecs(specs: string[]): QueryResult {
+  const bad = specs.filter((x) => !validSpec(x)).map((x) => JSON.stringify(x)).join(', ');
+  const verdict = `not a change spec: ${bad}; expected ${CHANGE_FORMAT}`;
+  return { name: 'context_for_change', query: specs.join(' '), title: 'context for change', found: false, verdict, matches: [], sections: [], notes: [verdict], next: [], badArgument: true };
+}
+
 export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions = {}): QueryResult {
+  if (!specs.every(validSpec)) return badSpecs(specs);
   const changes = specs.map(parseChange).filter((c) => c.file);
+  const known = new Set([...g.doc.nodes.map((n) => n.file), ...(opts.added ?? [])]);
+  const missing = changes.filter((c) => !known.has(c.file) && !onDisk(opts.repoDir, c.file));
+  const missingFiles = [...new Set(missing.map((c) => c.file))];
   const title = `context for change (${changes.length} file(s))`;
   const changed = g.doc.nodes.filter((n) => changes.some((c) => touched(n, c)));
   const { outside, broken } = outsideCallers(g, changed, new Set(opts.deleted ?? []));
@@ -993,10 +1024,10 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   const keyRows = [...changeSignatureRows(g, changed.filter((x) => x.kind === 'definition')), ...tableKeys.rows];
   const found = [...broken, ...routeRisk, ...attrRisk, ...entryRisk, ...risks(keyRows.map((r) => ({ ...r, detail: r.label })), false)];
   const risk = found.map((x) => x.row);
-  const cover = coverageNotes(g, changes, changed, new Set(opts.added ?? []));
+  const cover = coverageNotes(g, changes.filter((c) => !missing.includes(c)), changed, new Set(opts.added ?? []));
   const coverage = cover.uncovered ? ` (${cover.uncovered} of ${changes.length} file(s) not covered)` : '';
   // nothing matched, or a contributing capability absent for a changed route, means nothing was assessed: UNKNOWN, never LOW
-  const level = found.some((x) => x.high) ? 'HIGH' : unassessed ? 'UNKNOWN' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length ? 'UNKNOWN' : 'LOW';
+  const level = found.some((x) => x.high) ? 'HIGH' : unassessed ? 'UNKNOWN' : risk.length ? 'MEDIUM' : cover.uncovered || !changed.length || missing.length ? 'UNKNOWN' : 'LOW';
   const notes = [
     ...unknownNote([...outside, ...authz, ...attrs]),
     ...(routeIds.size ? capabilityNotes(g, ['route_authz']) : []),
@@ -1007,16 +1038,11 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
     ...(beyond ? [testsBeyondNote(MAX_DEPTH)] : []),
     ...(changed.length ? [] : ['no changed symbol matched: the risk is not decidable from this graph, which says nothing about the change']),
     ...cover.notes,
+    ...(missingFiles.length
+      ? [`no such file in the graph: ${missingFiles.join(', ')} (a mistyped path? nothing was checked for it: callers, routes, attributes, tests)`]
+      : []),
   ];
-  return {
-    name: 'context_for_change',
-    query: specs.join(' '),
-    title,
-    verdict: `${changes.length} file(s), ${changed.length} changed symbol(s), ${routeIds.size} route(s), `
-      + `${new Set(attrs.map((a) => a.id)).size} attribute(s); risk ${level}${coverage}`,
-    found: changed.length > 0,
-    matches: changed.map((n) => n.id),
-    sections: [
+  const sections: Section[] = [
       { name: 'risk', rows: risk, ordered: true, searched: 'routes without a check, writes to read attributes, entry points in other components' },
       { name: 'changed symbols', rows: changed.map((n) => nodeRow(n)), searched: 'definitions, routes, handlers and attributes on the given lines' },
       { name: 'callers outside the diff', rows: outside, searched: 'call and reference edges into the changed symbols' },
@@ -1026,7 +1052,19 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
         searched: 'callers of changed definitions with an undefined arity or a never-passed key; table rows on the changed lines lacking a sibling key' },
       { name: 'tests to run', rows: run, searched: `unit tests up to depth ${MAX_DEPTH} and browser tests` },
       { name: 'tests to add', rows: add, ordered: true, searched: 'changed definitions with no static test' },
-    ],
+  ];
+  // every file is unknown to the graph: no section was checked, so none may read "none"
+  const sectionsOut = missing.length === changes.length ? sections.map((x) => ({ ...x, unextracted: NOT_CHECKED })) : sections;
+  const missingNote = missingFiles.length ? `; no such file in the graph: ${missingFiles.join(', ')}` : '';
+  return {
+    name: 'context_for_change',
+    query: specs.join(' '),
+    title,
+    verdict: `${changes.length} file(s), ${changed.length} changed symbol(s), ${routeIds.size} route(s), `
+      + `${new Set(attrs.map((a) => a.id)).size} attribute(s); risk ${level}${coverage}${missingNote}`,
+    found: changed.length > 0,
+    matches: changed.map((n) => n.id),
+    sections: sectionsOut,
     counts: { changed: changed.length, 'callers outside': outside.length, routes: routeIds.size, 'tests to run': run.length, 'tests to add': add.length },
     notes,
     next: [

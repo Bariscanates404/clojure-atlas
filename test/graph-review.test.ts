@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import { BANDS } from '../src/mcp/graph.ts';
 import {
@@ -247,14 +250,17 @@ describe('context_for_change', () => {
   });
 
   it('a file the graph does not know is reported, not silently empty', () => {
-    const r = contextForChange(g, ['docs/readme.md']);
+    const dir = mkdtempSync(path.join(tmpdir(), 'atlas-review-'));
+    mkdirSync(path.join(dir, 'docs'));
+    writeFileSync(path.join(dir, 'docs', 'readme.md'), 'x');
+    const r = contextForChange(g, ['docs/readme.md'], { repoDir: dir });
     assert.equal(r.found, false);
     assert.match(r.notes.join(' '), /1 changed file\(s\) of a type this graph does not index \(\.md\)/);
     assert.match(r.verdict, /risk UNKNOWN/);
   });
 
   it('risk is UNKNOWN, never LOW, when no changed symbol was matched', () => {
-    const none: string[][] = [[], ['docs/readme.md'], [`${file}:45-49`], [`${file}:12-`], ['nowhere/x.clj']];
+    const none: string[][] = [[], ['docs/readme.md'], [`${file}:45-49`], ['nowhere/x.clj']];
     for (const specs of none) {
       const r = contextForChange(g, specs);
       assert.equal(r.found, false, specs.join());

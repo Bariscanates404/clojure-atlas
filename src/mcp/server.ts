@@ -175,7 +175,7 @@ export const TOOLS: ToolDef[] = [
     description: 'One call per review: risk notes, changed symbols, callers outside the diff, route authz with siblings, attributes read or written, tests to run and tests to add, for changed files or hunks.',
     required: ['changes'],
     props: { changes: { type: 'array', items: { type: 'string' }, description: 'repo-relative "file", "file:12" or "file:10-20,30-41" entries' } },
-    run: (g, a) => contextForChange(g, typeof a.changes === 'string' ? [a.changes] : Array.isArray(a.changes) ? a.changes.filter((x): x is string => typeof x === 'string') : []),
+    run: (g, a, opts) => contextForChange(g, strList(a, 'changes'), { ...(opts.repoDir !== undefined ? { repoDir: opts.repoDir } : {}) }),
   },
 ];
 
@@ -219,10 +219,11 @@ export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions
   if (name === 'graph_info') return badArguments(name, { base: common.base }, args) ?? { text: graphInfo(g, base, opts), isError: false };
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return { text: `unknown tool ${name}`, isError: true };
-  const missing = missingArguments(tool.required, args);
-  if (missing.length) return { text: `${name}: missing required argument(s) ${missing.join(', ')}`, isError: true };
+  // a present value of the wrong type is a type error, whether or not the argument is required
   const invalid = badArguments(name, { ...tool.props, ...common }, args);
   if (invalid) return invalid;
+  const missing = missingArguments(tool.required, args);
+  if (missing.length) return { text: `${name}: missing required argument(s) ${missing.join(', ')}`, isError: true };
   const res = tool.run(g, args, opts);
   const isError = res.badArgument === true;
   const st = staleness(g, base, opts);
