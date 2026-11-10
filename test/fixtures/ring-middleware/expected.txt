@@ -1,0 +1,146 @@
+node definition:app.core/-main [definition] src/app/core.clj:56 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/app [definition] src/app/core.clj:44 {"defined_by":"clojure.core/def"}
+node definition:app.core/assembled [definition] src/app/core.clj:50 {"defined_by":"clojure.core/def"}
+node definition:app.core/combined [definition] src/app/core.clj:38 {"defined_by":"clojure.core/def"}
+node definition:app.core/commented [definition] src/app/core.clj:60 {"defined_by":"clojure.core/def"}
+node definition:app.core/dynamic-routes [definition] src/app/core.clj:21 {"defined_by":"compojure.core/defroutes"}
+node definition:app.core/fn-app [definition] src/app/core.clj:54 {"defined_by":"clojure.core/def"}
+node definition:app.core/fn-routes [definition] src/app/core.clj:24 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/guessed [definition] src/app/core.clj:52 {"defined_by":"clojure.core/def"}
+node definition:app.core/inline [definition] src/app/core.clj:58 {"defined_by":"clojure.core/def"}
+node definition:app.core/loose-routes [definition] src/app/core.clj:27 {"defined_by":"compojure.core/defroutes"}
+node definition:app.core/make-handlers [definition] src/app/core.clj:48 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"rs","reads_complete":false,"escapes":["passed to apply"]}],"variadic":false}]}}
+node definition:app.core/nested-app [definition] src/app/core.clj:35 {"defined_by":"clojure.core/def"}
+node definition:app.core/nested-routes [definition] src/app/core.clj:15 {"defined_by":"compojure.core/defroutes"}
+node definition:app.core/private-routes [definition] src/app/core.clj:12 {"defined_by":"compojure.core/defroutes"}
+node definition:app.core/probe [definition] src/app/core.clj:66 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.core/route-level [definition] src/app/core.clj:18 {"defined_by":"compojure.core/defroutes"}
+node definition:app.core/served [definition] src/app/core.clj:64 {"defined_by":"clojure.core/def"}
+node definition:app.core/threaded [definition] src/app/core.clj:30 {"defined_by":"clojure.core/def"}
+node definition:app.core/threaded-routes [definition] src/app/core.clj:9 {"defined_by":"compojure.core/defroutes"}
+node definition:app.handlers/dyn [definition] src/app/handlers.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.handlers/index [definition] src/app/handlers.clj:3 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.handlers/loose [definition] src/app/handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.handlers/nested [definition] src/app/handlers.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.handlers/routed [definition] src/app/handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.handlers/secret [definition] src/app/handlers.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
+node definition:app.middleware/plain-helper [definition] src/app/middleware.clj:5 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"x","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
+node definition:app.middleware/with-log [definition] src/app/middleware.clj:4 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:app.middleware/wrap-auth [definition] src/app/middleware.clj:3 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"handler","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node key::keywords? [key] undefined:undefined
+node key::port [key] undefined:undefined
+node key::status [key] undefined:undefined
+node library_middleware:ring.middleware.json/wrap-json-body [library_middleware] src/app/core.clj:32
+node library_middleware:ring.middleware.json/wrap-json-response [library_middleware] src/app/core.clj:46
+node library_middleware:ring.middleware.params/wrap-params [library_middleware] src/app/core.clj:33
+node namespace:app.core [namespace] src/app/core.clj:1
+node namespace:app.handlers [namespace] src/app/handlers.clj:1
+node namespace:app.middleware [namespace] src/app/middleware.clj:1
+node route:GET /commented @app.core/commented [route] src/app/core.clj:60 {"method":"get","path":"/commented","full_path":"/commented","base":"app.core/commented","mount":"","library":"compojure"}
+node route:GET /dyn @app.core/dynamic-routes [route] src/app/core.clj:22 {"method":"get","path":"/dyn","full_path":"/dyn","base":"app.core/dynamic-routes","mount":"","library":"compojure","middleware":"unknown"}
+node route:GET /fn @app.core/fn-routes [route] src/app/core.clj:25 {"method":"get","path":"/fn","full_path":"/fn","base":"app.core/fn-routes","mount":"","library":"compojure"}
+node route:GET /index @app.core/threaded-routes [route] src/app/core.clj:10 {"method":"get","path":"/index","full_path":"/index","base":"app.core/threaded-routes","mount":"","library":"compojure"}
+node route:GET /inline @app.core/inline [route] src/app/core.clj:58 {"method":"get","path":"/inline","full_path":"/inline","base":"app.core/inline","mount":"","library":"compojure"}
+node route:GET /loose @app.core/loose-routes [route] src/app/core.clj:28 {"method":"get","path":"/loose","full_path":"/loose","base":"app.core/loose-routes","mount":"","library":"compojure","middleware":"unknown"}
+node route:GET /nested @app.core/nested-routes [route] src/app/core.clj:16 {"method":"get","path":"/nested","full_path":"/nested","base":"app.core/nested-routes","mount":"","library":"compojure"}
+node route:GET /routed @app.core/route-level [route] src/app/core.clj:19 {"method":"get","path":"/routed","full_path":"/routed","base":"app.core/route-level","mount":"","library":"compojure"}
+node route:GET /served @app.core/served [route] src/app/core.clj:64 {"method":"get","path":"/served","full_path":"/served","base":"app.core/served","mount":"","library":"compojure"}
+node route:POST /secret @app.core/private-routes [route] src/app/core.clj:13 {"method":"post","path":"/secret","full_path":"/secret","base":"app.core/private-routes","mount":"","library":"compojure"}
+edge definition:app.core/-main -produces_key-> key::port static_proven src/app/core.clj:56 {"via":"map-literal"}
+edge definition:app.core/-main -references-> definition:app.core/fn-app static_proven src/app/core.clj:56
+edge definition:app.core/app -references-> definition:app.core/combined static_proven src/app/core.clj:45
+edge definition:app.core/app -references-> definition:app.core/nested-app static_proven src/app/core.clj:45
+edge definition:app.core/app -references-> definition:app.core/threaded static_proven src/app/core.clj:45
+edge definition:app.core/assembled -calls-> definition:app.core/make-handlers static_proven src/app/core.clj:50 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/assembled -references-> definition:app.core/dynamic-routes static_proven src/app/core.clj:50
+edge definition:app.core/combined -passes_callback-> definition:app.middleware/with-log static_proven src/app/core.clj:42 {"via":"wrap-routes"}
+edge definition:app.core/combined -passes_callback-> definition:app.middleware/wrap-auth static_proven src/app/core.clj:41 {"via":"wrap-routes"}
+edge definition:app.core/combined -references-> definition:app.core/private-routes static_proven src/app/core.clj:40
+edge definition:app.core/combined -references-> definition:app.core/route-level static_proven src/app/core.clj:42
+edge definition:app.core/commented -calls-> definition:app.middleware/with-log static_proven src/app/core.clj:60 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/commented -passes_callback-> definition:app.handlers/index static_proven src/app/core.clj:60 {"via":"GET"}
+edge definition:app.core/dynamic-routes -passes_callback-> definition:app.handlers/dyn static_proven src/app/core.clj:22 {"via":"GET"}
+edge definition:app.core/fn-app -calls-> definition:app.core/fn-routes static_proven src/app/core.clj:54 {"arity":0,"arity_band":"static_proven"}
+edge definition:app.core/fn-app -calls-> definition:app.middleware/wrap-auth static_proven src/app/core.clj:54 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/fn-routes -passes_callback-> definition:app.handlers/index static_proven src/app/core.clj:25 {"via":"GET"}
+edge definition:app.core/guessed -calls-> definition:app.middleware/plain-helper static_proven src/app/core.clj:52 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"loose-routes"}]}
+edge definition:app.core/guessed -references-> definition:app.core/loose-routes static_proven src/app/core.clj:52
+edge definition:app.core/inline -calls-> definition:app.middleware/with-log static_proven src/app/core.clj:58 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/inline -passes_callback-> definition:app.handlers/index static_proven src/app/core.clj:58 {"via":"GET"}
+edge definition:app.core/loose-routes -passes_callback-> definition:app.handlers/loose static_proven src/app/core.clj:28 {"via":"GET"}
+edge definition:app.core/nested-app -calls-> definition:app.middleware/with-log static_proven src/app/core.clj:36 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/nested-app -calls-> definition:app.middleware/wrap-auth static_proven src/app/core.clj:36 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"nested-routes"}]}
+edge definition:app.core/nested-app -references-> definition:app.core/nested-routes static_proven src/app/core.clj:36
+edge definition:app.core/nested-routes -passes_callback-> definition:app.handlers/nested static_proven src/app/core.clj:16 {"via":"GET"}
+edge definition:app.core/private-routes -passes_callback-> definition:app.handlers/secret static_proven src/app/core.clj:13 {"via":"POST"}
+edge definition:app.core/probe -calls-> definition:app.core/served static_proven src/app/core.clj:66 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"map","keys":[],"band":"static_proven"}]}
+edge definition:app.core/route-level -passes_callback-> definition:app.handlers/routed static_proven src/app/core.clj:19 {"via":"GET"}
+edge definition:app.core/served -calls-> definition:app.middleware/with-log static_proven src/app/core.clj:64 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.core/served -passes_callback-> definition:app.handlers/index static_proven src/app/core.clj:64 {"via":"GET"}
+edge definition:app.core/threaded -produces_key-> key::keywords? static_proven src/app/core.clj:32 {"via":"map-literal"}
+edge definition:app.core/threaded -references-> definition:app.core/threaded-routes static_proven src/app/core.clj:31
+edge definition:app.core/threaded-routes -passes_callback-> definition:app.handlers/index static_proven src/app/core.clj:10 {"via":"GET"}
+edge definition:app.handlers/dyn -produces_key-> key::status static_proven src/app/handlers.clj:7 {"via":"map-literal"}
+edge definition:app.handlers/index -produces_key-> key::status static_proven src/app/handlers.clj:3 {"via":"map-literal"}
+edge definition:app.handlers/loose -produces_key-> key::status static_proven src/app/handlers.clj:8 {"via":"map-literal"}
+edge definition:app.handlers/nested -produces_key-> key::status static_proven src/app/handlers.clj:5 {"via":"map-literal"}
+edge definition:app.handlers/routed -produces_key-> key::status static_proven src/app/handlers.clj:6 {"via":"map-literal"}
+edge definition:app.handlers/secret -produces_key-> key::status static_proven src/app/handlers.clj:4 {"via":"map-literal"}
+edge namespace:app.core -defines-> definition:app.core/-main static_proven src/app/core.clj:56
+edge namespace:app.core -defines-> definition:app.core/app static_proven src/app/core.clj:44
+edge namespace:app.core -defines-> definition:app.core/assembled static_proven src/app/core.clj:50
+edge namespace:app.core -defines-> definition:app.core/combined static_proven src/app/core.clj:38
+edge namespace:app.core -defines-> definition:app.core/commented static_proven src/app/core.clj:60
+edge namespace:app.core -defines-> definition:app.core/dynamic-routes static_proven src/app/core.clj:21
+edge namespace:app.core -defines-> definition:app.core/fn-app static_proven src/app/core.clj:54
+edge namespace:app.core -defines-> definition:app.core/fn-routes static_proven src/app/core.clj:24
+edge namespace:app.core -defines-> definition:app.core/guessed static_proven src/app/core.clj:52
+edge namespace:app.core -defines-> definition:app.core/inline static_proven src/app/core.clj:58
+edge namespace:app.core -defines-> definition:app.core/loose-routes static_proven src/app/core.clj:27
+edge namespace:app.core -defines-> definition:app.core/make-handlers static_proven src/app/core.clj:48
+edge namespace:app.core -defines-> definition:app.core/nested-app static_proven src/app/core.clj:35
+edge namespace:app.core -defines-> definition:app.core/nested-routes static_proven src/app/core.clj:15
+edge namespace:app.core -defines-> definition:app.core/private-routes static_proven src/app/core.clj:12
+edge namespace:app.core -defines-> definition:app.core/probe static_proven src/app/core.clj:66
+edge namespace:app.core -defines-> definition:app.core/route-level static_proven src/app/core.clj:18
+edge namespace:app.core -defines-> definition:app.core/served static_proven src/app/core.clj:64
+edge namespace:app.core -defines-> definition:app.core/threaded static_proven src/app/core.clj:30
+edge namespace:app.core -defines-> definition:app.core/threaded-routes static_proven src/app/core.clj:9
+edge namespace:app.core -requires-> namespace:app.handlers static_proven src/app/core.clj:2
+edge namespace:app.core -requires-> namespace:app.middleware static_proven src/app/core.clj:3
+edge namespace:app.handlers -defines-> definition:app.handlers/dyn static_proven src/app/handlers.clj:7
+edge namespace:app.handlers -defines-> definition:app.handlers/index static_proven src/app/handlers.clj:3
+edge namespace:app.handlers -defines-> definition:app.handlers/loose static_proven src/app/handlers.clj:8
+edge namespace:app.handlers -defines-> definition:app.handlers/nested static_proven src/app/handlers.clj:5
+edge namespace:app.handlers -defines-> definition:app.handlers/routed static_proven src/app/handlers.clj:6
+edge namespace:app.handlers -defines-> definition:app.handlers/secret static_proven src/app/handlers.clj:4
+edge namespace:app.middleware -defines-> definition:app.middleware/plain-helper static_proven src/app/middleware.clj:5
+edge namespace:app.middleware -defines-> definition:app.middleware/with-log static_proven src/app/middleware.clj:4
+edge namespace:app.middleware -defines-> definition:app.middleware/wrap-auth static_proven src/app/middleware.clj:3
+edge route:GET /commented @app.core/commented -guarded_by-> definition:app.middleware/with-log heuristic src/app/core.clj:60 {"order":0,"level":"wrapper"}
+edge route:GET /commented @app.core/commented -routes_to-> definition:app.handlers/index static_proven src/app/core.clj:60
+edge route:GET /dyn @app.core/dynamic-routes -routes_to-> definition:app.handlers/dyn static_proven src/app/core.clj:22
+edge route:GET /fn @app.core/fn-routes -guarded_by-> definition:app.middleware/wrap-auth heuristic src/app/core.clj:54 {"order":0,"level":"wrapper"}
+edge route:GET /fn @app.core/fn-routes -routes_to-> definition:app.handlers/index static_proven src/app/core.clj:25
+edge route:GET /index @app.core/threaded-routes -guarded_by-> library_middleware:ring.middleware.json/wrap-json-body heuristic src/app/core.clj:32 {"order":2,"level":"wrapper"}
+edge route:GET /index @app.core/threaded-routes -guarded_by-> library_middleware:ring.middleware.json/wrap-json-response heuristic src/app/core.clj:46 {"order":0,"level":"wrapper"}
+edge route:GET /index @app.core/threaded-routes -guarded_by-> library_middleware:ring.middleware.params/wrap-params heuristic src/app/core.clj:33 {"order":1,"level":"wrapper"}
+edge route:GET /index @app.core/threaded-routes -routes_to-> definition:app.handlers/index static_proven src/app/core.clj:10
+edge route:GET /inline @app.core/inline -guarded_by-> definition:app.middleware/with-log heuristic src/app/core.clj:58 {"order":0,"level":"wrapper"}
+edge route:GET /inline @app.core/inline -routes_to-> definition:app.handlers/index static_proven src/app/core.clj:58
+edge route:GET /loose @app.core/loose-routes -routes_to-> definition:app.handlers/loose static_proven src/app/core.clj:28
+edge route:GET /nested @app.core/nested-routes -guarded_by-> definition:app.middleware/with-log heuristic src/app/core.clj:36 {"order":1,"level":"wrapper"}
+edge route:GET /nested @app.core/nested-routes -guarded_by-> definition:app.middleware/wrap-auth heuristic src/app/core.clj:36 {"order":2,"level":"wrapper"}
+edge route:GET /nested @app.core/nested-routes -guarded_by-> library_middleware:ring.middleware.json/wrap-json-response heuristic src/app/core.clj:46 {"order":0,"level":"wrapper"}
+edge route:GET /nested @app.core/nested-routes -routes_to-> definition:app.handlers/nested static_proven src/app/core.clj:16
+edge route:GET /routed @app.core/route-level -guarded_by-> definition:app.middleware/with-log heuristic src/app/core.clj:42 {"order":1,"level":"wrapper"}
+edge route:GET /routed @app.core/route-level -guarded_by-> library_middleware:ring.middleware.json/wrap-json-response heuristic src/app/core.clj:46 {"order":0,"level":"wrapper"}
+edge route:GET /routed @app.core/route-level -routes_to-> definition:app.handlers/routed static_proven src/app/core.clj:19
+edge route:GET /served @app.core/served -guarded_by-> definition:app.middleware/with-log heuristic src/app/core.clj:64 {"order":0,"level":"wrapper"}
+edge route:GET /served @app.core/served -routes_to-> definition:app.handlers/index static_proven src/app/core.clj:64
+edge route:POST /secret @app.core/private-routes -guarded_by-> definition:app.middleware/wrap-auth heuristic src/app/core.clj:41 {"order":1,"level":"wrapper"}
+edge route:POST /secret @app.core/private-routes -guarded_by-> library_middleware:ring.middleware.json/wrap-json-response heuristic src/app/core.clj:46 {"order":0,"level":"wrapper"}
+edge route:POST /secret @app.core/private-routes -routes_to-> definition:app.handlers/secret static_proven src/app/core.clj:13
+usages resolved=32 unresolved=0 unknown=0 not-vars=0 external=56
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure:24 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:8 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=3 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

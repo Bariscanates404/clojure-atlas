@@ -20,6 +20,7 @@ const FIXTURES: [string, string][] = [
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],
   ['system', 'integrant init-key, refs in edn and code, composite keys, mount defstate, component system-map'],
   ['client', 'reitit client routes (.cljs and shared .cljc) named by :name or :view, nested paths, parameters as {p}, paths differing only in parameter names merged into one node, secretary defroute'],
+  ['ring-middleware', 'compojure route vars wrapped through -> and nested calls and wrap-routes, library middleware, outermost first through the definitions that hold them; a handler assembled by apply or an unknown call gets middleware unknown'],
   ['requests', 'http-xhrio and project effect maps, cljs-ajax, cljs-http and js/fetch requests joined to server routes by method and path, URL helpers read through their body, query strings dropped from the join'],
   ['keys', 'map keys produced, consumed and removed (threaded slots heuristic), a key table, signatures with destructuring and call args'],
   ['schema', 'spec s/def and uses inside spec calls, malli schema defs and uses inside malli calls'],
