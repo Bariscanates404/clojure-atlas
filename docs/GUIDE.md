@@ -201,6 +201,12 @@ callers (38 S38)
 In diff mode (`base_graph`, or `added_keys` / `removed_keys` / `arities`) it lists the callers a signature change
 affects.
 
+This includes the keys **inside map arguments**: the callee's destructured key set, defaults and supported body
+reads, beside each caller's known literal-map keys. See the [map-contract example](../README.md#inspect-the-contract-inside-a-map-argument)
+for a real `login!` call and a hypothetical added key. The contract describes static parameter/key usage, not
+value types. Nested destructuring and `get-in` contribute their outer key to the signature; `key_flow` can list
+literal key occurrences deeper in maps and paths, grouped by keyword rather than by map identity.
+
 ### route_authz
 
 Handler, middleware chain and permission check of a backend route. Question: what serves `POST /api/articles` in

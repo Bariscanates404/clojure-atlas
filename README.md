@@ -1,12 +1,16 @@
 # clojure-atlas
 
-**Give your AI coding agent a map of your Clojure codebase.**
+**Built for agentic coding. Give your AI agent a map of your Clojure codebase.**
 
-Find callers, trace re-frame events, inspect routes and middleware, and identify tests affected by a change.
+Trace callers and data providers/consumers, inspect function contracts **down to the keys inside map arguments**,
+follow re-frame events and routes, and identify tests affected by a change.
 clojure-atlas turns **Clojure, ClojureScript and `.cljc` source** into a local code graph, then exposes it as
 **13 MCP tools** with source locations and explicit confidence levels.
 
-![clojure-atlas — an ASCII atlas connecting source, calls, events, routes and tests](docs/assets/atlas.svg)
+Built as a **companion tool for coding agents**, Atlas supplies the structural context they need before changing
+code: who depends on it, which parameters and map keys its consumers expect, and which tests relate to it.
+
+![clojure-atlas — provider to map parameter set to consumer; inspect contracts with signature_impact and key_flow](docs/assets/atlas.svg)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
 [![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-91d5b6?style=flat-square&labelColor=17252b)](#requirements)
@@ -19,7 +23,7 @@ A personal project by **Barış Can Ateş** · MIT licensed · Built on [clj-kon
 
 English | [Türkçe](README.tr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
-[Capabilities](#what-you-can-do) · [Supported stack](#languages-and-ecosystem-support) · [Examples](#see-it-in-action) ·
+[Capabilities](#what-you-can-do) · [Map contracts](#contracts-down-to-map-keys) · [Supported stack](#languages-and-ecosystem-support) · [Examples](#see-it-in-action) ·
 [Quick start](#quick-start) · [Coverage](#coverage) · [Full guide](docs/GUIDE.md)
 
 ## What you can do
@@ -30,7 +34,9 @@ the tools; Atlas returns the relationships it can establish, with `file:line` ci
 | Ask your agent… | Atlas gives it… | MCP tools |
 |---|---|---|
 | “Who calls this, and what could my change affect?” | Direct callers, value references and transitive dependents | `callers`, `blast_radius` |
-| “Can I change this function's arguments or this map key?” | Arities, keys passed by callers, key producers/consumers and missing keys in sibling map rows | `signature_impact`, `key_flow`, `key_siblings` |
+| “What parameter set does each caller provide, and what does the function read?” | Arities, destructured map keys, defaults, keyword arguments and keys supplied at each call site | `signature_impact` |
+| “Who provides this map key, and who consumes it?” | Key producers and consumers, including literal keys inside nested maps and key paths | `key_flow` |
+| “Is this configuration row missing a key?” | Keys present in sibling map rows but absent from this one | `key_siblings` |
 | “What handles this endpoint? Where is permission checked?” | Route handlers, ordered middleware and configured permission checks | `route_authz`, `permission_routes` |
 | “What happens when this re-frame event fires?” | Dispatchers, handlers, subscriptions and HTTP requests | `event_flow` |
 | “Who reads or writes this database attribute?” | Proven reads and writes, with uncertain references kept visible | `attribute_usage` |
@@ -39,6 +45,30 @@ the tools; Atlas returns the relationships it can establish, with `file:line` ci
 
 A call, a callback and a keyword with the same spelling are different things. Atlas models those distinctions,
 including Clojure's registrations and data-driven connections. It gives your agent evidence to inspect before editing.
+
+### An agent's workflow
+
+1. **Orient:** use `graph_info` to check the snapshot, active adapters and analysis gaps.
+2. **Investigate:** inspect callers, parameter contracts, map-key providers/consumers and the potential impact of a change.
+3. **Plan and verify:** use `context_for_change` and the test tools to find affected code and related tests; inspect
+   cited source, make the change and run the relevant tests. Rebuild the graph and restart the MCP server for the next pass.
+
+## Contracts, down to map keys
+
+Atlas makes the **source-visible parameter contract** inspectable: what a caller supplies, what a function
+destructures or reads, and which call sites a proposed change affects.
+
+| Level | What Atlas can show |
+|---|---|
+| **Parameter set** | Accepted arities, positional/rest parameters and keyword arguments such as `& {:keys [verbose]}` |
+| **Keys inside a map argument** | `{:keys [email password]}`, `:or` defaults, `:as` aliases, literal keys passed by callers and supported reads in the function body |
+| **Provider / consumer** | Producers such as map literals, `assoc` and `assoc-in`; consumers such as destructuring, keyword lookup, `get` and `get-in` |
+| **Contract changes** | Call sites affected by added/removed keys or changed arities, using `signature_impact` with `added_keys`, `removed_keys`, `arities` or `base_graph` |
+| **Nested maps** | Literal key occurrences in nested maps, destructuring and paths such as `(get-in cart [:meta :count])`, through `key_flow` |
+
+The scope is **static key usage**, not value/type validation. `key_flow` groups occurrences by keyword, not by
+the identity of a particular map. `signature_impact` records the outer key of nested destructuring or `get-in`,
+not a complete nested schema. Runtime-built maps and keys may remain unknown.
 
 ## Languages and ecosystem support
 
@@ -49,6 +79,7 @@ this is not a general JavaScript or TypeScript analyzer.
 | Area | Recognized libraries / forms | What is covered today |
 |---|---|---|
 | Core Clojure | Vars, calls, value uses, callbacks, multimethods, protocols | Definitions and dependency relations; dispatch candidates are heuristic |
+| Parameter and map contracts | `defn` arities, map destructuring, keyword args, map literals and key operations | Caller-supplied key sets, consumed keys, provider/consumer sites and signature-change impact |
 | Frontend state | **re-frame**, including `re-frame.alpha` | Event/subscription registrations, dispatch, subscription inputs and subscribers |
 | Backend routing | **Compojure**, **Reitit**, **Pedestal** table routes | Paths, mounted route copies and handlers; Pedestal service-map interceptors are not extracted |
 | Middleware | **Ring**, Compojure `wrap-routes`, Reitit route data and `ring-handler` | Ordered chains, including outer wrappers; inferred chains are marked heuristic |
@@ -71,7 +102,72 @@ See the [roadmap](ROADMAP.md) for those adapters, bidi, compojure-api and other 
 These excerpts come from the [committed example graphs](examples/) of public projects. The invocation is an
 MCP tool call, not a shell command. `[S]` means statically proven; `[H]` means heuristic.
 
-### Find the callers before a refactor
+### Inspect the contract inside a map argument
+
+In polylith-realworld, `login!` takes **one map argument** and destructures **`:email` and `:password`**.
+Atlas shows that key set beside the arguments supplied by its callers:
+
+```text
+signature_impact {"fn": "clojure.realworld.user.core/login!", "group_by": "none"}
+```
+
+```text
+SIGNATURE_IMPACT clojure.realworld.user.core/login! — 4 caller(s) in 1 component(s); arities 1; no finding
+counts: arities=1 [S1]  callers=4 [S4]
+[... trimmed ...]
+arities (1)
+  1. [{:keys [email password]}]  components/user/src/clojure/realworld/user/core.clj:50 [S]  (4 caller(s))
+callers (4 S4)
+  1. clojure.realworld.user.interface/login!: arity 1, arg0 symbol login-input (keys unknown)  components/user/src/clojure/realworld/user/interface.clj:6 [S]
+  2. clojure.realworld.user.core-test/login--invalid-password--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:34 [S]
+[... trimmed ...]
+```
+
+The literal map's key set is visible; the map passed as `login-input` remains unknown. `[S]` on that row proves
+the call relationship, not the contents of the runtime map.
+
+<details>
+<summary><strong>Change the parameter contract: what if login! also needs :tenant-id?</strong></summary>
+
+```text
+signature_impact {"fn": "clojure.realworld.user.core/login!", "added_keys": [":tenant-id"], "group_by": "none"}
+```
+
+```text
+SIGNATURE_IMPACT clojure.realworld.user.core/login! — 3 caller(s) affected by the change (new keys: :tenant-id); 4 caller(s) in 1 component(s); arities 1; no finding
+counts: affected=4 [S3 ?1]  arities=1 [S1]  callers=4 [S4]
+[... trimmed ...]
+  1. clojure.realworld.user.core-test/login--invalid-password--return-negative-result does not pass :tenant-id  components/user/test/clojure/realworld/user/core_test.clj:34 [S]  (argument 0 passes {:email :password})
+[... trimmed ...]
+```
+
+All three literal-map callers omit the proposed key. The fourth caller forwards `login-input`, so its impact
+is **UNKNOWN**. This is a hypothetical contract change; the tool does not modify source. “No finding” refers
+to the existing signature; the `affected` section describes the proposed change.
+
+</details>
+
+<details>
+<summary><strong>Find the providers and consumers of :email across the project</strong></summary>
+
+```text
+key_flow {"key": ":email", "group_by": "none", "limit": 2}
+```
+
+```text
+KEY_FLOW :email — 9 producer(s), 5 consumer(s) in 1 component(s); 23 site(s) in tests
+counts: producers=9 [S9]  consumers=5 [S5]  tests=23 [S23]
+[... trimmed ...]
+```
+
+The result lists map-literal producers in `register!` and destructuring consumers including `login!`, with
+source locations. Because `:email` is unqualified, every map using that keyword is grouped together; this
+does not prove that a specific producer's map reaches a specific consumer.
+
+</details>
+
+<details>
+<summary><strong>Find the callers before a refactor</strong></summary>
 
 **Question:** Who calls `integrant.core/dependent-keys`?
 
@@ -91,6 +187,8 @@ callers (4 S4)
   4. integrant.core/run!  src/integrant/core.cljc:389 [S]
 next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symbol="integrant.core/dependent-keys")
 ```
+
+</details>
 
 <details>
 <summary><strong>Trace a re-frame event across dispatch sites and its handler</strong></summary>

@@ -1,27 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="268" viewBox="0 0 1080 268" role="img" aria-labelledby="title desc">
   <title id="title">Clojure Atlas</title>
-  <desc id="desc">An ASCII wordmark and a map of source relationships: calls, events, routes and tests. Local code intelligence, delivered over MCP.</desc>
+  <desc id="desc">An ASCII wordmark beside a left-to-right data contract: a provider supplies a map parameter set to a consumer. signature_impact inspects call contracts; key_flow finds key producers and consumers.</desc>
   <rect width="1080" height="268" rx="14" fill="#101e24"/>
   <rect x="1" y="1" width="1078" height="266" rx="13" fill="none" stroke="#2c4148"/>
   <g font-family="Menlo, 'DejaVu Sans Mono', monospace">
-    <text x="36" y="34" font-size="12" letter-spacing="2" fill="#9fb5bc">CLOJURE / CODE ATLAS</text>
+    <text x="36" y="34" font-size="12" letter-spacing="2" fill="#9fb5bc">CLOJURE / AGENTIC CODING</text>
     <text x="1044" y="34" text-anchor="end" font-size="12" fill="#91d5b6">(know your code)</text>
     <path d="M36 50H1044" stroke="#2c4148"/>
-    <g font-size="24" fill="#b8eed4" xml:space="preserve" style="white-space:pre">
+    <g font-size="21" fill="#b8eed4" xml:space="preserve" style="white-space:pre">
       <text x="36" y="93">&#160;&#160;&#160;&#160;_&#160;&#160;&#160;_____&#160;_&#160;&#160;&#160;&#160;&#160;&#160;_&#160;&#160;&#160;____&#160;&#160;</text>
       <text x="36" y="122">&#160;&#160;&#160;/&#160;\&#160;|_&#160;&#160;&#160;_|&#160;|&#160;&#160;&#160;&#160;/&#160;\&#160;/&#160;___|&#160;</text>
       <text x="36" y="151">&#160;&#160;/&#160;_&#160;\&#160;&#160;|&#160;|&#160;|&#160;|&#160;&#160;&#160;/&#160;_&#160;\\___&#160;\&#160;</text>
       <text x="36" y="180">&#160;/&#160;___&#160;\&#160;|&#160;|&#160;|&#160;|__/&#160;___&#160;\___)&#160;|</text>
       <text x="36" y="209">/_/&#160;&#160;&#160;\_\|_|&#160;|____/_/&#160;&#160;&#160;\_\____/&#160;</text>
     </g>
-    <path d="M532 73V211" stroke="#2c4148"/>
-    <g font-size="15" xml:space="preserve" style="white-space:pre">
-      <text x="566" y="85" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;.--&#160;(calls)&#160;--.</text>
-      <text x="566" y="111" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;/&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;\</text>
-      <text x="566" y="137" fill="#91d5b6">&#160;&#160;(source)&#160;+---&#160;(atlas)&#160;---+&#160;(events)</text>
-      <text x="566" y="163" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;\&#160;&#160;&#160;&#160;&#160;&#160;|&#160;&#160;&#160;&#160;&#160;&#160;&#160;/</text>
-      <text x="566" y="189" fill="#8ba6af">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;'--&#160;(routes)-'</text>
-      <text x="566" y="215" fill="#e5cd91">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;+---&#160;(tests)</text>
+    <path d="M476 73V211" stroke="#2c4148"/>
+    <g font-size="17" xml:space="preserve" style="white-space:pre">
+      <text x="559" y="83" text-anchor="middle" font-size="12" letter-spacing="1" fill="#9fb5bc">PROVIDER</text>
+      <text x="763" y="83" text-anchor="middle" font-size="12" letter-spacing="1" fill="#9fb5bc">PARAM SET</text>
+      <text x="967" y="83" text-anchor="middle" font-size="12" letter-spacing="1" fill="#9fb5bc">CONSUMER</text>
+      <text x="508" y="110" fill="#b8eed4">&#160;(caller)&#160;----&gt;&#160;{:email&#160;:password}&#160;----&gt;&#160;(callee)</text>
+      <path d="M559 122V152H650M967 122V152H876" fill="none" stroke="#68888f" stroke-width="1.5"/>
+      <text x="763" y="158" text-anchor="middle" fill="#91d5b6">signature_impact</text>
+      <text x="508" y="187" fill="#e5cd91">&#160;&#160;&#160;&#160;&#160;key_flow:&#160;who&#160;writes&#160;/&#160;reads&#160;each&#160;key?</text>
+      <text x="508" y="213" fill="#9fb5bc" font-size="14">&#160;&#160;&#160;&#160;&#160;calls&#160;&#160;/&#160;&#160;events&#160;&#160;/&#160;&#160;routes&#160;&#160;/&#160;&#160;tests</text>
     </g>
     <path d="M36 230H1044" stroke="#2c4148"/>
     <text x="36" y="251" font-size="11" letter-spacing="1" fill="#9fb5bc">SOURCE RELATIONSHIPS. LOCAL GRAPH. MCP TOOLS.</text>
