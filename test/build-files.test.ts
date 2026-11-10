@@ -77,7 +77,7 @@ describe('tracked sources the walk does not read', () => {
     assert.equal(doc.stats.files.sources, 1);
     assert.deepEqual(doc.stats.files.unread_names, ['.dev/user.clj', 'dist/app/gen.clj']);
     const d = degradation(doc);
-    assert.match(degradedLine(d!), /^DEGRADED: 2 tracked Clojure file\(s\) were not analyzed, as they sit in a hidden or root build folder \(\.dev\/user\.clj, dist\/app\/gen\.clj\)/);
+    assert.match(degradedLine(d!), /^DEGRADED: 2 tracked Clojure file\(s\) were not analyzed, as git tracks them but the file walk did not read them, whether they sit in a hidden path, node_modules or a build folder, are symbolic links, or are deleted in the working tree \(\.dev\/user\.clj, dist\/app\/gen\.clj\)/);
     assert.deepEqual(unanalyzedFor(d, 'app.gen/anything'), { timedOut: [], unread: ['dist/app/gen.clj'] });
   });
 });

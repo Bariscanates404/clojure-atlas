@@ -402,7 +402,7 @@ export function routeAuthz(g: Graph, query: string): QueryResult {
     const a = r.attrs ?? {};
     const where = [a.base && `base ${String(a.base)}`, a.mount && `mount ${String(a.mount)}`].filter(Boolean).join(', ');
     const head = `${r.name}${where ? ` (${where})` : ''}`;
-    const handler = outEdges(g, r.id, ['routes_to']).map((e) => edgeRow(g, e.to, e));
+    const handler = outEdges(g, r.id, ['routes_to']).map((e) => edgeRow(g, e.to, e, { entry: `route ${r.name}` }));
     const mw = outEdges(g, r.id, ['guarded_by'])
       .slice()
       .sort((x, y) => num(x.attrs?.order, 0) - num(y.attrs?.order, 0))

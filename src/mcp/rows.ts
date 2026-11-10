@@ -70,8 +70,11 @@ export const site = (e: GraphEdge): { file: string; line: number | null } => ({ 
 export function entryOf(g: Graph, id: string): string | undefined {
   const n = g.byId.get(id);
   if (!n) return undefined;
-  const route = inEdges(g, id, ['routes_to'])[0];
-  if (route) return `route ${g.byId.get(route.from)?.name ?? route.from}`;
+  const routes = inEdges(g, id, ['routes_to']);
+  if (routes.length) {
+    const more = routes.length - 1;
+    return `route ${g.byId.get(routes[0].from)?.name ?? routes[0].from}${more ? ` (and ${more} more route${more > 1 ? 's' : ''})` : ''}`;
+  }
   if (n.kind === 'handler') return 'event handler';
   if (n.roles?.includes('handler')) return 'handler';
   return undefined;

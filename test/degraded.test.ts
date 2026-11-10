@@ -16,8 +16,8 @@ import { callTool } from '../src/mcp/server.ts';
 import { fixtureDir } from './helpers/atlas-fixture.ts';
 import { graphOf } from './helpers/inline-graph.ts';
 
-const NO_LARGE = { files: 0, names: [] };
-const NONE = { timedOut: NO_LARGE, unread: NO_LARGE, recovered: NO_LARGE };
+const NO_LARGE = { files: 0, names: [], edn: 0 };
+const NONE = { timedOut: NO_LARGE, unread: NO_LARGE, recovered: NO_LARGE, unreadWhy: {} };
 const CORE = '(ns demo.core)\n(defn target [a] (inc a))\n(defn lonely [] 1)\n(defn user [] (target 1))\n';
 const BROKEN = '(ns demo.broken\n  (:require [demo.core :as c]))\n(defn oops [] (c/target 2)\n';
 
@@ -120,7 +120,7 @@ describe('files over the size limit', () => {
   });
 
   it('are listed in the build log line, three names at most', () => {
-    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'] }, duplicates: [], ...NONE });
+    const line = degradedLine({ files: 0, names: [], edges: 0, large: { files: 5, names: ['a.clj', 'b.clj', 'c.clj', 'd.clj', 'e.clj'], edn: 0 }, duplicates: [], ...NONE });
     assert.match(line, /5 file\(s\) over 2 MB were skipped \(a\.clj, b\.clj, c\.clj, \.\.\.\)/);
   });
 });
