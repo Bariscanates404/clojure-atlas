@@ -321,8 +321,7 @@ npm install --save-dev \
 npx clojure-atlas build
 ```
 
-The package is not currently published on npm; use the Git install above. Access to the repository is required
-while it is private. A source install uses TypeScript and Node type definitions to compile the CLI; these are
+The package is not currently published on npm; use the Git install above. A source install uses TypeScript and Node type definitions to compile the CLI; these are
 build-time dependencies, separate from its zero required npm runtime dependencies.
 
 The graph is saved to `.clojure-atlas/graph.json.gz`. The first build downloads and verifies the pinned
