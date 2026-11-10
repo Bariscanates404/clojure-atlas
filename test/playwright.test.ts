@@ -37,6 +37,6 @@ describe('playwright', () => {
     const doc = await buildFixture('browser');
     const cap = doc.capabilities.find((c) => c.name === 'browser_tests');
     assert.equal(cap?.status, 'absent');
-    assert.match(cap?.note ?? '', /e2e: typescript 7\.\d+\.\d+ has no compiler API/);
+    assert.match(cap?.note ?? '', /e2e: typescript 7\.\d+\.\d+ in clojure-atlas's own install has no compiler API/);
   });
 });

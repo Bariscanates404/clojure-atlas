@@ -1,0 +1,23 @@
+node definition:app.ev/from-literal [definition] src/app/ev.cljs:12 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:app.ev/go [definition] src/app/ev.cljs:8 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"ev","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:app.ev/go-whole [definition] src/app/ev.cljs:10 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"event-vector","reads_complete":false,"escapes":["passed to rf/dispatch-sync"]}],"variadic":false}]}}
+node definition:app.ev/plain [definition] src/app/ev.cljs:14 {"defined_by":"cljs.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node dynamic_event:(non-literal event id) [dynamic_event] src/app/ev.cljs:8
+node event::app.ev/never-dynamic [event] src/app/ev.cljs:6 {"registered_by":"re-frame.core/reg-event-db"}
+node event::app.ev/saved [event] src/app/ev.cljs:4 {"registered_by":"re-frame.core/reg-event-db"}
+node handler:event :app.ev/never-dynamic src/app/ev.cljs:6 [handler] src/app/ev.cljs:6
+node handler:event :app.ev/saved src/app/ev.cljs:4 [handler] src/app/ev.cljs:4
+node namespace:app.ev [namespace] src/app/ev.cljs:1
+edge definition:app.ev/from-literal -calls-> definition:app.ev/go static_proven src/app/ev.cljs:12 {"arity":1,"arity_band":"static_proven"}
+edge definition:app.ev/go -dispatches-> dynamic_event:(non-literal event id) unknown src/app/ev.cljs:8
+edge definition:app.ev/go-whole -dispatches-> dynamic_event:(non-literal event id) unknown src/app/ev.cljs:10
+edge definition:app.ev/plain -dispatches-> event::app.ev/never-dynamic static_proven src/app/ev.cljs:14
+edge event::app.ev/never-dynamic -registers-> handler:event :app.ev/never-dynamic src/app/ev.cljs:6 static_proven src/app/ev.cljs:6
+edge event::app.ev/saved -registers-> handler:event :app.ev/saved src/app/ev.cljs:4 static_proven src/app/ev.cljs:4
+edge namespace:app.ev -defines-> definition:app.ev/from-literal static_proven src/app/ev.cljs:12
+edge namespace:app.ev -defines-> definition:app.ev/go static_proven src/app/ev.cljs:8
+edge namespace:app.ev -defines-> definition:app.ev/go-whole static_proven src/app/ev.cljs:10
+edge namespace:app.ev -defines-> definition:app.ev/plain static_proven src/app/ev.cljs:14
+usages resolved=1 unresolved=0 unknown=0 not-vars=0 external=11
+adapters multimethods=off:0 implementations=off:0 events=re-frame.core:5 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:0 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
+files sources=1 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

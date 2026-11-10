@@ -1,6 +1,8 @@
-// How far the graph's commit is from the commit a caller is looking at. The distance comes from a
-// read-only `git rev-list --count` in a local clone when one is configured; without a clone a differing
-// sha is reported as STALE with an unknown distance, never as fresh.
+// How far the graph's commit is from the commit a caller is looking at, in both directions: commits the base has that
+// the graph lacks (behind) and commits the graph has that the base lacks (ahead). The distance comes from a read-only
+// `git rev-list --left-right --count` in a local clone when one is configured; without a clone a differing sha is
+// reported as STALE with an unknown distance, never as fresh. A graph ahead of or diverged from the base describes
+// code the base does not contain, so it is stale however few commits that is.
 import { execFileSync } from 'node:child_process';
 import { UNVERSIONED, type Snapshot } from '../snapshot.ts';
 import type { Graph } from './graph.ts';
@@ -13,8 +15,15 @@ export interface StalenessOptions {
   // the working tree's snapshot (src/snapshot.ts), compared with the graph's when both are known
   snapshot?: () => Snapshot;
   maxDistance?: number;
-  // Commits reachable from `base` but not from `graphSha`; null when git cannot tell. Injectable for tests.
-  distance?: (graphSha: string, base: string) => number | null;
+  // How the graph's commit and the base relate; null when git cannot tell. Injectable for tests.
+  distance?: (graphSha: string, base: string) => Divergence | null;
+}
+
+export interface Divergence {
+  // commits reachable from the base but not from the graph's commit
+  behind: number;
+  // commits reachable from the graph's commit but not from the base
+  ahead: number;
 }
 
 export interface Staleness {
@@ -26,14 +35,14 @@ export interface Staleness {
 // A full hex sha is shortened to ten characters; any other name (a branch, a tag) is shown whole.
 const short = shortSha;
 
-export function gitDistance(repoDir: string): (graphSha: string, base: string) => number | null {
+export function gitDistance(repoDir: string): (graphSha: string, base: string) => Divergence | null {
   return (graphSha, base) => {
     try {
-      const out = execFileSync('git', ['-C', repoDir, 'rev-list', '--count', `${graphSha}..${base}`], {
+      const out = execFileSync('git', ['-C', repoDir, 'rev-list', '--left-right', '--count', `${graphSha}...${base}`], {
         encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'],
       });
-      const n = Number.parseInt(out.trim(), 10);
-      return Number.isFinite(n) ? n : null;
+      const [ahead, behind] = out.trim().split(/\s+/).map((x) => Number.parseInt(x, 10));
+      return Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null;
     } catch (err) {
       process.stderr.write(`clojure-atlas: git rev-list failed in ${repoDir}: ${(err as Error).message.split('\n')[0]}\n`);
       return null;
@@ -76,12 +85,24 @@ function stalenessToBase(g: Graph, base: string | undefined, opts: StalenessOpti
   if (sameCommit(sha, base)) return { stale: false, distance: 0, header: null };
   const max = opts.maxDistance ?? DEFAULT_MAX_DISTANCE;
   const measure = opts.distance ?? (opts.repoDir ? gitDistance(opts.repoDir) : undefined);
-  const distance = measure ? measure(sha, base.trim()) : null;
-  if (distance === null) {
+  const found = measure ? measure(sha, base.trim()) : null;
+  if (found === null) {
     return {
       stale: true,
       distance: null,
-      header: `STALE: graph built at ${short(sha)}, base ${short(base)}; distance unknown${measure ? ' (git could not compare them)' : ' (no repo configured)'}. Cited lines may have moved since.`,
+      header: `STALE: graph built at ${short(sha)}, base ${short(base)}; `
+        + `distance unknown${measure ? ' (git could not compare them)' : ' (no repo configured)'}. Cited lines may have moved since.`,
+    };
+  }
+  const { behind: distance, ahead } = found;
+  if (ahead > 0) {
+    const relation = distance > 0
+      ? `diverged from base ${short(base)} (${ahead} commit(s) ahead, ${distance} behind)`
+      : `${ahead} commit(s) ahead of base ${short(base)}`;
+    return {
+      stale: true,
+      distance,
+      header: `STALE: graph built at ${short(sha)} is ${relation}: it describes code the base does not contain. Cited lines may not exist there.`,
     };
   }
   if (distance > max) {

@@ -21,3 +21,20 @@ describe('effect maps', () => {
     ]);
   });
 });
+
+describe('dispatches whose event id is not a literal', () => {
+  it('are recorded as UNKNOWN sites and event_flow says any event may be dispatched there', async () => {
+    const { buildFixture } = await import('./helpers/atlas-fixture.ts');
+    const { graphFromJson } = await import('../src/mcp/graph.ts');
+    const { eventFlow } = await import('../src/mcp/queries.ts');
+    const g = graphFromJson(JSON.stringify(await buildFixture('reframe-dynamic')));
+    const saved = eventFlow(g, ':app.ev/saved');
+    assert.match(saved.verdict, /dispatched from 0 site\(s\)/);
+    assert.match(saved.verdict, /2 dispatch site\(s\) with a non-literal event id may also dispatch it/);
+    assert.ok(saved.notes.some((n) => /2 dispatch site\(s\) with a non-literal event id may also dispatch it/.test(n)));
+    const sites = saved.sections.find((s) => s.short === 'dispatch sites with a non-literal event id');
+    assert.deepEqual(sites?.rows.map((r) => [r.label, r.band, r.line]), [['app.ev/go', 'unknown', 8], ['app.ev/go-whole', 'unknown', 10]]);
+    const quiet = eventFlow(g, ':app.ev/never-dynamic');
+    assert.match(quiet.verdict, /2 dispatch site\(s\) with a non-literal event id may also dispatch it/);
+  });
+});

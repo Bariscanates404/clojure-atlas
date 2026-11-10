@@ -9,7 +9,7 @@ import { BUILT_IN_LINT_AS, effectiveLintAs } from '../src/build/kondo.ts';
 import { graphFromJson } from '../src/mcp/graph.ts';
 import { graphInfo } from '../src/mcp/server.ts';
 import { gitDistance, staleness } from '../src/mcp/staleness.ts';
-import { changedPaths, configSources, projectKnownSymbols, snapshotOf, UNVERSIONED } from '../src/snapshot.ts';
+import { cachedSnapshot, changedPaths, configSources, ignoredAmong, projectKnownSymbols, snapshotOf, UNVERSIONED } from '../src/snapshot.ts';
 
 const root = mkdtempSync(path.join(tmpdir(), 'atlas-snapshot-'));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -56,8 +56,31 @@ describe('snapshot', () => {
 
   it('measures the commit distance with git, and answers null where git cannot', () => {
     const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-    assert.equal(gitDistance(root)(head, head), 0);
+    assert.deepEqual(gitDistance(root)(head, head), { ahead: 0, behind: 0 });
     assert.equal(gitDistance(root)('0'.repeat(40), head), null);
+  });
+
+  it('tells behind, ahead and diverged apart on real commits', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'atlas-distance-'));
+    after(() => rmSync(repo, { recursive: true, force: true }));
+    const g = (...args: string[]) => execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
+    const commit = (name: string) => {
+      writeFileSync(path.join(repo, name), name);
+      g('add', '.');
+      g('commit', '-qm', name);
+      return g('rev-parse', 'HEAD');
+    };
+    g('init', '-q', '-b', 'main');
+    const base = commit('a');
+    const tip = commit('b');
+    commit('c');
+    const top = g('rev-parse', 'HEAD');
+    g('checkout', '-q', '-b', 'side', base);
+    const side = commit('d');
+    const measure = gitDistance(repo);
+    assert.deepEqual(measure(base, top), { ahead: 0, behind: 2 }, 'the graph is an ancestor of the base');
+    assert.deepEqual(measure(top, base), { ahead: 2, behind: 0 }, 'the graph is ahead of the base');
+    assert.deepEqual(measure(side, tip), { ahead: 1, behind: 1 }, 'neither is an ancestor of the other');
   });
 
   it('reads both paths of a rename or copy from git status, ', () => {
@@ -104,5 +127,41 @@ describe('snapshot', () => {
     const g = graphFromJson(JSON.stringify({ format: 'code-graph', version: 2, capabilities: [], nodes: [], edges: [], source: { sha: 'a'.repeat(40) } }));
     assert.match(staleness(g, 'release-candidate-1').header ?? '', /base release-candidate-1;/);
     assert.match(staleness(g, 'b'.repeat(40)).header ?? '', /base b{10};/);
+  });
+});
+
+describe('the snapshot of a tree asked again and again', () => {
+  const repo = mkdtempSync(path.join(tmpdir(), 'atlas-cached-'));
+  after(() => rmSync(repo, { recursive: true, force: true }));
+  const g = (...args: string[]) => execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { stdio: 'ignore' });
+  writeFileSync(path.join(repo, '.gitignore'), 'local.clj\n');
+  writeFileSync(path.join(repo, 'tracked.clj'), '(ns tracked)');
+  writeFileSync(path.join(repo, 'local.clj'), '(ns local)');
+  g('init', '-q');
+  g('add', '.gitignore', 'tracked.clj');
+  g('commit', '-qm', 'init');
+
+  it('asks git about untracked files only: an ignored one is found, a tracked one is never listed', () => {
+    assert.deepEqual(ignoredAmong(repo, ['tracked.clj', 'local.clj']), ['local.clj']);
+    assert.deepEqual(ignoredAmong(repo, ['tracked.clj']), []);
+  });
+
+  it('walks the tree once per window and shows an edit from the first call after it', () => {
+    let clock = 1000;
+    let walks = 0;
+    const snap = cachedSnapshot(() => { walks++; return snapshotOf(repo, 'v1'); }, 3000, () => clock);
+    const clean = snap();
+    writeFileSync(path.join(repo, 'tracked.clj'), '(ns tracked) (def edited 1)');
+    clock += 2999;
+    assert.equal(snap().id, clean.id, 'inside the window the answer is the remembered one');
+    assert.equal(walks, 1);
+    clock += 1;
+    const after = snap();
+    assert.equal(walks, 2);
+    assert.notEqual(after.id, clean.id, 'the first call after the window sees the edit');
+    assert.deepEqual(after.dirty.map(([f]) => f), ['local.clj', 'tracked.clj']);
+    clock -= 10_000;
+    snap();
+    assert.equal(walks, 3, 'a clock that went back walks again');
   });
 });

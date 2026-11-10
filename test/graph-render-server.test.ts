@@ -307,7 +307,8 @@ describe('render: every row line of a real query is cited', () => {
 describe('staleness', () => {
   const g = graph(() => {});
   const sha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  const at = (n: number | null) => () => n;
+  const at = (n: number | null) => () => (n === null ? null : { behind: n, ahead: 0 });
+  const split = (ahead: number, behind: number) => () => ({ ahead, behind });
 
   it('no base, no header', () => assert.deepEqual(staleness(g, undefined), { stale: false, distance: null, header: null }));
   it('blank base, no header', () => assert.equal(staleness(g, '  ').header, null));
@@ -330,6 +331,18 @@ describe('staleness', () => {
       else assert.match(s.header ?? '', /within threshold/);
     });
   }
+
+  it('a graph ahead of the base is STALE, never fresh', () => {
+    const s = staleness(g, 'bbbbbbbbbb', { distance: split(2, 0) });
+    assert.deepEqual([s.stale, s.distance], [true, 0]);
+    assert.match(s.header ?? '', /^STALE: graph built at aaaaaaaaaa is 2 commit\(s\) ahead of base bbbbbbbbbb: it describes code the base does not contain/);
+  });
+
+  it('a graph diverged from the base is STALE even within the behind threshold', () => {
+    const s = staleness(g, 'bbbbbbbbbb', { distance: split(1, 3) });
+    assert.deepEqual([s.stale, s.distance], [true, 3]);
+    assert.match(s.header ?? '', /^STALE: graph built at aaaaaaaaaa is diverged from base bbbbbbbbbb \(1 commit\(s\) ahead, 3 behind\)/);
+  });
 
   it('an unmeasurable distance is STALE, never fresh', () => {
     const s = staleness(g, 'bbbbbbbbbb', { distance: at(null) });

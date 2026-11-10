@@ -11,6 +11,8 @@ const SERVER = /^(ring\.adapter\.|org\.httpkit\.server$|aleph\.http$|immutant\.w
 
 export interface Wrapper {
   def: string;
+  // where the middleware is applied: the wrapping call can be in another file than the route
+  file: string;
   line: number;
   library: boolean;
 }
@@ -42,14 +44,15 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
     const name = first && first.t === 'symbol' ? first.text : undefined;
     return !!name && [...walk(xs.slice(3))].some((f) => f.t === 'list' && f.children[0] && textOf(unwrap(f.children[0])) === name);
   };
-  const isMiddleware = (u: VarUse) => /^wrap-/.test(u.name) || /^ring\.middleware\./.test(u.to) || (u.to === 'compojure.handler' && ['site', 'api'].includes(u.name)) || appliesHandler(fullName(u));
+  const isMiddleware = (u: VarUse) => /^wrap-/.test(u.name) || /^ring\.middleware\./.test(u.to) || (u.to === 'compojure.handler' && ['site',
+    'api'].includes(u.name)) || appliesHandler(fullName(u));
 
   const useOf = (file: string, f: Form | undefined): VarUse | undefined => {
     const u = f && unwrap(f);
     const use = u && u.t === 'symbol' ? ctx.useAt(file, u.row, u.col) : undefined;
     return use && use.to !== UNKNOWN_NS ? use : undefined;
   };
-  const wrapper = (use: VarUse, line: number): Wrapper => ({ def: fullName(use), line, library: !ctx.defs.has(fullName(use)) });
+  const wrapper = (use: VarUse, file: string, line: number): Wrapper => ({ def: fullName(use), file, line, library: !ctx.defs.has(fullName(use)) });
   const headName = (file: string, f: Form): string => {
     const use = useOf(file, f);
     return use ? fullName(use) : '';
@@ -62,9 +65,9 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
     if (!use) return undefined;
     if (use.to === COMPOJURE && use.name === 'wrap-routes' && s.t === 'list') {
       const arg = useOf(file, s.children[1]);
-      return arg ? wrapper(arg, unwrap(s.children[1]).row) : undefined;
+      return arg ? wrapper(arg, file, unwrap(s.children[1]).row) : undefined;
     }
-    return isMiddleware(use) ? wrapper(use, head.row) : undefined;
+    return isMiddleware(use) ? wrapper(use, file, head.row) : undefined;
   };
 
   // from a value up to the top: the wrappers met, innermost first, then those around the definition holding the value
@@ -99,8 +102,8 @@ export function wrappingOf(ctx: Context): (file: string, route: Form) => Wrappin
       } else if (use.to === COMPOJURE && use.name === 'wrap-routes') {
         const arg = index === 1 ? useOf(file, parent.children[2]) : undefined;
         if (!arg) return [null];
-        wrappers.push(wrapper(arg, unwrap(parent.children[2]).row));
-      } else if (index === 1 && isMiddleware(use)) wrappers.push(wrapper(use, head.row));
+        wrappers.push(wrapper(arg, file, unwrap(parent.children[2]).row));
+      } else if (index === 1 && isMiddleware(use)) wrappers.push(wrapper(use, file, head.row));
       else if (index === 1 && SERVER.test(use.to)) return [wrappers];
       else return [null];
       cur = parent;

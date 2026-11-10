@@ -68,7 +68,9 @@ function effectDispatches(ctx: Context): Keyword[] {
         if (value.t !== 'vector') continue;
         const events = key === ':dispatch-n'
           ? flatChildren(value)
-          : key === ':dispatch-later' ? flatChildren(value).flatMap((m) => (unwrap(m).t === 'map' ? entries(unwrap(m)).filter(([k]) => k === ':dispatch').map(([, v]) => v) : [])) : [];
+          : key === ':dispatch-later'
+            ? flatChildren(value).flatMap((m) => (unwrap(m).t === 'map' ? entries(unwrap(m)).filter(([k]) => k === ':dispatch').map(([, v]) => v) : []))
+            : [];
         for (const e of events) {
           const id = eventId(e);
           const kw = id && keywords.get(at({ file, row: id.row, col: id.col }));
@@ -78,6 +80,19 @@ function effectDispatches(ctx: Context): Keyword[] {
     }
   }
   return out;
+}
+
+const DISPATCH = /^dispatch(-sync)?$/;
+const DYNAMIC_EVENT = 'dynamic_event:(non-literal event id)';
+
+// Calls of dispatch and dispatch-sync whose event id is not a keyword written at the call: a parameter, a call, a
+// whole event vector held in a variable. Any event may be dispatched there; the sites are the boundary.
+function dynamicDispatches(ctx: Context): VarUse[] {
+  return ctx.analysis.varUses.filter((u) => {
+    if (!RF.has(u.to) || !DISPATCH.test(u.name)) return false;
+    const call = formAt(ctx.forms(u.file), u.row, u.col);
+    return !!call && !eventId(kids(call)[1]);
+  });
 }
 
 export const reFrame: Adapter = {
@@ -90,14 +105,16 @@ export const reFrame: Adapter = {
     const edges: GraphEdge[] = [];
     const node = (kind: string, kw: Keyword, extra: Partial<GraphNode> = {}) => {
       const component = ctx.componentOf(kw.file);
-      nodes.push({ id: nodeId(kind, keywordName(kw)), kind, name: keywordName(kw), file: kw.file, line: kw.row, ...(component ? { component } : {}), ...extra });
+      nodes.push({ id: nodeId(kind, keywordName(kw)), kind, name: keywordName(kw), file: kw.file, line: kw.row, ...(component ? { component } : {}),
+        ...extra });
     };
     for (const r of registrations(ctx)) {
       node(r.kind, r.kw, { attrs: { registered_by: r.kw.reg } });
       const handler = r.handlerDef ? defId(r.handlerDef) : handlerId(r);
       if (!r.handlerDef) {
         const component = ctx.componentOf(r.form.file);
-        nodes.push({ id: handler, kind: 'handler', name: `${r.name} ${r.kind} handler`, file: r.form.file, line: r.form.row, end_line: r.form.endRow, ...(component ? { component } : {}) });
+        nodes.push({ id: handler, kind: 'handler', name: `${r.name} ${r.kind} handler`, file: r.form.file, line: r.form.row, end_line: r.form.endRow,
+          ...(component ? { component } : {}) });
       }
       edges.push({ from: nodeId(r.kind, r.name), to: handler, kind: 'registers', band: 'static_proven', file: r.kw.file, line: r.kw.row });
     }
@@ -107,13 +124,17 @@ export const reFrame: Adapter = {
       // a referenced id nobody registers still gets a node, so "no handler" is an answer
       node(kind, kw, { attrs: { registered_by: null } });
       edges.push({
-        from: owner(kw), to: nodeId(kind, keywordName(kw)), kind: kind === 'event' ? 'dispatches' : 'subscribes', band: 'static_proven', file: kw.file, line: kw.row,
+        from: owner(kw), to: nodeId(kind, keywordName(kw)), kind: kind === 'event' ? 'dispatches' : 'subscribes', band: 'static_proven', file: kw.file,
+          line: kw.row,
       });
     }
     for (const kw of effectDispatches(ctx)) {
       node('event', kw, { attrs: { registered_by: null } });
       edges.push({ from: owner(kw), to: nodeId('event', keywordName(kw)), kind: 'dispatches', band: 'heuristic', file: kw.file, line: kw.row });
     }
+    const dynamic = dynamicDispatches(ctx);
+    if (dynamic.length) nodes.push({ id: DYNAMIC_EVENT, kind: 'dynamic_event', name: '(non-literal event id)', file: dynamic[0].file, line: dynamic[0].row });
+    for (const u of dynamic) edges.push({ from: owner(u), to: DYNAMIC_EVENT, kind: 'dispatches', band: 'unknown', file: u.file, line: u.row });
     return { nodes, edges };
   },
 };

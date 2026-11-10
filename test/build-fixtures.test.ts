@@ -15,7 +15,9 @@ const FIXTURES: [string, string][] = [
   ['relations', 'calls vs references vs passed callbacks (vector, partial, comp, apply, alias, closure, empty map), a handler registered with add-watch, macro expansion, binding/with-redefs as UNKNOWN, dispatch candidates for defmulti, extend-type, extend-protocol, reify'],
   ['multimethods', 'defmethod nodes, resolved keyword dispatch, heuristic dispatch edges, a library multimethod'],
   ['reframe', 'events, subscriptions, inline and var handlers, :<- inputs, an unregistered event, the re-frame.alpha re-exports'],
+  ['reframe-dynamic', 'dispatch and dispatch-sync with an event id that is a parameter or a whole vector held in a variable: UNKNOWN dispatch sites on one dynamic-event node, next to a literal dispatch'],
   ['routes', 'compojure context mounts (also through route vars and non-literal paths), reitit route data with middleware and router interceptors, pedestal table routes and interceptors, handler calls, branching bodies, duplicate routes'],
+  ['ring-wrap-files', 'middleware applied in another file than the routes it wraps: the guarded_by edges and the library middleware node cite the wrapping file and line'],
   ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],
   ['system', 'integrant init-key, refs in edn and code, composite keys, mount defstate, component system-map'],
@@ -47,5 +49,18 @@ describe("the project's own clj-kondo config", () => {
     assert.deepEqual([u.resolved, u.unresolved, u.unknown], [6, 1, 7]);
     assert.deepEqual(u.topUnresolved, [['app.macros/never-defined', 1]]);
     assert.deepEqual(u.topUnknown, [['Variable', 3], ['widget', 2], ['->Variable', 1], ['map->Variable', 1]]);
+  });
+});
+
+describe('middleware edges cite the wrapper', () => {
+  it('in the file that wraps the routes, not the file that defines them', async () => {
+    const doc = await buildFixture('ring-wrap-files');
+    const guards = doc.edges.filter((e) => e.kind === 'guarded_by' && e.from.startsWith('route:POST /danger'));
+    assert.deepEqual(guards.map((e) => [e.to, `${e.file}:${e.line}`]), [
+      ['definition:app.main/wrap-auth', 'src/app/main.clj:11'],
+      ['library_middleware:ring.middleware.params/wrap-params', 'src/app/main.clj:12'],
+    ]);
+    const lib = doc.nodes.find((n) => n.kind === 'library_middleware');
+    assert.equal(`${lib?.file}:${lib?.line}`, 'src/app/main.clj:12');
   });
 });
