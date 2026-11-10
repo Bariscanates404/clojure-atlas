@@ -109,6 +109,87 @@ Projenin kendi `.clj-kondo` yapılandırması dikkate alınır. Proje kökündek
 adaptörlerin tahmin edemediği şeyleri ekler: def benzeri makrolar için `:lint-as`, `:route-macros` ve route yetkilendirme
 anahtarları olan `:route-authz`, `:permission-middleware` ve `:permission-fns`.
 
+<a id="project-configuration"></a>
+### Proje yapılandırması
+
+Bir proje makrosuyla oluşturulmuş bir var ve bir proje makrosuyla yazılmış bir route, makro adlandırılana kadar görünmezdir.
+Şu makroya ve route'a sahip küçük bir deneme projesi alalım:
+
+```clojure
+;; src/probe/defs.clj
+(ns probe.defs)
+
+(defmacro defsetting [name value]
+  `(def ~name ~value))
+
+(defsetting timeout-ms 5000)
+
+;; src/probe/core.clj
+(ns probe.core
+  (:require [probe.defs :as defs]))
+
+(defn deadline [now]
+  (+ now defs/timeout-ms))
+
+;; src/probe/web.clj
+(ns probe.web
+  (:require [compojure.core :as c]))
+
+(defmacro GET* [path args & body]
+  `(c/GET ~path ~args ~@body))
+
+(defn hello [_req]
+  {:status 200 :body "hello"})
+
+(def app
+  (c/routes
+    (GET* "/hello" [] hello)))
+```
+
+Yapılandırma olmadan var kullanılıyor ama tanımı yok, route ise mevcut değil:
+
+```
+CALLERS probe.defs/timeout-ms — no definition matches "probe.defs/timeout-ms"; used at src/probe/core.clj:5 but no definition was found
+[... trimmed ...]
+ROUTE_AUTHZ GET /hello — no route matches "GET /hello"
+[... trimmed ...]
+```
+
+Bu `.clojure-atlas.edn` dosyasını proje köküne koyun ve yeniden build edin. İki anahtar da tam nitelikli bir makroyu,
+benzer davrandığı tam nitelikli forma eşler:
+
+```clojure
+{:lint-as      {probe.defs/defsetting clojure.core/def}
+ :route-macros {probe.web/GET* compojure.core/GET}}
+```
+
+```
+CALLERS probe.defs/timeout-ms — 1 direct caller(s) in 1 component(s)
+counts: callers and references=1 [S1]
+definition (1)
+  1. probe.defs/timeout-ms  src/probe/defs.clj:6 [S]
+callers and references (1)
+  1. probe.core/deadline  src/probe/core.clj:5 [S]
+[... trimmed ...]
+```
+
+```
+ROUTE_AUTHZ GET /hello — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]
+[... trimmed ...]
+GET /hello @probe.web/app (base probe.web/app): handler (1)
+  1. probe.web/hello  src/probe/web.clj:12 [S]  entry: route GET /hello @probe.web/app
+[... trimmed ...]
+```
+
+(İlk yanıt `callers` aracının `include_references: true` ile çağrılmasıdır, çünkü `timeout-ms` bir fonksiyon değil, bir değerdir.)
+`:lint-as` bunun yerine projenin `.clj-kondo/config.edn` dosyasında, clj-kondo'nun kendi biçiminde de durabilir ve sonuç
+aynıdır; `:route-macros` yalnızca `.clojure-atlas.edn` içinde vardır:
+
+```clojure
+{:lint-as {probe.defs/defsetting clojure.core/def}}
+```
+
 ## Araçlar
 
 Aşağıdaki her örnek, [examples/](examples/) içindeki bir graf üzerinde `clojure-atlas mcp` çıktısıdır. Yalnızca
@@ -120,7 +201,7 @@ bir `DEGRADED` satırı ile başlar (bkz. sonraki bölüm). `[S]`, `[H]` ve `[?]
 Grafın hangi commit'i anlattığı, her adaptörün ne bulduğu ve band sayıları. Soru: integrant grafı neleri biliyor?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T04:47:34.989Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -364,7 +445,7 @@ Eksik anahtar kanıtlanmıştır. Satırda olması gerekip gerekmediği okuyucuy
 ### context_for_change
 
 Her review için tek çağrı: değişen semboller, diff dışındaki çağıranlar, route'lar, nitelikler, çalıştırılacak testler
-ve eklenecek testler. Değişen bir route'un çıkarılmış yetkilendirmesi yoksa risk LOW değil UNKNOWN'dur. Soru: polylith-realworld'ün article store dosyasının 60-80. satırlarındaki bir değişiklik neye
+ve eklenecek testler. Değişen bir route'un çıkarılmış yetkilendirmesi yoksa risk LOW değil UNKNOWN'dur. Grafikte olmayan bir yol `no such file in the graph` olarak okunur ve her bölüm `not checked` olur; hatalı biçimli bir girdi reddedilir. Soru: polylith-realworld'ün article store dosyasının 60-80. satırlarındaki bir değişiklik neye
 dokunuyor?
 
 ```
@@ -497,6 +578,7 @@ kaynakta elle kontrol edildi ve file:line bilgisi [bench/questions.json](bench/q
 İlk on iki positive soru ilk koşudan önce sabitlendi ve ilk koşu 12 üzerinden 11 aldı. Iskalanan soru (`re-frame.alpha`
 üzerinden re-frame kayıtları) builder'da bir fixture ile düzeltildi ve soru olduğu gibi tutuldu. Sonradan iki soru eklendi: compojure middleware zinciri (q13) ve bir reitit
 frontend route'u (q14).
+Hiçbir MCP aracı istemci route'larını listelemez; bu yüzden q14, grafın düğümleri doğrudan okunarak puanlanır: 14 olumlu yanıttan 13'ü bir araçtan gelir.
 
 ## Gereksinimler
 
@@ -558,7 +640,7 @@ TypeScript'i kendiniz yazabilirsiniz.
   literal'leri, key_siblings bulguları.
 - **Proje makroları**: clj-kondo bir makroyu yalnızca projenin `.clj-kondo` config'i ona bir `:lint-as` ya da hook
   verdiğinde açar (ya da `.clojure-atlas.edn` onu `:lint-as` altında adlandırır). Birini ekleyip yeniden build
-  ederseniz, içindeki kullanımlar yine STATIC_PROVEN olur.
+  ederseniz, içindeki kullanımlar yine STATIC_PROVEN olur. Bkz. [Proje yapılandırması](#project-configuration).
 - **Sarmalanması okunamayan middleware** `middleware: not extracted (UNKNOWN)` olarak bildirilir, "none" olarak değil.
 - **Ayrıştırılamayan dosyalar ve 2 MB'tan büyük dosyalar**: tanımları ve çağrıları graftan eksik kalır. Her yanıt bu durumda onları adlandıran bir
   `DEGRADED` satırı ile başlar.

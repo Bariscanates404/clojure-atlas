@@ -109,6 +109,87 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 汎用アダプタが推測できない情報を追加できます。def に似たマクロ用の `:lint-as`、`:route-macros`、
 そしてルート認可のキーである `:route-authz`、`:permission-middleware`、`:permission-fns` です。
 
+<a id="project-configuration"></a>
+### プロジェクト設定
+
+プロジェクトのマクロで作られた var と、プロジェクトのマクロで書かれたルートは、そのマクロに名前を付けるまで見えません。
+このマクロとルートを持つ小さな検証用プロジェクトを例にします。
+
+```clojure
+;; src/probe/defs.clj
+(ns probe.defs)
+
+(defmacro defsetting [name value]
+  `(def ~name ~value))
+
+(defsetting timeout-ms 5000)
+
+;; src/probe/core.clj
+(ns probe.core
+  (:require [probe.defs :as defs]))
+
+(defn deadline [now]
+  (+ now defs/timeout-ms))
+
+;; src/probe/web.clj
+(ns probe.web
+  (:require [compojure.core :as c]))
+
+(defmacro GET* [path args & body]
+  `(c/GET ~path ~args ~@body))
+
+(defn hello [_req]
+  {:status 200 :body "hello"})
+
+(def app
+  (c/routes
+    (GET* "/hello" [] hello)))
+```
+
+設定がないと、その var は使われているのに定義がなく、ルートも存在しないことになります。
+
+```
+CALLERS probe.defs/timeout-ms — no definition matches "probe.defs/timeout-ms"; used at src/probe/core.clj:5 but no definition was found
+[... trimmed ...]
+ROUTE_AUTHZ GET /hello — no route matches "GET /hello"
+[... trimmed ...]
+```
+
+次の `.clojure-atlas.edn` をプロジェクトルートに置いて再構築します。どちらのキーも、完全修飾したマクロを、
+そのマクロが振る舞いを真似る完全修飾の形式に対応付けます。
+
+```clojure
+{:lint-as      {probe.defs/defsetting clojure.core/def}
+ :route-macros {probe.web/GET* compojure.core/GET}}
+```
+
+```
+CALLERS probe.defs/timeout-ms — 1 direct caller(s) in 1 component(s)
+counts: callers and references=1 [S1]
+definition (1)
+  1. probe.defs/timeout-ms  src/probe/defs.clj:6 [S]
+callers and references (1)
+  1. probe.core/deadline  src/probe/core.clj:5 [S]
+[... trimmed ...]
+```
+
+```
+ROUTE_AUTHZ GET /hello — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]
+[... trimmed ...]
+GET /hello @probe.web/app (base probe.web/app): handler (1)
+  1. probe.web/hello  src/probe/web.clj:12 [S]  entry: route GET /hello @probe.web/app
+[... trimmed ...]
+```
+
+(最初の回答は `include_references: true` を付けた `callers` です。`timeout-ms` は関数ではなく値だからです。)
+`:lint-as` は、プロジェクトの `.clj-kondo/config.edn` に clj-kondo 自身の形式で置くこともでき、結果は同じです。
+`:route-macros` は `.clojure-atlas.edn` にしか存在しません。
+
+```clojure
+{:lint-as {probe.defs/defsetting clojure.core/def}}
+```
+
 ## ツール
 
 以下の例はすべて、[examples/](examples/) にあるグラフに対する `clojure-atlas mcp` の実際の出力です。
@@ -120,7 +201,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 グラフがどのコミットを表すか、各アダプタが何を見つけたかを、band ごとの件数付きで返します。質問: integrant のグラフは何を知っているか。
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T04:47:34.989Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -354,7 +435,8 @@ next: key_flow(key=":re-frame/lifecycle")  callers(var="re-frame.subs.alpha-test
 ### context_for_change
 
 レビューごとに 1 回の呼び出しで、変更されたシンボル、diff 外の呼び出し元、ルート、属性、実行すべきテスト、追加すべきテストを返します。
-変更されたルートに抽出された認可がない場合、リスクは LOW ではなく UNKNOWN になります。質問: polylith-realworld の article ストアの 60-80 行目を変更すると何に影響するか。
+変更されたルートに抽出された認可がない場合、リスクは LOW ではなく UNKNOWN になります。
+グラフにないパスは `no such file in the graph` と表示され、すべてのセクションが `not checked` になります。不正な形式のエントリは拒否されます。質問: polylith-realworld の article ストアの 60-80 行目を変更すると何に影響するか。
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -485,6 +567,8 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs、usermanager です。
 最初の 12 問の肯定の質問は最初の実行の前に固定しました。最初の実行は 12 問中 11 問でした。外れた 1 問
 (`re-frame.alpha` 経由の re-frame の登録) は、フィクスチャを付けてビルダー側で修正し、質問は元のまま残しました。
 後から 2 問を追加しました。compojure のミドルウェアチェーン (q13) と reitit のフロントエンドルート (q14) です。
+クライアントルートを一覧する MCP ツールはないため、q14 はグラフのノードを直接読んで採点します。そのため、14 問の肯定の質問のうち
+13 問の回答はツールから得られています。
 
 ## 要件
 
@@ -542,7 +626,7 @@ clj-kondo が行います。clojure-atlas はその出力とソースの形を�
   (`duplicate-namespace` 経由)、スレッドされたキースロット、transact や query の呼び出し外にあるクエリリテラル、key_siblings の finding。
 - **プロジェクトのマクロ**: clj-kondo がマクロを展開するのは、プロジェクトの `.clj-kondo` 設定がそのマクロに `:lint-as` または
   hook を与えている場合 (または `.clojure-atlas.edn` が `:lint-as` の下にその名前を挙げている場合) だけです。
-  どちらかを追加して再構築すれば、その内部の使用は再び STATIC_PROVEN になります。
+  どちらかを追加して再構築すれば、その内部の使用は再び STATIC_PROVEN になります。[プロジェクト設定](#project-configuration)を参照してください。
 - **ラップを読み取れないミドルウェア**は、「none」ではなく `middleware: not extracted (UNKNOWN)` と報告されます。
 - **解析できないファイルと 2 MB を超えるファイル**: その定義と呼び出しはグラフに含まれません。その場合、すべての回答は、それらを挙げる
   `DEGRADED` 行で始まります。

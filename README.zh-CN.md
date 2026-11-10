@@ -109,6 +109,87 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 用于类 def 宏的 `:lint-as`、`:route-macros`，以及路由授权键
 `:route-authz`、`:permission-middleware` 和 `:permission-fns`。
 
+<a id="project-configuration"></a>
+### 项目配置
+
+由项目宏创建的 var，以及用项目宏编写的路由，在宏被点名之前都是不可见的。
+以一个带有这个宏和路由的小型探测项目为例：
+
+```clojure
+;; src/probe/defs.clj
+(ns probe.defs)
+
+(defmacro defsetting [name value]
+  `(def ~name ~value))
+
+(defsetting timeout-ms 5000)
+
+;; src/probe/core.clj
+(ns probe.core
+  (:require [probe.defs :as defs]))
+
+(defn deadline [now]
+  (+ now defs/timeout-ms))
+
+;; src/probe/web.clj
+(ns probe.web
+  (:require [compojure.core :as c]))
+
+(defmacro GET* [path args & body]
+  `(c/GET ~path ~args ~@body))
+
+(defn hello [_req]
+  {:status 200 :body "hello"})
+
+(def app
+  (c/routes
+    (GET* "/hello" [] hello)))
+```
+
+没有配置时，该 var 被使用却没有定义，而该路由根本不存在：
+
+```
+CALLERS probe.defs/timeout-ms — no definition matches "probe.defs/timeout-ms"; used at src/probe/core.clj:5 but no definition was found
+[... trimmed ...]
+ROUTE_AUTHZ GET /hello — no route matches "GET /hello"
+[... trimmed ...]
+```
+
+把下面这个 `.clojure-atlas.edn` 放在项目根目录并重新构建。两个键都是把完全限定的宏映射到
+它所等同的完全限定形式：
+
+```clojure
+{:lint-as      {probe.defs/defsetting clojure.core/def}
+ :route-macros {probe.web/GET* compojure.core/GET}}
+```
+
+```
+CALLERS probe.defs/timeout-ms — 1 direct caller(s) in 1 component(s)
+counts: callers and references=1 [S1]
+definition (1)
+  1. probe.defs/timeout-ms  src/probe/defs.clj:6 [S]
+callers and references (1)
+  1. probe.core/deadline  src/probe/core.clj:5 [S]
+[... trimmed ...]
+```
+
+```
+ROUTE_AUTHZ GET /hello — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]
+[... trimmed ...]
+GET /hello @probe.web/app (base probe.web/app): handler (1)
+  1. probe.web/hello  src/probe/web.clj:12 [S]  entry: route GET /hello @probe.web/app
+[... trimmed ...]
+```
+
+（第一个回答是带 `include_references: true` 的 `callers`，因为 `timeout-ms` 是一个值，而不是函数。）
+`:lint-as` 也可以放在项目的 `.clj-kondo/config.edn` 中，使用 clj-kondo 自己的格式，结果相同；
+`:route-macros` 只存在于 `.clojure-atlas.edn`：
+
+```clojure
+{:lint-as {probe.defs/defsetting clojure.core/def}}
+```
+
 ## 工具
 
 下面的每个示例都是 `clojure-atlas mcp` 在 [examples/](examples/) 中某个图上的真实输出，
@@ -120,7 +201,7 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 图描述的是哪个提交，每个适配器找到了什么，并附各 band 的数量。问题：integrant 的图知道什么？
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T04:47:34.989Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -354,7 +435,8 @@ next: key_flow(key=":re-frame/lifecycle")  callers(var="re-frame.subs.alpha-test
 ### context_for_change
 
 每次评审只需一次调用：变更的符号、diff 之外的调用者、路由、属性、需要运行的测试和需要补充的测试。
-当变更的路由没有提取到授权时，风险是 UNKNOWN，而不是 LOW。问题：修改 polylith-realworld 中 article store 的第 60-80 行会涉及什么？
+当变更的路由没有提取到授权时，风险是 UNKNOWN，而不是 LOW。
+不在图中的路径会显示为 `no such file in the graph`，所有部分都显示为 `not checked`；格式错误的条目会被拒绝。问题：修改 polylith-realworld 中 article store 的第 60-80 行会涉及什么？
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -480,6 +562,8 @@ babashka、cider-nrepl、fulcro、pedestal、shadow-cljs 和 usermanager。表�
 前十二道肯定类问题在首次运行之前就已确定，首次运行得分为 12 题中的 11 题。未通过的一题
 （通过 `re-frame.alpha` 的 re-frame 注册）已用 fixture 在构建器中修复，该问题保持原样。之后又新增了两题，分别针对
 compojure 中间件链（q13）和 reitit 前端路由（q14）。
+没有任何 MCP 工具列出客户端路由，因此 q14 是通过直接读取图的节点来评分的：14 道肯定类问题中有
+13 道的答案来自工具。
 
 ## 要求
 
@@ -528,7 +612,7 @@ clj-kondo 完成；clojure-atlas 读取它的输出和源码形式，并构建�
 在多个文件中定义的命名空间的使用（通过 `duplicate-namespace`）、线程化的键槽位、transact 或 query 调用之外的
   查询字面量、key_siblings 的 finding。
 - **项目宏**：只有当项目的 `.clj-kondo` 配置为某个宏提供了 `:lint-as` 或 hook（或 `.clojure-atlas.edn` 在 `:lint-as` 下点名了它）时，
-  clj-kondo 才会展开它。添加其中之一并重新构建，其内部的使用就会重新成为 STATIC_PROVEN。
+  clj-kondo 才会展开它。添加其中之一并重新构建，其内部的使用就会重新成为 STATIC_PROVEN。参见[项目配置](#project-configuration)。
 - **包装无法读取的中间件**会报告为 `middleware: not extracted (UNKNOWN)`，而不是 “none”。
 - **无法解析的文件和超过 2 MB 的文件**：它们的定义和调用不在图中。此时每个回答都以一行 `DEGRADED` 开头，并列出这些文件。
 - **Pedestal service map 的 interceptor** 不会被读取，因此每条 pedestal 路由的中间件都是 UNKNOWN。

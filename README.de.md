@@ -111,6 +111,87 @@ Die projekteigene `.clj-kondo`-Konfiguration wird beachtet. Eine optionale `.clo
 was die generischen Adapter nicht erraten können: `:lint-as` für def-ähnliche Makros, `:route-macros` sowie die
 Schlüssel für die Routenautorisierung `:route-authz`, `:permission-middleware` und `:permission-fns`.
 
+<a id="project-configuration"></a>
+### Projektkonfiguration
+
+Eine Var, die ein Projektmakro erzeugt, und eine Route, die mit einem Projektmakro geschrieben ist, bleiben unsichtbar, bis das Makro benannt wird.
+Nehmen wir ein kleines Probe-Projekt mit diesem Makro und dieser Route:
+
+```clojure
+;; src/probe/defs.clj
+(ns probe.defs)
+
+(defmacro defsetting [name value]
+  `(def ~name ~value))
+
+(defsetting timeout-ms 5000)
+
+;; src/probe/core.clj
+(ns probe.core
+  (:require [probe.defs :as defs]))
+
+(defn deadline [now]
+  (+ now defs/timeout-ms))
+
+;; src/probe/web.clj
+(ns probe.web
+  (:require [compojure.core :as c]))
+
+(defmacro GET* [path args & body]
+  `(c/GET ~path ~args ~@body))
+
+(defn hello [_req]
+  {:status 200 :body "hello"})
+
+(def app
+  (c/routes
+    (GET* "/hello" [] hello)))
+```
+
+Ohne Konfiguration wird die Var verwendet, hat aber keine Definition, und die Route existiert nicht:
+
+```
+CALLERS probe.defs/timeout-ms — no definition matches "probe.defs/timeout-ms"; used at src/probe/core.clj:5 but no definition was found
+[... trimmed ...]
+ROUTE_AUTHZ GET /hello — no route matches "GET /hello"
+[... trimmed ...]
+```
+
+Legen Sie diese `.clojure-atlas.edn` in den Projektstamm und bauen Sie neu. Beide Schlüssel ordnen ein voll qualifiziertes
+Makro der voll qualifizierten Form zu, wie sie sich verhält:
+
+```clojure
+{:lint-as      {probe.defs/defsetting clojure.core/def}
+ :route-macros {probe.web/GET* compojure.core/GET}}
+```
+
+```
+CALLERS probe.defs/timeout-ms — 1 direct caller(s) in 1 component(s)
+counts: callers and references=1 [S1]
+definition (1)
+  1. probe.defs/timeout-ms  src/probe/defs.clj:6 [S]
+callers and references (1)
+  1. probe.core/deadline  src/probe/core.clj:5 [S]
+[... trimmed ...]
+```
+
+```
+ROUTE_AUTHZ GET /hello — not provable: route authz not in this graph
+counts: route=1 [S1]  handler=1 [S1]
+[... trimmed ...]
+GET /hello @probe.web/app (base probe.web/app): handler (1)
+  1. probe.web/hello  src/probe/web.clj:12 [S]  entry: route GET /hello @probe.web/app
+[... trimmed ...]
+```
+
+(Die erste Antwort stammt von `callers` mit `include_references: true`, da `timeout-ms` ein Wert ist und keine Funktion.)
+`:lint-as` kann stattdessen auch in der `.clj-kondo/config.edn` des Projekts stehen, in clj-kondos eigenem Format, mit
+demselben Ergebnis; `:route-macros` gibt es nur in `.clojure-atlas.edn`:
+
+```clojure
+{:lint-as {probe.defs/defsetting clojure.core/def}}
+```
+
 ## Tools
 
 Jedes Beispiel unten ist echte Ausgabe von `clojure-atlas mcp` über einen Graphen in [examples/](examples/), nur dort
@@ -123,7 +204,7 @@ Welchen Commit der Graph beschreibt, was jeder Adapter gefunden hat, mit Band-Z�
 integrant-Graph?
 
 ```
-graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T02:17:12.010Z: 296 nodes, 1481 edges
+graph integrant @ master sha bcad6bcf35b62d3a32a453dc26b6d3a4d659dc01 built 2026-11-10T04:47:34.989Z: 296 nodes, 1481 edges
 snapshot c90296dac61d6d6d: 0 uncommitted file(s), analyzer clojure-atlas 0.1.0, clj-kondo v2025.10.23
 config c77762fd2fd2 from .clj-kondo/config.edn
   definitions: available, 854 edges {"static_proven":854}
@@ -368,7 +449,7 @@ Der fehlende Schlüssel ist bewiesen. Ob die Zeile ihn haben sollte, bleibt dem 
 ### context_for_change
 
 Ein Aufruf pro Review: geänderte Symbole, Aufrufer außerhalb des Diffs, Routen, Attribute, auszuführende Tests und
-hinzuzufügende Tests. Hat eine geänderte Route keine extrahierte Autorisierung, ist das Risiko UNKNOWN, nicht LOW. Frage: Was berührt eine Änderung an den Zeilen 60-80 des Article-Stores von polylith-realworld?
+hinzuzufügende Tests. Hat eine geänderte Route keine extrahierte Autorisierung, ist das Risiko UNKNOWN, nicht LOW. Ein Pfad, der nicht im Graphen ist, liest sich `no such file in the graph`, und jeder Abschnitt ist `not checked`; ein fehlerhafter Eintrag wird abgelehnt. Frage: Was berührt eine Änderung an den Zeilen 60-80 des Article-Stores von polylith-realworld?
 
 ```
 CONTEXT_FOR_CHANGE components/article/src/clojure/realworld/article/store.clj:60-80 — 1 file(s), 3 changed symbol(s), 0 route(s), 0 attribute(s); risk LOW
@@ -502,6 +583,7 @@ im Quelltext geprüft, ohne das Tool, und ihr file:line steht in [bench/question
 Die ersten zwölf positiven Fragen wurden vor dem ersten Lauf festgelegt, der 11 von 12 erreichte. Der Fehlschlag (re-frame-
 Registrierungen über `re-frame.alpha`) wurde im Builder mit einer Fixture behoben, und die Frage blieb unverändert. Zwei Fragen kamen später hinzu, für die compojure-Middleware-Kette (q13) und eine
 reitit-Frontend-Route (q14).
+Kein MCP-Tool listet Client-Routen auf, daher wird q14 durch direktes Lesen der Graph-Knoten bewertet: 13 der 14 positiven Antworten stammen von einem Tool.
 
 ## Voraussetzungen
 
@@ -563,7 +645,7 @@ kann sie portieren, oder Sie schreiben das TypeScript selbst.
   key_siblings-Befunde.
 - **Projekt-Makros**: clj-kondo expandiert ein Makro nur, wenn die `.clj-kondo`-Config des Projekts ihm ein `:lint-as`
   oder einen Hook gibt (oder `.clojure-atlas.edn` es unter `:lint-as` nennt). Fügen Sie eines hinzu und bauen Sie neu,
-  sind die Verwendungen darin wieder STATIC_PROVEN.
+  sind die Verwendungen darin wieder STATIC_PROVEN. Siehe [Projektkonfiguration](#project-configuration).
 - **Middleware, deren Umhüllung nicht gelesen werden kann**, wird als `middleware: not extracted (UNKNOWN)` gemeldet,
   nicht als "none".
 - **Nicht parsbare Dateien und Dateien über 2 MB**: Ihre Definitionen und Aufrufe fehlen im Graphen. Jede Antwort beginnt dann mit einer
