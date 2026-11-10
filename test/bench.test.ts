@@ -1,7 +1,8 @@
 // The benchmark compares the vars an answer names with the hand-verified set: missing and extra items both fail it.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { answerSet, score, staleGraph, type Question } from '../bench/scoring.ts';
+import { answerSet, score, scoreNodes, staleGraph, type Question } from '../bench/scoring.ts';
+import type { Graph, GraphNode } from '../src/mcp/graph.ts';
 import type { QueryResult, Row } from '../src/mcp/rows.ts';
 import { VERSION } from '../src/version.ts';
 
@@ -22,6 +23,26 @@ describe('benchmark scoring', () => {
     ]);
     assert.deepEqual(answerSet('event_flow', r), ['a.boot', 'a/view']);
     assert.throws(() => answerSet('graph_info', r), /no answer sections known for tool graph_info/);
+  });
+
+  it('reads the sections a question names, and counts library middleware as an answer item', () => {
+    const r = result([
+      ['r: handler', ['definition:a/h'], 'handler'],
+      ['r: middleware (outermost first)', ['definition:a/wrap-auth', 'library_middleware:ring.middleware.params/wrap-params'], 'middleware'],
+    ]);
+    assert.deepEqual(answerSet('route_authz', r), ['a/h']);
+    assert.deepEqual(answerSet('route_authz', r, ['middleware']), ['a/wrap-auth', 'ring.middleware.params/wrap-params']);
+    assert.equal(score({ ...q('route_authz', ['a/wrap-auth', 'ring.middleware.params/wrap-params']), sections: ['middleware'] }, r).pass, true);
+  });
+
+  it('scores a question about a kind of node no tool lists against the graph itself', () => {
+    const node = (name: string, attrs: Record<string, unknown>): GraphNode => ({ id: `client_route:${name}`, kind: 'client_route', name, attrs });
+    const g = { byKind: new Map([['client_route', [node('/a', { name: ':a' }), node('/b', { name: ':b' }), node('/c', {})]]]) } as unknown as Graph;
+    const ask = (expected: string[], attrs: Record<string, unknown>): Question => ({ ...q('graph_nodes', expected), args: { kind: 'client_route', attrs } });
+    assert.equal(scoreNodes(ask(['/a'], { name: ':a' }), g).pass, true);
+    assert.deepEqual(scoreNodes(ask(['/a'], {}), g).extra, ['/b', '/c']);
+    assert.deepEqual(scoreNodes(ask(['/z'], { name: ':z' }), g).missing, ['/z']);
+    assert.deepEqual(scoreNodes({ ...q('graph_nodes', []), args: { kind: 'none' } }, g).answered, []);
   });
 
   it('passes an exact answer and fails one with a missing or an extra item', () => {

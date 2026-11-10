@@ -2,6 +2,7 @@
 // sections that answer the question, compared as sets. A question passes when nothing is missing and nothing extra.
 // An absence question has no expected items: the correct answer is that there is none. It passes only when the answer
 // states that kind of absence and names nothing.
+import type { Graph } from '../src/mcp/graph.ts';
 import type { QueryResult } from '../src/mcp/rows.ts';
 import { analyzerFor } from '../src/snapshot.ts';
 
@@ -20,7 +21,13 @@ export interface Question {
   absence?: Absence;
   // the graph capability an absence of kind capability-off is about
   capability?: string;
+  // the sections that hold the answer, where the tool's usual ones are not (route_authz: the middleware of a route)
+  sections?: string[];
 }
+
+// The pseudo-tool of a question about a kind of node no MCP tool lists: it reads the graph, args {kind, attrs}, and
+// the answer is the names of the nodes of that kind whose attrs hold every given value.
+export const GRAPH_NODES = 'graph_nodes';
 
 export interface Score {
   id: string;
@@ -46,11 +53,11 @@ const ANSWER_SECTIONS: Record<string, readonly string[]> = {
 };
 
 // The vars and namespaces an answer names; rows of other kinds (an inline handler, a route) are not vars.
-export function answerSet(tool: string, result: QueryResult): string[] {
-  const wanted = ANSWER_SECTIONS[tool];
+export function answerSet(tool: string, result: QueryResult, sections?: readonly string[]): string[] {
+  const wanted = sections ?? ANSWER_SECTIONS[tool];
   if (!wanted) throw new Error(`no answer sections known for tool ${tool}`);
   const ids = result.sections.filter((s) => wanted.includes(s.short ?? s.name)).flatMap((s) => s.rows.map((r) => r.id));
-  return [...new Set(ids.flatMap((id) => /^(definition|namespace):(.+)$/.exec(id)?.slice(2, 3) ?? []))].sort();
+  return [...new Set(ids.flatMap((id) => /^(definition|namespace|library_middleware):(.+)$/.exec(id)?.slice(2, 3) ?? []))].sort();
 }
 
 const NOT_AVAILABLE = '(absent|unavailable|not used|not listed|not declared|not detected)';
@@ -69,17 +76,27 @@ function statesAbsence(q: Question, result: QueryResult): boolean {
   return new RegExp(`\\b${name}\\b[^\\n]*\\b${NOT_AVAILABLE}\\b|\\b${NOT_AVAILABLE}\\b[^\\n]*\\b${name}\\b`).test(text);
 }
 
+const compared = (q: Question, answered: string[]): Score => {
+  const found = q.expected.filter((e) => answered.includes(e));
+  const missing = q.expected.filter((e) => !answered.includes(e));
+  const extra = answered.filter((a) => !q.expected.includes(a));
+  return { id: q.id, answered, found, missing, extra, pass: !missing.length && !extra.length };
+};
+
+export function scoreNodes(q: Question, g: Graph): Score {
+  const attrs = Object.entries((q.args.attrs ?? {}) as Record<string, unknown>);
+  const nodes = (g.byKind.get(String(q.args.kind)) ?? []).filter((n) => attrs.every(([k, v]) => n.attrs?.[k] === v));
+  return compared(q, [...new Set(nodes.map((n) => n.name))].sort());
+}
+
 export function score(q: Question, result: QueryResult): Score {
-  const answered = answerSet(q.tool, result);
+  const answered = answerSet(q.tool, result, q.sections);
   if (q.absence) {
     const stated = statesAbsence(q, result);
     const named = namedRows(q.tool, result);
     return { id: q.id, answered, found: [], missing: [], extra: answered, stated, named, pass: stated && named === 0 };
   }
-  const found = q.expected.filter((e) => answered.includes(e));
-  const missing = q.expected.filter((e) => !answered.includes(e));
-  const extra = answered.filter((a) => !q.expected.includes(a));
-  return { id: q.id, answered, found, missing, extra, pass: !missing.length && !extra.length };
+  return compared(q, answered);
 }
 
 // A graph built by another clojure-atlas version than the code under test says nothing about it: the reason it must

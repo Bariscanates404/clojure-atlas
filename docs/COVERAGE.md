@@ -22,32 +22,32 @@ How to read the columns:
 
 | repo | files expected | files analyzed | syntax-error files | definitions | resolved | unresolved | resolution rate | unknown namespace | multimethods | implementations | events | routes | data_attributes | system | schemas | key_flow | key_tables | client_routes | requests | selectors | browser_tests | unknown edges | build | graph |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| babashka | 663 | 656 | 2 | 6464 | 15264 | 61 | 99.6% | 2176 | 448 | 738 | 0 | 0 | 20 | 4 | 384 | 19533 | 221 | 0 | 0 | 0 | 0 | 163 | 5.6 s | 734 KB |
-| biff | 163 | 146 | 1 | 1250 | 2449 | 13 | 99.5% | 20 | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5221 | 30 | 0 | 0 | 0 | 0 | 133 | 1.3 s | 173 KB |
+| babashka | 663 | 656 | 2 | 6464 | 15264 | 61 | 99.6% | 2176 | 448 | 738 | 0 | 0 | 20 | 4 | 384 | 19533 | 221 | 0 | 0 | 0 | 0 | 163 | 4.7 s | 734 KB |
+| biff | 163 | 146 | 1 | 1250 | 2449 | 13 | 99.5% | 20 | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5221 | 30 | 0 | 0 | 0 | 0 | 133 | 1.1 s | 173 KB |
 | cider-nrepl | 131 | 130 | 0 | 1149 | 3091 | 22 | 99.3% | 186 | 57 | 55 | 0 | 0 | 0 | 0 | 0 | 5285 | 45 | 0 | 0 | 0 | 0 | 93 | 1.0 s | 159 KB |
-| clj-kondo | 461 | 427 | 12 | 2744 | 10743 | 26 | 99.8% | 251 | 116 | 721 | 1 | 0 | 0 | 4 | 8 | 22915 | 99 | 0 | 0 | 0 | 0 | 40 | 2.1 s | 490 KB |
-| compojure | 11 | 11 | 0 | 87 | 250 | 0 | 100.0% | 0 | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 0 | 0.3 s | 13 KB |
-| datascript | 67 | 67 | 1 | 1018 | 4392 | 496 | 89.9% | 1255 | 15 | 326 | 0 | 0 | 1424 | 0 | 0 | 3844 | 52 | 0 | 0 | 0 | 0 | 135 | 1.8 s | 160 KB |
-| day-of-datomic | 43 | 43 | 0 | 127 | 84 | 29 | 74.3% | 1 | 0 | 1 | 0 | 0 | 86 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 50 | 0.4 s | 11 KB |
-| fulcro | 140 | 140 | 0 | 2699 | 9834 | 16 | 99.8% | 919 | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11666 | 74 | 0 | 0 | 0 | 0 | 103 | 2.9 s | 379 KB |
-| honeysql | 26 | 20 | 0 | 504 | 2578 | 0 | 100.0% | 14 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2252 | 3 | 0 | 0 | 0 | 0 | 6 | 1.1 s | 75 KB |
-| integrant | 7 | 7 | 0 | 138 | 442 | 0 | 100.0% | 0 | 52 | 12 | 0 | 0 | 0 | 61 | 0 | 494 | 3 | 0 | 0 | 0 | 0 | 0 | 0.4 s | 21 KB |
-| logseq | 1094 | 1088 | 0 | 18099 | 69041 | 0 | 100.0% | 162 | 324 | 313 | 0 | 0 | 25169 | 0 | 131 | 86978 | 627 | 0 | 0 | 0 | 0 | 22904 | 11.9 s | 3.4 MB |
-| malli | 93 | 93 | 0 | 1372 | 7797 | 52 | 99.3% | 226 | 849 | 2134 | 0 | 0 | 0 | 0 | 93 | 9216 | 77 | 0 | 0 | 0 | 0 | 10 | 3.1 s | 291 KB |
-| metabase | 4547 | 4460 | 0 | 68325 | 311181 | 111 | 100.0% | 9522 | 10174 | 3461 | 0 | 15 | 0 | 2 | 543 | 389885 | 6356 | 0 | 0 | 0 | 0 | 4891 | 46.7 s | 13.3 MB |
-| mount | 47 | 47 | 0 | 222 | 913 | 0 | 100.0% | 3 | 0 | 9 | 0 | 2 | 30 | 56 | 0 | 288 | 3 | 0 | 0 | 0 | 0 | 0 | 0.5 s | 31 KB |
-| next-jdbc | 46 | 38 | 0 | 337 | 2230 | 6 | 99.7% | 1 | 2 | 417 | 0 | 0 | 0 | 0 | 92 | 1179 | 4 | 0 | 0 | 0 | 0 | 4 | 0.6 s | 69 KB |
+| clj-kondo | 461 | 427 | 12 | 2744 | 10743 | 26 | 99.8% | 251 | 116 | 721 | 1 | 2 | 0 | 4 | 8 | 22915 | 99 | 0 | 0 | 0 | 0 | 40 | 2.0 s | 490 KB |
+| compojure | 11 | 11 | 0 | 87 | 250 | 0 | 100.0% | 0 | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 0 | 0.2 s | 13 KB |
+| datascript | 67 | 67 | 1 | 1018 | 4392 | 496 | 89.9% | 1255 | 15 | 326 | 0 | 0 | 1424 | 0 | 0 | 3844 | 52 | 0 | 0 | 0 | 0 | 135 | 1.6 s | 160 KB |
+| day-of-datomic | 43 | 43 | 0 | 127 | 84 | 29 | 74.3% | 1 | 0 | 1 | 0 | 0 | 86 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 50 | 0.3 s | 11 KB |
+| fulcro | 140 | 140 | 0 | 2699 | 9834 | 16 | 99.8% | 919 | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11666 | 74 | 0 | 0 | 0 | 0 | 103 | 2.6 s | 379 KB |
+| honeysql | 26 | 20 | 0 | 504 | 2578 | 0 | 100.0% | 14 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2252 | 3 | 0 | 0 | 0 | 0 | 6 | 0.8 s | 75 KB |
+| integrant | 7 | 7 | 0 | 138 | 442 | 0 | 100.0% | 0 | 52 | 12 | 0 | 0 | 0 | 61 | 0 | 494 | 3 | 0 | 0 | 0 | 0 | 0 | 0.3 s | 21 KB |
+| logseq | 1094 | 1088 | 0 | 18099 | 69041 | 0 | 100.0% | 162 | 324 | 313 | 0 | 0 | 25169 | 0 | 131 | 86978 | 627 | 17 | 0 | 0 | 0 | 22904 | 8.6 s | 3.4 MB |
+| malli | 93 | 93 | 0 | 1372 | 7797 | 52 | 99.3% | 226 | 849 | 2134 | 0 | 0 | 0 | 0 | 93 | 9216 | 77 | 0 | 0 | 0 | 0 | 10 | 2.6 s | 291 KB |
+| metabase | 4547 | 4460 | 0 | 68325 | 311181 | 111 | 100.0% | 9522 | 10174 | 3461 | 0 | 15 | 0 | 2 | 543 | 389885 | 6356 | 0 | 0 | 0 | 0 | 4891 | 47.5 s | 13.3 MB |
+| mount | 47 | 47 | 0 | 222 | 913 | 0 | 100.0% | 3 | 0 | 9 | 0 | 2 | 30 | 56 | 0 | 288 | 3 | 0 | 0 | 0 | 0 | 0 | 2.2 s | 32 KB |
+| next-jdbc | 46 | 38 | 0 | 337 | 2230 | 6 | 99.7% | 1 | 2 | 417 | 0 | 0 | 0 | 0 | 92 | 1179 | 4 | 0 | 0 | 0 | 0 | 4 | 915.3 s | 69 KB |
 | pathom3 | 55 | 53 | 0 | 907 | 3815 | 0 | 100.0% | 4 | 8 | 109 | 0 | 0 | 0 | 0 | 27 | 11782 | 368 | 0 | 0 | 0 | 0 | 0 | 1.9 s | 228 KB |
-| pedestal | 230 | 230 | 1 | 2083 | 5035 | 22 | 99.6% | 283 | 13 | 598 | 0 | 115 | 0 | 24 | 180 | 5111 | 12 | 0 | 0 | 0 | 0 | 23 | 1.6 s | 265 KB |
-| penpot | 1560 | 1558 | 0 | 25341 | 124814 | 13 | 100.0% | 1888 | 1582 | 2629 | 0 | 0 | 0 | 423 | 193 | 149846 | 451 | 0 | 1 | 0 | 0 | 2609 | 16.3 s | 4.7 MB |
-| polylith-realworld | 51 | 51 | 0 | 372 | 871 | 0 | 100.0% | 0 | 0 | 0 | 0 | 22 | 0 | 0 | 0 | 1372 | 21 | 0 | 0 | 0 | 0 | 28 | 0.6 s | 48 KB |
-| re-frame | 70 | 70 | 0 | 762 | 2629 | 0 | 100.0% | 47 | 6 | 73 | 362 | 0 | 0 | 0 | 7 | 1730 | 4 | 2 | 0 | 0 | 0 | 120 | 1.0 s | 115 KB |
+| pedestal | 230 | 230 | 1 | 2083 | 5035 | 22 | 99.6% | 283 | 13 | 598 | 0 | 115 | 0 | 24 | 180 | 5111 | 12 | 0 | 0 | 0 | 0 | 23 | 1.5 s | 265 KB |
+| penpot | 1560 | 1558 | 0 | 25341 | 124814 | 13 | 100.0% | 1888 | 1582 | 2629 | 0 | 0 | 0 | 423 | 193 | 149846 | 451 | 0 | 1 | 0 | 0 | 2609 | 16.8 s | 4.7 MB |
+| polylith-realworld | 51 | 51 | 0 | 372 | 871 | 0 | 100.0% | 0 | 0 | 0 | 0 | 253 | 0 | 0 | 0 | 1372 | 21 | 0 | 0 | 0 | 0 | 28 | 0.5 s | 50 KB |
+| re-frame | 70 | 70 | 0 | 762 | 2629 | 0 | 100.0% | 47 | 6 | 73 | 362 | 0 | 0 | 0 | 7 | 1730 | 4 | 2 | 0 | 0 | 0 | 120 | 0.9 s | 115 KB |
 | reagent | 65 | 65 | 0 | 829 | 2841 | 0 | 100.0% | 85 | 5 | 124 | 0 | 0 | 0 | 0 | 0 | 1473 | 2 | 0 | 0 | 0 | 0 | 16 | 0.9 s | 98 KB |
-| reitit | 133 | 133 | 0 | 944 | 3654 | 0 | 100.0% | 14 | 30 | 618 | 8 | 555 | 0 | 4 | 146 | 9874 | 111 | 20 | 0 | 0 | 0 | 4 | 1.7 s | 206 KB |
-| ring | 72 | 72 | 0 | 634 | 1485 | 0 | 100.0% | 58 | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2047 | 8 | 0 | 0 | 0 | 0 | 2 | 0.6 s | 86 KB |
-| shadow-cljs | 320 | 320 | 3 | 2389 | 5051 | 16 | 99.7% | 909 | 465 | 186 | 0 | 0 | 0 | 0 | 227 | 11958 | 46 | 0 | 0 | 0 | 0 | 11 | 2.3 s | 377 KB |
-| usermanager | 11 | 7 | 0 | 49 | 70 | 0 | 100.0% | 10 | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 92 | 0 | 0 | 0 | 0 | 0 | 0 | 0.2 s | 7 KB |
-| xtdb-v1 | 227 | 226 | 4 | 2759 | 11437 | 3 | 100.0% | 483 | 275 | 2051 | 152 | 0 | 1821 | 13 | 203 | 14346 | 158 | 0 | 0 | 0 | 0 | 482 | 2.9 s | 535 KB |
+| reitit | 133 | 133 | 0 | 944 | 3654 | 0 | 100.0% | 14 | 30 | 618 | 8 | 557 | 0 | 4 | 146 | 9874 | 111 | 20 | 0 | 0 | 0 | 4 | 1.8 s | 206 KB |
+| ring | 72 | 72 | 0 | 634 | 1485 | 0 | 100.0% | 58 | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2047 | 8 | 0 | 0 | 0 | 0 | 2 | 0.7 s | 86 KB |
+| shadow-cljs | 320 | 320 | 3 | 2389 | 5051 | 16 | 99.7% | 909 | 465 | 186 | 0 | 0 | 0 | 0 | 227 | 11958 | 46 | 0 | 0 | 0 | 0 | 11 | 2.4 s | 377 KB |
+| usermanager | 11 | 7 | 0 | 49 | 70 | 0 | 100.0% | 10 | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 92 | 0 | 0 | 0 | 0 | 0 | 0 | 0.3 s | 7 KB |
+| xtdb-v1 | 227 | 226 | 4 | 2759 | 11437 | 3 | 100.0% | 483 | 275 | 2051 | 152 | 0 | 1821 | 13 | 203 | 14346 | 158 | 0 | 0 | 0 | 0 | 482 | 3.1 s | 535 KB |
 
 ## Repos under 95% resolution rate, or with unknown-namespace usages above 5% of resolved
 
@@ -90,7 +90,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### clj-kondo
 - most frequent unresolved: `app.core/` 6, `app.api/my-fn` 2, `app.api/renamed-fn` 2, `foo/compile-route` 2, `foo/with-redefs` 2, `a/x` 1, `another-funs/bar` 1, `another-funs/baz` 1, `app.api/my-var` 1, `app.api2/foo` 1, `app.api2/prewalk` 1, `app.api3/my-foo` 1, `bar/weird-macro` 1, `clj-kondo.impl.toolsreader.v1v2v2.clojure.tools.reader.impl.utils/Pattern` 1, `compojure.core/x` 1
 - most frequent unknown: `a` 23, `x` 22, `_` 13, `reader` 12, `b` 10, `this` 9, `y` 9, `aliased` 8, `referred` 8, `access` 6, `desc` 5, `z` 5, `n` 4, `node` 4, `with-mixin` 4
-- adapters: multimethods (defmethod) 116 edges, implementations (protocol implementations) 721 edges, events (re-frame.core) 1 edges, routes (compojure) 0 edges, data_attributes off, system (integrant) 4 edges, schemas (spec) 8 edges, key_flow (keywords in code) 22915 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
+- adapters: multimethods (defmethod) 116 edges, implementations (protocol implementations) 721 edges, events (re-frame.core) 1 edges, routes (compojure) 2 edges, data_attributes off, system (integrant) 4 edges, schemas (spec) 8 edges, key_flow (keywords in code) 22915 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
 
 ### compojure
 - most frequent unresolved: none
@@ -165,7 +165,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### polylith-realworld
 - most frequent unresolved: none
 - most frequent unknown: none
-- adapters: multimethods off, implementations off, events off, routes (compojure) 22 edges, data_attributes off, system off, schemas (spec) 0 edges, key_flow (keywords in code) 1372 edges, key_tables (map literals in code) 0 edges, client_routes off, requests off, selectors off, browser_tests off
+- adapters: multimethods off, implementations off, events off, routes (compojure) 253 edges, data_attributes off, system off, schemas (spec) 0 edges, key_flow (keywords in code) 1372 edges, key_tables (map literals in code) 0 edges, client_routes off, requests off, selectors off, browser_tests off
 
 ### re-frame
 - most frequent unresolved: none
@@ -180,7 +180,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### reitit
 - most frequent unresolved: none
 - most frequent unknown: `String` 6, `function` 3, `.-composedPath` 1, `default` 1, `number` 1, `object` 1, `string` 1
-- adapters: multimethods (defmethod) 30 edges, implementations (protocol implementations) 618 edges, events (re-frame.core) 8 edges, routes (compojure, pedestal, reitit) 555 edges, data_attributes off, system (integrant) 4 edges, schemas (malli, spec) 146 edges, key_flow (keywords in code) 9874 edges, key_tables (map literals in code) 0 edges, client_routes (reitit in ClojureScript or secretary) 0 edges, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
+- adapters: multimethods (defmethod) 30 edges, implementations (protocol implementations) 618 edges, events (re-frame.core) 8 edges, routes (compojure, pedestal, reitit) 557 edges, data_attributes off, system (integrant) 4 edges, schemas (malli, spec) 146 edges, key_flow (keywords in code) 9874 edges, key_tables (map literals in code) 0 edges, client_routes (reitit in ClojureScript or secretary) 0 edges, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
 
 ### ring
 - most frequent unresolved: none
