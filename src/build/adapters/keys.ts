@@ -3,7 +3,7 @@
 // get, get-in, select-keys, contains?, find and destructuring consume it; dissoc removes it. Threaded slots are HEURISTIC.
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { keywordName, type Keyword } from '../analysis.ts';
-import { flatChildren, textOf, unwrap, walk, type Form } from '../reader.ts';
+import { flatChildren, headName, isAnnotationMark, isThreadStep, kids, unwrap, walk, type Form } from '../reader.ts';
 import { CORE_NS, type Adapter, type Context, type Owner } from '../model.ts';
 
 type Role = 'produces_key' | 'consumes_key' | 'removes_key';
@@ -14,9 +14,8 @@ interface Site {
   threaded: boolean;
 }
 
-const THREADING = new Set(['->', '->>', 'cond->', 'cond->>', 'some->', 'some->>', 'doto']);
-const COND_THREADING = new Set(['cond->', 'cond->>']);
-const BINDING_FORMS = new Set(['let', 'loop', 'binding', 'when-let', 'if-let', 'when-some', 'if-some', 'doseq', 'for', 'with-open', 'with-redefs', 'letfn']);
+const BINDING_FORMS = new Set(['let', 'loop', 'binding', 'when-let', 'if-let', 'when-some', 'if-some', 'when-first', 'doseq', 'for', 'with-open',
+  'with-redefs', 'letfn', 'go-loop', 'with-let']);
 const FN_FORMS = new Set(['fn', 'defn', 'defn-', 'defmacro', 'defmethod', 'bound-fn']);
 const DESTRUCTURE_KEYS = new Set([':keys', ':strs', ':syms', ':as', ':or']);
 
@@ -29,34 +28,81 @@ function coreHead(ctx: Context, file: string, list: Form): string | undefined {
   return use && CORE_NS.test(use.to) ? use.name : undefined;
 }
 
-// A map in a binding position: a let-style binding target or a function parameter.
-function isDestructuring(ctx: Context, file: string, map: Form): boolean {
-  const p = ctx.parentOf(file, map.row, map.col);
-  // a map in the key slot of a binding map destructures a nested value: {{:keys [c]} :child}
-  if (p?.parent.t === 'map' && p.index % 2 === 0) return isDestructuring(ctx, file, p.parent);
-  if (!p || p.parent.t !== 'vector') return false;
-  const owner = ctx.parentOf(file, p.parent.row, p.parent.col)?.parent;
-  const head = owner && owner.t === 'list' ? textOf(owner.children[0]) : undefined;
-  if (!head) return false;
-  if (BINDING_FORMS.has(head)) return p.index % 2 === 0;
-  if (FN_FORMS.has(head)) return true;
-  // a multi-arity body: ([a {:keys [b]}] ...)
-  const grand = ctx.parentOf(file, owner?.row ?? 0, owner?.col ?? 0)?.parent;
-  return !!grand && grand.t === 'list' && FN_FORMS.has(textOf(grand.children[0]) ?? '');
+const KEYS_KEY = /^::?([^/]+\/)?keys$/;
+const provenNames = new WeakMap<Context, Set<string>>();
+
+// Where clj-kondo read a name as :keys destructuring. It proves the map holding the name is a binding pattern in
+// whatever form binds it: a record method, letfn, a for :let, a macro the project's config teaches clj-kondo.
+function destructuredNames(ctx: Context): Set<string> {
+  let at = provenNames.get(ctx);
+  if (!at) {
+    at = new Set(ctx.analysis.keywords.filter((k) => k.destructured).map((k) => `${k.file}:${k.row}:${k.col}`));
+    provenNames.set(ctx, at);
+  }
+  return at;
 }
 
-// Whether the form at `index` of `parent` is a step the threaded value passes through: not the head, not the value
-// that starts the thread, not a cond-> test and not an as-> form (which names its value explicitly).
+function hasProvenKeys(ctx: Context, file: string, map: Form): boolean {
+  const xs = kids(map);
+  const names = destructuredNames(ctx);
+  return xs.some((k, i) => i % 2 === 0 && k.t === 'keyword' && KEYS_KEY.test(k.text) && i + 1 < xs.length
+    && kids(xs[i + 1]).some((n) => names.has(`${file}:${n.row}:${n.col}`)));
+}
+
+// The form at `index` of a fn-like list that stands for its parameter vector: (fn name? [params] ...), (defn name doc?
+// attrs? [params] ...), (defmethod name dispatch [params] ...). It is the first vector after the name (a defmethod's
+// dispatch value may be a vector too), also when a type hint or a reader conditional wraps it. -1 when the form has
+// several arities.
+const paramsIndex = (list: Form, head: string): number =>
+  kids(list).findIndex((c, i) => i >= (head === 'defmethod' ? 3 : 1) && (unwrap(c).t === 'vector' || c.t === 'cond') && !isAnnotation(list, i));
+
+// (s/defn f :- Out [a :- A]), (mu/defn ...): the form after a `:-` is a schema, not a parameter vector or a pattern.
+const isAnnotation = (parent: Form, index: number): boolean => index > 0 && isAnnotationMark(kids(parent)[index - 1]);
+
+// The collection a form stands in, seen through what only decorates it: ^hint x and #?(:clj x :cljs y) stand where x
+// would. The metadata itself (the first child of ^{...} x) stands nowhere.
+function placeOf(ctx: Context, file: string, f: Form): { parent: Form; index: number } | undefined {
+  let at = ctx.parentOf(file, f.row, f.col);
+  while (at && ((at.parent.t === 'meta' && at.index === 1) || at.parent.t === 'cond')) at = ctx.parentOf(file, at.parent.row, at.parent.col);
+  return at;
+}
+
+// What a vector binds: pairs of target and value (the binding vector of a let-style form) or parameters (of a fn-like
+// form, or of one arity of it). A vector anywhere else, a function's body included, binds nothing: it is data.
+function bindingVector(ctx: Context, file: string, vec: Form): 'pairs' | 'params' | undefined {
+  const at = placeOf(ctx, file, vec);
+  if (!at || at.parent.t !== 'list') return undefined;
+  const head = headName(at.parent);
+  if (head && BINDING_FORMS.has(head)) return at.index === 1 ? 'pairs' : undefined;
+  if (head && FN_FORMS.has(head)) return paramsIndex(at.parent, head) === at.index ? 'params' : undefined;
+  // one arity of a multi-arity fn: ([a {:keys [b]}] ...)
+  const grand = at.index === 0 ? placeOf(ctx, file, at.parent)?.parent : undefined;
+  const fn = grand?.t === 'list' ? headName(grand) : undefined;
+  return grand && fn && FN_FORMS.has(fn) && paramsIndex(grand, fn) < 0 ? 'params' : undefined;
+}
+
+// Whether the form at this place is a binding target: the left side of a let-style pair, a function parameter, or a
+// pattern nested in one ([a {:keys [b]}], {{:keys [c]} :child}).
+function isBindingTarget(ctx: Context, file: string, f: Form): boolean {
+  const p = placeOf(ctx, file, f);
+  if (!p) return false;
+  if (p.parent.t === 'map') return p.index % 2 === 0 && isDestructuring(ctx, file, p.parent);
+  if (p.parent.t !== 'vector' || isAnnotation(p.parent, p.index)) return false;
+  const binds = bindingVector(ctx, file, p.parent);
+  if (binds) return binds === 'params' || p.index % 2 === 0;
+  return isBindingTarget(ctx, file, p.parent);
+}
+
+// A map that is a binding pattern and not a map literal: it stands in a binding position, or clj-kondo read its
+// :keys as destructuring.
+function isDestructuring(ctx: Context, file: string, map: Form): boolean {
+  return isBindingTarget(ctx, file, map) || hasProvenKeys(ctx, file, map);
+}
+
 // The :keys, :or or :as of a binding map, as opposed to a data key that happens to be named so.
 function isBindingKey(ctx: Context, k: Keyword): boolean {
   const at = ctx.parentOf(k.file, k.row, k.col);
   return !k.destructured && !!at && at.parent.t === 'map' && at.index % 2 === 0 && isDestructuring(ctx, k.file, at.parent);
-}
-
-function isThreadStep(parent: Form, index: number): boolean {
-  const head = parent.t === 'list' ? textOf(parent.children[0]) : undefined;
-  if (!head || !THREADING.has(head)) return false;
-  return COND_THREADING.has(head) ? index >= 3 && index % 2 === 1 : index >= 2;
 }
 
 function isThreaded(ctx: Context, file: string, list: Form): boolean {

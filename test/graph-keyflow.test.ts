@@ -99,8 +99,9 @@ describe('signature_impact', () => {
     assert.ok(!l.some((x) => /destructures :a /.test(x)));
     assert.ok(l.some((x) => /destructures :k2 /.test(x)), 'kwargs keys count too');
   });
-  it('flags a passed key the function never reads when reads are complete', () => {
-    assert.ok(labels(r, 'findings').some((l) => /ui\/one passes :z which f never reads/.test(l)));
+  it('lists a passed key the function never reads as an extra key, not a finding, when reads are complete', () => {
+    assert.ok(labels(r, 'extra keys').some((l) => /ui\/one passes :z which f never reads/.test(l)));
+    assert.ok(!labels(r, 'findings').some((l) => /:z/.test(l)), 'a map is open: an extra key breaks nothing');
   });
   it('lists callers with arity and passed keys, apply as UNKNOWN, refers dropped', () => {
     const c = rows(rv, 'callers');
@@ -132,7 +133,7 @@ describe('signature_impact', () => {
     it(`a use as a value (${via}) leaves callers unknown: no never-passed claim, the use stays an UNKNOWN row`, () => {
       const res = signatureImpact(sigGraph(valueUse(via)), 'core/f');
       assert.ok(!labels(res, 'findings').some((x) => /but no caller passes it/.test(x)));
-      assert.ok(labels(res, 'findings').some((x) => /ui\/one passes :z which f never reads/.test(x)), 'claims about a known call stay');
+      assert.ok(labels(res, 'extra keys').some((x) => /ui\/one passes :z which f never reads/.test(x)), 'claims about a known call stay');
       assert.ok(rows(res, 'callers').some((x) => x.band === 'unknown' && new RegExp(`via ${via}`).test(x.label)));
     });
   }
@@ -149,7 +150,7 @@ describe('signature_impact', () => {
     assert.ok(never.every((x) => /but no caller passes it/.test(x.label)));
     assert.deepEqual(res.next.filter((n) => n.startsWith('key_flow')), ['key_flow(key=":b")']);
     assert.equal(rows(res, 'findings').filter((x) => x.finding === 'arity-missing').length, 1);
-    assert.equal(rows(res, 'findings').filter((x) => x.finding === 'unread').length, 1);
+    assert.equal(rows(res, 'extra keys').filter((x) => x.finding === 'unread').length, 1);
   });
   it('a call without recorded arguments is an UNKNOWN row', () => {
     const g = sigGraph((b, f) => b.edge(b.def('x/bare'), 'calls', f, { file: 'components/x/src/bare.clj', line: 7 }));

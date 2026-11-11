@@ -8,7 +8,7 @@ import { defId, groupBy, nsId, isSpecialForm, UNKNOWN_NS, type Context, type Own
 import { formAt, kids, textOf } from './reader.ts';
 import { assertionHeads, classify } from './relations.ts';
 import { dynamicResolutions } from './dynamic.ts';
-import { callArgs, signatureOf, type Arity } from './signatures.ts';
+import { agreesWithKondo, callArgs, signatureOf, type Arity } from './signatures.ts';
 
 // How usages of vars came out: resolved to a project definition, naming a project namespace but no definition
 // in it, not resolved by kondo at all, or pointing into a library.
@@ -66,12 +66,16 @@ function definitionNode(ctx: Context, d: VarDef, signature: Arity[] | null, file
   };
 }
 
-// The arities of a name's definitions: one per defn, the distinct ones when several files define it.
+// The arities of a name's definitions: one per defn, the distinct ones when several files define it. A form the
+// project's clj-kondo config lints as defn (or clj-kondo knows as one, like schema.core/defn) is read the same way,
+// and any of them only when clj-kondo counted the same parameters.
 function signatureOfAll(ctx: Context, defs: readonly VarDef[]): Arity[] | null {
   const seen = new Map<string, Arity>();
   for (const d of defs) {
-    const form = /\/defn-?$/.test(d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
-    for (const a of (form && signatureOf(form, (f) => ctx.nameOf(d.file, f))) || []) seen.set(JSON.stringify(a), a);
+    const form = /\/defn-?$/.test(d.lintAs ?? d.definedBy ?? '') ? formAt(ctx.forms(d.file), d.row, d.col) : undefined;
+    const arities = form && signatureOf(form, (f) => ctx.nameOf(d.file, f));
+    if (!arities || !agreesWithKondo(arities, d.fixedArities, d.varargsMin)) continue;
+    for (const a of arities) seen.set(JSON.stringify(a), a);
   }
   return seen.size ? [...seen.values()] : null;
 }

@@ -188,7 +188,7 @@ Arities, destructured keys and what each caller passes. Question: how is `integr
 ```
 SIGNATURE_IMPACT integrant.core/init — 38 caller(s) in 1 component(s); arities 1, 2; no finding
 counts: arities=2 [S2]  callers=38 [S38]
-findings: none (searched: arity mismatches, destructured keys no caller passes, passed keys the function never reads)
+findings: none (searched: arity mismatches, required destructured keys no caller passes, passed keys that look like a misspelling of a key the function reads)
 arities (2 S2)
   1. [config]  src/integrant/core.cljc:650 [S]  (27 caller(s))
   2. [config keys]  src/integrant/core.cljc:650 [S]  (11 caller(s))
@@ -202,10 +202,35 @@ In diff mode (`base_graph`, or `added_keys` / `removed_keys` / `arities`) it lis
 affects.
 
 This includes the keys **inside map arguments**: the callee's destructured key set, defaults and supported body
-reads, beside each caller's known literal-map keys. See the [map-contract example](../README.md#inspect-the-contract-inside-a-map-argument)
-for a real `login!` call and a hypothetical added key. The contract describes static parameter/key usage, not
-value types. Nested destructuring and `get-in` contribute their outer key to the signature; `key_flow` can list
-literal key occurrences deeper in maps and paths, grouped by keyword rather than by map identity.
+reads, beside each caller's known literal-map keys. See the [parameter-set example](../README.md#provider--parameter-set--consumer)
+for a call that passes a key the function never reads, and a hypothetical added key. What is described is static
+parameter and key usage, not value types or a schema.
+
+How the answer treats a map parameter, which in Clojure is open:
+
+- **Required key**: destructured, with no `:or` default, and the body neither tests it nor falls back from it. Only a
+  required key no caller passes is a `never-passed` finding, and only a new required key makes a caller "affected"
+  when two graphs are compared.
+- **Optional key**: it has an `:or` default, or the body reads it with a default (`(get m :k d)`, `(:k m d)`), asks
+  for it (`(contains? m :k)`), or uses it only where a value is tested or fallen back from (`(or k d)`, `(if k ..)`,
+  `(when-let [x k] ..)`, `some->`, a `cond->` test). The arity row lists them as `optional:`. This is read from the
+  shape of the body, without following a name that is bound again, so it can call a key optional that is not; it
+  never does the reverse.
+- **Extra key**: a caller passes a key the function never reads. That breaks nothing, so it is listed under
+  `extra keys`, not under findings. It becomes a HEURISTIC finding only when it looks like a slip of a key the
+  function does read and that call does not pass (`:usrname` beside `:username`).
+- **Reads of a plain parameter** (`[m]`): `(:k m)`, `(get m :k)`, `(get-in m [:k ..])` (outer key), `(m :k)`,
+  `(contains? m :k)`, the first keyword step of `(-> m :k ..)`, and a `let` that destructures it, its `:as` alias
+  followed. A truthiness test is neither a read nor a hand-on. Any other use (passed to a function, returned, used
+  inside a step of a threading form) makes the reads incomplete; the answer then says the keys the parameter never
+  reads are not provable instead of listing extra keys.
+- **Forms other than defn**: `schema.core/defn` is read with its `:- Schema` annotations skipped. A macro the
+  project's clj-kondo config lints as `defn` is read as one, and its findings are HEURISTIC, because the macro may
+  add or drop parameters when it expands. A signature is recorded only when clj-kondo counts the same parameters:
+  a `.cljc` function whose parameter vector differs per platform through a reader conditional has none.
+
+Nested destructuring and `get-in` contribute their **outer key** to the signature; `key_flow` lists literal key
+occurrences deeper in maps and paths, grouped by keyword, not by map identity.
 
 ### route_authz
 
@@ -513,6 +538,17 @@ programs are started from an absolute path found on PATH, never from the analyze
   named in syntax-quoted macro bodies, usages inside a project macro clj-kondo cannot expand (via
   `unexpanded-macro`), usages of a namespace defined in more than one file (via `duplicate-namespace`), threaded
   key slots, query literals outside a transact or query call, key_siblings findings.
+- **Map keys are keyword occurrences.** `key_flow` joins every map that uses a keyword: it does not follow one map
+  from the place that builds it to the place that reads it, and a key nested in another map is listed under its own
+  name, not under a path. `signature_impact` records the outer key of nested destructuring and `get-in`. Keys in a
+  map held in a local, built with `keyword`, merged or passed on are not visible; the answers say UNKNOWN there.
+- **Map literal or binding pattern.** A `{...}` is read as a pattern in the binding vector of `let`, `loop`, `for`,
+  `doseq`, `if-let`, `when-let`, `if-some`, `when-some`, `when-first`, `with-open`, `binding`, `go-loop`, `with-let`
+  (also through a namespace alias), in the parameters of `fn`, `defn`, `defmethod`, `defmacro`, and wherever
+  clj-kondo itself read its `:keys` as destructuring (record and reify methods, `letfn`, `for :let`, macros the
+  project's config teaches it). A pattern **without `:keys`** in any other binding macro is read as a map literal:
+  its `{x :k}` is not a consumer and its `:as` shows up as a produced key. A map literal inside a pull pattern or a
+  schema vector is listed as a map-literal producer of its keys.
 - **Project macros**: clj-kondo expands a macro only when the project's `.clj-kondo` config gives it a `:lint-as`
   or a hook (or `.clojure-atlas.edn` names it under `:lint-as`). Add one and rebuild, and the usages inside it are
   STATIC_PROVEN again. See [Project configuration](#project-configuration).
@@ -527,7 +563,7 @@ programs are started from an absolute path found on PATH, never from the analyze
   systems without refs. See [ROADMAP.md](../ROADMAP.md).
 - **datascript and day-of-datomic** resolve less (89.9%, 1,255 unknown-namespace usages; and 74.3%, 1 unknown-namespace usage, respectively): datascript defines record constructors through
   a macro clj-kondo does not know; day-of-datomic's tutorials are REPL scripts without an ns form. See
-  [Coverage](../README.md#coverage).
+  [Measurements](../README.md#measurements).
 - **Unknown-namespace symbols** (locals bound by unknown macros, fields of deftype or proxy) are counted, not
   linked.
 - **No incremental build or watch.** Rebuild after a change; the server warns with `STALE` when it can tell.

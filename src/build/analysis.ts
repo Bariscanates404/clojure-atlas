@@ -27,6 +27,12 @@ export interface VarDef extends Span {
   ns: string;
   name: string;
   definedBy?: string;
+  // what the project's clj-kondo config (or clj-kondo itself) reads the defining form as: clojure.core/defn for a
+  // macro linted as defn
+  lintAs?: string;
+  // the parameter counts clj-kondo read, over every platform of a .cljc file
+  fixedArities?: number[];
+  varargsMin?: number;
   test: boolean;
   macro: boolean;
   // a function: kondo knows its arities, or it is a multimethod
@@ -150,6 +156,9 @@ export function normalize(raw: Raw): Analysis {
       ns: s(r.ns) ?? '',
       name: s(r.name) ?? '',
       ...(s(r['defined-by']) ? { definedBy: s(r['defined-by']) } : {}),
+      ...(s(r['defined-by->lint-as']) ? { lintAs: s(r['defined-by->lint-as']) } : {}),
+      ...(Array.isArray(r['fixed-arities']) ? { fixedArities: r['fixed-arities'].filter((x): x is number => typeof x === 'number') } : {}),
+      ...(n(r['varargs-min-arity']) !== undefined ? { varargsMin: n(r['varargs-min-arity']) } : {}),
       test: r.test === true,
       macro: r.macro === true,
       fn: r.macro !== true && (Array.isArray(r['fixed-arities']) || n(r['varargs-min-arity']) !== undefined || r['defined-by'] === 'clojure.core/defmulti'),
@@ -157,7 +166,12 @@ export function normalize(raw: Raw): Analysis {
       langs: [s(r.lang) ?? languageOf(span(r).file)],
     })),
     (x) => key(x.file, x.ns, x.name, x.row, x.col),
-    (p, q) => ({ ...p, langs: [...new Set([...p.langs, ...q.langs])].sort() }),
+    // a platform that counts other parameters leaves both counts: the form then has no single parameter vector
+    (p, q) => ({
+      ...p, langs: [...new Set([...p.langs, ...q.langs])].sort(),
+      ...(p.fixedArities || q.fixedArities ? { fixedArities: [...new Set([...(p.fixedArities ?? []), ...(q.fixedArities ?? [])])] } : {}),
+      ...(p.varargsMin !== q.varargsMin ? { varargsMin: -1 } : {}),
+    }),
   );
   const varUses = dedupe(
     list(a['var-usages'])

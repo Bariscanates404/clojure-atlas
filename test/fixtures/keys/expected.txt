@@ -1,8 +1,8 @@
-node definition:cart.core/checkout [definition] src/cart/core.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads_complete":false,"escapes":["passed to ->","used as a value"]}],"variadic":false}]}}
+node definition:cart.core/checkout [definition] src/cart/core.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads":[":items"],"reads_complete":false,"escapes":["passed to ->"]}],"variadic":false}]}}
 node definition:cart.core/configure [definition] src/cart/core.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"opts","reads_complete":false,"escapes":["passed to assoc"]},{"kind":"kwargs","keys":[":verbose"],"reads_complete":true}],"variadic":true}]}}
 node definition:cart.core/item-types [definition] src/cart/core.clj:3 {"defined_by":"clojure.core/def"}
 node definition:cart.core/line-total [definition] src/cart/core.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"map","keys":[":price",":qty"],"as":"item","defaults":[":qty"],"reads":[":discount"],"reads_complete":true}],"variadic":false}]}}
-node definition:cart.core/summary [definition] src/cart/core.clj:20 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads":[":meta",":total"],"reads_complete":false,"escapes":["passed to ->"]}],"variadic":false}]}}
+node definition:cart.core/summary [definition] src/cart/core.clj:20 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"cart","reads":[":meta",":total"],"reads_complete":true}],"variadic":false}]}}
 node key::cfg [key] undefined:undefined
 node key::count [key] undefined:undefined
 node key::coupon [key] undefined:undefined

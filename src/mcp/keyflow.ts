@@ -15,6 +15,7 @@ export interface ParamDesc {
   keys?: string[];
   as?: string;
   defaults?: string[];
+  optional?: string[];
   reads?: string[];
   reads_complete?: boolean;
   escapes?: string[];
@@ -65,6 +66,7 @@ export function signatureOf(n: GraphNode | undefined): ArityDesc[] | null {
       ...(Array.isArray(p.keys) ? { keys: strs(p.keys) } : {}),
       ...(typeof p.as === 'string' ? { as: p.as } : {}),
       ...(Array.isArray(p.defaults) ? { defaults: strs(p.defaults) } : {}),
+      ...(Array.isArray(p.optional) ? { optional: strs(p.optional) } : {}),
       ...(Array.isArray(p.reads) ? { reads: strs(p.reads) } : {}),
       ...(typeof p.reads_complete === 'boolean' ? { reads_complete: p.reads_complete } : {}),
       ...(Array.isArray(p.escapes) ? { escapes: strs(p.escapes) } : {}),
@@ -158,15 +160,24 @@ function callLabel(c: CallSite): string {
 interface Findings {
   arityMissing: Row[];
   neverPassed: Row[];
+  // a passed key the function never reads that looks like a slip of one it does read and this call does not pass
   unread: Row[];
+  // any other passed key the function never reads: a map is open, so this breaks nothing and is not a finding
+  extra: Row[];
   unprovable: string[];
 }
+
+// Whether a key reads like a slip of another: a short edit apart, on names long enough for that to mean something.
+const looksLike = (a: string, b: string): boolean => {
+  const [x, y] = [localName(a), localName(b)];
+  return a !== b && Math.min(x.length, y.length) >= 3 && editDistance(x, y) <= 2 && editDistance(x, y) < Math.min(x.length, y.length) - 1;
+};
 
 // A key counts as never passed only when every caller is known. A use as a value is a `references` edge whose via is
 // not `refer` (the graph records dispatch maps, apply and partial there): its arguments are not visible, so it leaves no
 // claim at all. A use the graph records no edge for is outside what this can know.
 function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls: CallSite[], usedAsValue: boolean): Findings {
-  const out: Findings = { arityMissing: [], neverPassed: [], unread: [], unprovable: [] };
+  const out: Findings = { arityMissing: [], neverPassed: [], unread: [], extra: [], unprovable: [] };
   for (const c of calls) {
     if (c.attrs && !c.arity) {
       out.arityMissing.push(edgeRow(g, c.edge.from, c.edge, {
@@ -180,12 +191,17 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
   for (const a of arities) {
     const using = calls.filter((c) => c.arity === a);
     a.params.forEach((p, i) => {
-      if (p.kind !== 'map' && p.kind !== 'kwargs' && !p.reads?.length) return;
       const seen = using.map((c) => ({ c, passed: passedAt(c, a, i) }));
       const proven = seen.filter((x) => x.passed);
       const unknownN = seen.length - proven.length;
+      if (p.kind !== 'map' && p.kind !== 'kwargs' && !p.reads?.length) {
+        // a plain parameter that is only handed on: a caller's literal map cannot be checked against it
+        if (proven.length && p.escapes?.length) out.unprovable.push(`param ${i} of ${arityText(a)} is passed on (${p.escapes.join(', ')}): ` +
+          'keys it never reads are not provable');
+        return;
+      }
       for (const k of usedAsValue || !proven.length ? [] : (p.keys ?? [])) {
-        if (p.defaults?.includes(k) || proven.some((x) => x.passed?.keys.includes(k))) continue;
+        if (p.defaults?.includes(k) || p.optional?.includes(k) || proven.some((x) => x.passed?.keys.includes(k))) continue;
         out.neverPassed.push({
           label: `${shortName(fn)} destructures ${k} (param ` +
             `${i}${arities.length > 1 ? `, arity ${fixedCount(a)}${a.variadic ? '+' : ''}` : ''}) but no caller passes it`,
@@ -197,7 +213,8 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
           band: unknownN ? 'heuristic' : proven.reduce<Band>((b, x) => weakest(b, x.passed?.band ?? 'unknown'), 'static_proven'),
           ...(fn.component ? { component: fn.component } : {}),
           detail: `0 of ${proven.length} caller(s) with a known argument pass ` +
-            `it${unknownN ? `; ${unknownN} caller(s) pass an argument whose keys are not provable` : ''}; no :or default`,
+            `it${unknownN ? `; ${unknownN} caller(s) pass an argument whose keys are not provable` : ''}; no :or default, and the body ` +
+            'neither tests it nor falls back from it',
         });
       }
       if (proven.length && p.reads_complete === false) {
@@ -206,13 +223,22 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
       if (p.reads_complete !== true) return;
       const reads = new Set([...(p.reads ?? []), ...(p.keys ?? [])]);
       for (const x of proven) {
-        const extra = (x.passed?.keys ?? []).filter((k) => !reads.has(k));
-        if (!extra.length) continue;
-        out.unread.push(edgeRow(g, x.c.edge.from, x.c.edge, {
-          label: `${x.c.caller} passes ${extra.join(' ')} which ${shortName(fn)} never reads`,
+        const passed = x.passed?.keys ?? [];
+        const extra = passed.filter((k) => !reads.has(k));
+        const absent = [...reads].filter((k) => !passed.includes(k));
+        const slips = extra.map((k) => ({ k, meant: absent.find((r) => looksLike(k, r)) })).filter((s) => s.meant);
+        const plain = extra.filter((k) => !slips.some((s) => s.k === k));
+        if (slips.length) out.unread.push(edgeRow(g, x.c.edge.from, x.c.edge, {
+          label: `${x.c.caller} passes ${slips.map((s) => s.k).join(' ')} which ${shortName(fn)} never reads`,
+          finding: 'unread',
+          band: weakest(x.passed?.band ?? 'heuristic', 'heuristic'),
+          detail: `${shortName(fn)} reads ${slips.map((s) => s.meant).join(' ')}, which this call does not pass: a misspelling?`,
+        }));
+        if (plain.length) out.extra.push(edgeRow(g, x.c.edge.from, x.c.edge, {
+          label: `${x.c.caller} passes ${plain.join(' ')} which ${shortName(fn)} never reads`,
           finding: 'unread',
           band: x.passed?.band ?? 'heuristic',
-          detail: `param ${i} reads ${keyList([...reads])}`,
+          detail: `param ${i} reads ${keyList([...reads])}; a map is open, an extra key breaks nothing`,
         }));
       }
     });
@@ -228,8 +254,13 @@ function keysOf(as: ArityDesc[]): Set<string> {
 // reads alone (a :strs entry) are not a hand-on.
 const passesMapOn = (p: ParamDesc): boolean => (p.kind === 'map' || p.kind === 'kwargs') && !!p.escapes?.length;
 
+// Destructured keys a caller has to pass: not the ones with an :or default, nor the ones the body tests or falls back from.
 function requiredKeys(as: ArityDesc[]): Set<string> {
-  return new Set(as.flatMap((a) => a.params.flatMap((p) => (p.keys ?? []).filter((k) => !p.defaults?.includes(k)))));
+  return new Set(as.flatMap((a) => a.params.flatMap((p) => (p.keys ?? []).filter((k) => !p.defaults?.includes(k) && !p.optional?.includes(k)))));
+}
+
+function optionalKeys(as: ArityDesc[]): Set<string> {
+  return new Set(as.flatMap((a) => a.params.flatMap((p) => [...(p.defaults ?? []), ...(p.optional ?? [])])));
 }
 
 function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: ArityDesc[] | null, change: SignatureChange,
@@ -244,6 +275,8 @@ function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: Arit
     const hk = keysOf(head);
     added = [...new Set([...added, ...[...requiredKeys(head)].filter((k) => !bk.has(k))])];
     removed = [...new Set([...removed, ...[...bk].filter((k) => !hk.has(k))])];
+    const eased = [...optionalKeys(head)].filter((k) => !bk.has(k));
+    if (eased.length) summary.push(`new optional keys (a default, a test or a fallback in the body; no caller has to pass them): ${eased.join(' ')}`);
     const gone = base.filter((ba) => !head.some((ha) => ha.variadic === ba.variadic && fixedCount(ha) === fixedCount(ba)));
     if (gone.length) summary.push(`arities removed: ${gone.map(arityText).join(', ')}`);
     arityOk ??= (n) => !!arityFor(head, n);
@@ -305,7 +338,8 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
   if (!arities) {
     return {
       name: 'signature_impact', query, title, found: true, matches: [fn.id], sections: [],
-      verdict: `no signature recorded for ${fn.name}: not a defn/defn- (a def, macro or multimethod), or the graph has no signatures`,
+      verdict: `no signature recorded for ${fn.name}: not a defn/defn- (a def, macro or multimethod), a form whose parameters clj-kondo ` +
+        'counts differently than its source reads (a reader conditional in the parameters), or the graph has no signatures',
       notes, next: [call('callers', { var: fn.name })],
     };
   }
@@ -315,6 +349,8 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
   });
   const valueEdges = inEdges(g, fn.id, ['references', 'passes_callback', 'registers_handler']).filter((e) => e.attrs?.via !== 'refer');
   const f = signatureFindings(g, fn, arities, calls, valueEdges.length > 0);
+  const definedBy = typeof fn.attrs?.defined_by === 'string' ? fn.attrs.defined_by : '';
+  const viaMacro = !!definedBy && !/^(clojure\.core|cljs\.core|schema\.core)\/defn-?$/.test(definedBy);
   const callerRows: Row[] = calls.map((c) => {
     const r = edgeRow(g, c.edge.from, c.edge, { label: callLabel(c) });
     if (!c.attrs) return { ...r, band: 'unknown' as Band, reason: 'call site arguments were not recorded' };
@@ -327,11 +363,15 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     reason: 'arity and arguments decided at runtime',
   }));
   const callerSection = [...callerRows, ...valueRows];
-  const arityRows: Row[] = arities.map((a, i) => nodeRow(fn, {
-    id: `${fn.id}@${i}`,
-    label: arityText(a),
-    detail: `${calls.filter((c) => c.arity === a).length} caller(s)${a.params.some(passesMapOn) ? '; passes a map parameter on' : ''}`,
-  }));
+  const arityRows: Row[] = arities.map((a, i) => {
+    const soft = [...optionalKeys([a])];
+    return nodeRow(fn, {
+      id: `${fn.id}@${i}`,
+      label: arityText(a),
+      detail: `${calls.filter((c) => c.arity === a).length} caller(s)${soft.length ? `; optional: ${soft.join(' ')}` : ''}` +
+        `${a.params.some(passesMapOn) ? '; passes a map parameter on' : ''}`,
+    });
+  });
   const sections: Section[] = [];
   const verdict: string[] = [];
   const change = opts.change ?? {};
@@ -339,18 +379,25 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     const baseNode = opts.base ? (opts.base.byId.get(fn.id) ?? resolve(opts.base, ['definition'], fn.name)[0]) : undefined;
     if (opts.base && !baseNode) notes.push(`${fn.name} is not in the base graph: a new function, every caller is new`);
     const a = affectedByChange(g, fn, arities, baseNode ? signatureOf(baseNode) : null, change, calls);
+    if (viaMacro) a.rows = a.rows.map((r) => ({ ...r, band: weakest(r.band, 'heuristic') }));
     sections.push({ name: 'affected by the change', short: 'affected', rows: a.rows, ordered: true,
       searched: 'callers whose arity disappears, that do not pass a new key, or still pass a removed one' });
     verdict.push(`${a.rows.filter((r) => r.band !== 'unknown').length} caller(s) affected by the ` +
       `change${a.summary.length ? ` (${a.summary.join('; ')})` : ''}`);
   }
-  const findings = [...f.arityMissing, ...f.neverPassed, ...f.unread];
+  // a form that is only linted as defn may add or drop parameters when it expands: what it yields is not proven
+  const findings = [...f.arityMissing, ...f.neverPassed, ...f.unread].map((r) => (viaMacro ? { ...r, band: weakest(r.band, 'heuristic') } : r));
   sections.push(...gated(g, ['signatures'], [
-    { name: 'findings', rows: findings, ordered: true, searched: 'arity mismatches, destructured keys no caller passes, passed keys the function never reads' },
+    { name: 'findings', rows: findings, ordered: true,
+      searched: 'arity mismatches, required destructured keys no caller passes, passed keys that look like a misspelling of a key the function reads' },
+    ...(f.extra.length ? [{ name: 'extra keys', short: 'extra', rows: f.extra,
+      searched: 'passed keys the function never reads; a map is open, so they break nothing' }] : []),
     { name: 'arities', rows: arityRows, ordered: true },
     { name: 'callers', rows: callerSection, searched: 'calls edges into the definition, plus value uses (apply, partial)' },
   ]));
   notes.push(...f.unprovable);
+  if (viaMacro) notes.push(`the signature is read from a (${definedBy} ...) form the way a defn is read; clj-kondo counts the same parameters, ` +
+    'what else the macro does with them is not visible, so findings are HEURISTIC');
   if (valueRows.length) notes.push(`${valueRows.length} use(s) through apply, partial or as a value: their arity and keys are not provable`);
   const comps = new Set(callerSection.map((r) => r.component ?? '(no component)'));
   const blind = callerRows.filter((r) => r.band === 'unknown').length;
@@ -361,7 +408,8 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     `${callerSection.length} caller(s) in ${comps.size} component(s)${unknownTotal ? `, ${unknownTotal} UNKNOWN (${unknownParts.join(', ')})` : ''}`,
     `arities ${arities.map((a) => (a.variadic ? `${fixedCount(a)}+` : String(fixedCount(a)))).join(', ')}`,
     findings.length ? `${findings.length} finding(s): ${f.arityMissing.length} arity not defined, ${f.neverPassed.length} key never passed, ` +
-      `${f.unread.length} unread key passed` : 'no finding',
+      `${f.unread.length} passed key that looks misspelled` : 'no finding',
+    ...(f.extra.length ? [`${f.extra.length} call(s) pass an extra key the function never reads (no finding: a map is open)`] : []),
   );
   const neverKey = f.neverPassed[0]?.key;
   const crossCaller = calls.find((c) => g.byId.get(c.edge.from)?.component !== fn.component);

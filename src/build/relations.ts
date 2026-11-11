@@ -4,7 +4,7 @@
 // at runtime, an UNKNOWN boundary) or a value use (data, an alias, a returned value).
 import type { Band } from '../mcp/graph.ts';
 import type { VarUse } from './analysis.ts';
-import { formAt, kids, textOf, type Form } from './reader.ts';
+import { formAt, headName, kids, type Form } from './reader.ts';
 import { CORE_NS, isSpecialForm, UNKNOWN_NS, type Context } from './model.ts';
 
 export type Relation = 'calls' | 'references' | 'passes_callback' | 'registers_handler' | 'expands_via' | 'rebinds';
@@ -30,7 +30,6 @@ const REGISTRARS = new Set([
   'clojure.core/add-watch', 'clojure.core/add-tap',
 ]);
 
-const headOf = (f: Form | undefined) => (f && f.t === 'list' ? textOf(f.children[0])?.replace(/^.*\//, '') : undefined);
 
 // The clojure.core name a list's head resolves to, else undefined: a user's own `binding` or a local that shadows
 // one is not the macro, whatever its text says.
@@ -62,7 +61,7 @@ function shape(ctx: Context, u: VarUse): Classified {
   if (u.macro) return { kind: 'expands_via', band: 'static_proven' };
   const at = placeOf(ctx, u.file, u.nameRow, u.nameCol);
   const parent = at?.parent;
-  const head = headOf(parent);
+  const head = headName(parent);
   if (parent?.t === 'list' && at?.index === 0) return { kind: 'calls', band: 'static_proven' };
   // (apply f args): a call with an argument count known only at runtime
   if (coreHeadOf(ctx, u.file, parent) === 'apply' && at?.index === 1) return { kind: 'calls', band: 'heuristic', via: 'apply' };

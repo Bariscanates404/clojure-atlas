@@ -12,7 +12,7 @@ node definition:shop.catalog/status-routes [definition] src/shop/catalog.clj:19 
 node definition:shop.handlers/collect [definition] src/shop/handlers.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"h","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:shop.handlers/delete-order [definition] src/shop/handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"req","reads_complete":false,"escapes":["passed to auth/require!","returned"]}],"variadic":false}]}}
 node definition:shop.handlers/health [definition] src/shop/handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
-node definition:shop.handlers/list-orders [definition] src/shop/handlers.clj:5 {"defined_by":"shop.macros/defhandler"}
+node definition:shop.handlers/list-orders [definition] src/shop/handlers.clj:5 {"defined_by":"shop.macros/defhandler","signature":{"arities":[{"params":[{"kind":"symbol","name":"req","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:shop.handlers/report [definition] src/shop/handlers.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
 node definition:shop.legacy/legacy [definition] src/shop/legacy.clj:5 {"defined_by":"clojure.core/def"}
 node definition:shop.macros/defhandler [definition] src/shop/macros.clj:2 {"defined_by":"clojure.core/defmacro","macro":true}
@@ -22,13 +22,13 @@ node definition:shop.routes/app [definition] src/shop/routes.clj:19 {"defined_by
 node definition:shop.routes/order-routes [definition] src/shop/routes.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
 node definition:shop.routes/report-routes [definition] src/shop/routes.clj:13 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"perm","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
 node definition:shop.web/GET* [definition] src/shop/web.clj:4 {"defined_by":"clojure.core/defmacro","macro":true}
-node key::authz [key] undefined:undefined {"other_uses":1}
+node key::authz [key] undefined:undefined
 node key::data [key] undefined:undefined
 node key::delete [key] undefined:undefined
 node key::exempt [key] undefined:undefined
-node key::get [key] undefined:undefined {"other_uses":1}
+node key::get [key] undefined:undefined
 node key::handler [key] undefined:undefined
-node key::middleware [key] undefined:undefined {"other_uses":1}
+node key::middleware [key] undefined:undefined
 node key::or [key] undefined:undefined
 node key::permission [key] undefined:undefined
 node key::post [key] undefined:undefined
@@ -67,6 +67,7 @@ node route:GET /status @shop.catalog/status-routes [route] src/shop/catalog.clj:
 node route:POST /catalog/export @shop.catalog/catalog-routes [route] src/shop/catalog.clj:15 {"method":"post","path":"/catalog/export","full_path":"/catalog/export","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:PUT /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"put","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 edge definition:shop.catalog/catalog-routes -calls-> definition:shop.catalog/item-authz static_proven src/shop/catalog.clj:13 {"arity":1,"arity_band":"static_proven"}
+edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:12 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:13 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:14 {"via":"map-literal"}
 edge definition:shop.catalog/catalog-routes -produces_key-> key::authz static_proven src/shop/catalog.clj:16 {"via":"map-literal"}
@@ -130,7 +131,9 @@ edge definition:shop.routes/order-routes -produces_key-> key::tenant static_prov
 edge definition:shop.routes/order-routes -references-> definition:shop.auth/tenant-of static_proven src/shop/routes.clj:9
 edge definition:shop.routes/order-routes -references-> definition:shop.handlers/delete-order static_proven src/shop/routes.clj:10
 edge definition:shop.routes/report-routes -produces_key-> key::authz static_proven src/shop/routes.clj:15 {"via":"map-literal"}
+edge definition:shop.routes/report-routes -produces_key-> key::get static_proven src/shop/routes.clj:15 {"via":"map-literal"}
 edge definition:shop.routes/report-routes -produces_key-> key::handler static_proven src/shop/routes.clj:15 {"via":"map-literal"}
+edge definition:shop.routes/report-routes -produces_key-> key::middleware static_proven src/shop/routes.clj:14 {"via":"map-literal"}
 edge definition:shop.routes/report-routes -produces_key-> key::permission static_proven src/shop/routes.clj:15 {"via":"map-literal"}
 edge definition:shop.routes/report-routes -references-> definition:shop.auth/wrap-permission static_proven src/shop/routes.clj:14
 edge definition:shop.routes/report-routes -references-> definition:shop.handlers/report static_proven src/shop/routes.clj:15
@@ -201,5 +204,5 @@ edge route:POST /catalog/export @shop.catalog/catalog-routes -routes_to-> defini
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::edit-catalog static_proven src/shop/catalog.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
 usages resolved=25 unresolved=0 unknown=0 not-vars=0 external=28
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:36 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:42 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:36 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:45 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
 files sources=8 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

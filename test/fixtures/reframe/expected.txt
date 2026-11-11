@@ -19,7 +19,7 @@ node handler:subscription :app.events/count src/app/events.cljs:15 [handler] src
 node handler:subscription :app.events/items src/app/events.cljs:13 [handler] src/app/events.cljs:13
 node handler:subscription :app.events/same src/app/events.cljs:30 [handler] src/app/events.cljs:30
 node key::items [key] undefined:undefined
-node key::on-click [key] undefined:undefined {"other_uses":1}
+node key::on-click [key] undefined:undefined
 node key::same [key] undefined:undefined
 node key::x [key] undefined:undefined
 node namespace:app.alpha [namespace] src/app/alpha.cljs:1
@@ -30,6 +30,7 @@ node subscription::app.events/count [subscription] src/app/events.cljs:15 {"regi
 node subscription::app.events/items [subscription] src/app/events.cljs:13 {"registered_by":"re-frame.core/reg-sub"}
 node subscription::app.events/same [subscription] src/app/events.cljs:30 {"registered_by":"re-frame.core/reg-sub"}
 edge definition:app.alpha/button -dispatches-> event::remove-item static_proven src/app/alpha.cljs:8
+edge definition:app.alpha/button -produces_key-> key::on-click static_proven src/app/alpha.cljs:8 {"via":"map-literal"}
 edge definition:app.events/view -dispatches-> event::app.events/save static_proven src/app/events.cljs:19
 edge definition:app.events/view -dispatches-> event::app.events/unknown static_proven src/app/events.cljs:20
 edge definition:app.events/view -produces_key-> key::on-click static_proven src/app/events.cljs:19 {"via":"map-literal"}
@@ -63,5 +64,5 @@ edge subscription::app.events/count -registers-> handler:subscription :app.event
 edge subscription::app.events/items -registers-> handler:subscription :app.events/items src/app/events.cljs:13 static_proven src/app/events.cljs:13
 edge subscription::app.events/same -registers-> handler:subscription :app.events/same src/app/events.cljs:30 static_proven src/app/events.cljs:30
 usages resolved=4 unresolved=0 unknown=0 not-vars=0 external=34
-adapters multimethods=off:0 implementations=off:0 events=re-frame.core:17 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:5 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
+adapters multimethods=off:0 implementations=off:0 events=re-frame.core:17 routes=off:0 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:6 key_tables=map literals in code:0 client_routes=off:0 requests=ClojureScript sources:0 selectors=off:0 browser_tests=off:0
 files sources=4 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

@@ -254,3 +254,19 @@ export function formAt(forms: readonly Form[], row: number, col: number): Form |
   }
   return undefined;
 }
+
+// The macro or function a list calls, without its namespace alias: p/let and async/go-loop read like let and go-loop.
+export const headName = (f: Form | undefined): string | undefined => (f && f.t === 'list' ? textOf(f.children[0])?.replace(/^.*\//, '') : undefined);
+
+const THREADING = new Set(['->', '->>', 'cond->', 'cond->>', 'some->', 'some->>', 'doto']);
+
+// Whether the form at `index` of `parent` is a step the threaded value passes through: not the head, not the value
+// that starts the thread, not a cond-> test and not an as-> form (which names its value explicitly).
+export function isThreadStep(parent: Form, index: number): boolean {
+  const head = parent.t === 'list' ? textOf(parent.children[0]) : undefined;
+  if (!head || !THREADING.has(head)) return false;
+  return head.startsWith('cond') ? index >= 3 && index % 2 === 1 : index >= 2;
+}
+
+// (s/defn f :- Out [a :- A]), (mu/defn ...): a `:-` says the next form is a schema, not a parameter or a pattern.
+export const isAnnotationMark = (f: Form | undefined): boolean => !!f && unwrap(f).t === 'keyword' && textOf(unwrap(f)) === ':-';
