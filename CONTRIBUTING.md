@@ -42,6 +42,12 @@ same pull request.
 You may also contribute just the fixture and the expected rows. That describes the library's semantics, and
 someone can write the TypeScript.
 
+## Reporting
+
+A wrong or misleading answer is the most useful report: open an issue with the tool call, the answer and the smallest
+Clojure that shows it. A security problem goes through [SECURITY.md](SECURITY.md), not a public issue. Everyone taking
+part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Rules
 
 - Every number in the docs comes from a real run.
