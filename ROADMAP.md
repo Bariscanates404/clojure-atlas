@@ -11,6 +11,9 @@ project is used. Each item lands with a fixture and the coverage and benchmark t
 - pedestal service-map interceptors (`:io.pedestal.http/interceptors`), so pedestal routes get their middleware chain.
 - malli registries (schemas held by a def are supported).
 - integrant systems without refs.
+- a browser test that waits for a request (`page.waitForResponse('**/api/x')`) has no edge to the request or the route.
+- selectors built at runtime (`(str "item-" id)`) are not nodes.
+- a test-hook class rendered outside `:class` (a custom prop, a string built with `str`, a branch of `if`) is not seen as rendered.
 - Windows: a pinned clj-kondo binary exists, but the build and server have not been verified on Windows.
 - Proxy support for the clj-kondo download. Today, behind a proxy, put clj-kondo on PATH.
 

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_PROTOCOL, invalidArguments, missingArguments, stdioServer, SUPPORTED_PROTOCOLS } from '../src/mcp/stdio.ts';
+
+// found from this file, so the suite also runs from another working directory
+const SERVE_FIXTURE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'helpers', 'serve-fixture.ts');
 
 const server = stdioServer<{ tag: string }>({
   name: 'fake',
@@ -74,7 +79,7 @@ describe('protocol edges', () => {
     assert.deepEqual(r.result, {});
   });
   it('a client that closes our stdout ends the server quietly with exit 0', async () => {
-    const child = spawn(process.execPath, ['test/helpers/serve-fixture.ts'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [SERVE_FIXTURE], { stdio: ['pipe', 'pipe', 'pipe'] });
     let err = '';
     child.stderr.on('data', (d: Buffer) => { err += d.toString(); });
     child.stdout.destroy();

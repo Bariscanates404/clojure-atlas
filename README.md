@@ -167,7 +167,7 @@ integration; Atlas is not a JavaScript or TypeScript analyzer.
 | Data | **Datomic**, **DataScript**, **XTDB v1 / Crux** | Attributes, transaction writes, query and pull reads | Unproven references are kept as UNKNOWN rows; no SQL (next.jdbc, HoneySQL) analysis |
 | System lifecycle | **Integrant**, **Mount**, **Component** | System keys, registrations, dependency edges | Integrant systems without refs are not read |
 | Schemas | **clojure.spec / cljs.spec**, **Malli** | Registered specs, Malli schemas held in vars | Malli registries are not read; schemas are not checked against maps |
-| Tests | **clojure.test / cljs.test**, **Playwright**, literal Hiccup selectors | Static test links | Playwright needs optional TypeScript 5; tests reaching code through HTTP or `resolve` are not linked |
+| Tests | **clojure.test / cljs.test**, **Playwright**, literal Hiccup selectors | Static test links | Playwright needs optional TypeScript 5; a fixture from `test.extend` without a type argument has no class, so it is not linked; tests reaching code through HTTP or `resolve` are not linked |
 | Project layout | **deps.edn**, **Leiningen**, **shadow-cljs**, **Babashka**, **Boot**, **Polylith** | Source discovery, grouping by component | Build aliases and tasks are not analyzed |
 
 An adapter recognizes specific source forms, not every use of a library. `graph_info` reports which adapters
@@ -621,6 +621,7 @@ Changes in what Atlas reads, each with a fixture or test, kept apart from the ra
 | Read frontend route tables in another namespace | Logseq: **0 → 17** client-route nodes | [coverage](docs/COVERAGE.md), [benchmark q14](docs/BENCHMARK.md#positive-questions) |
 | Recognize `re-frame.alpha` | Registrations and dispatches through the alpha namespace are extracted | [fixture](test/fixtures/reframe/src/app/alpha.cljs) |
 | Apply the project's clj-kondo config | Project `:lint-as` entries and hooks take part in the analysis | [fixture](test/fixtures/project-config/), [tests](test/config.test.ts) |
+| Type Playwright fixtures without the project's `node_modules` | Tests that get page objects from `test.extend<…>` fixtures are linked to the page-object members in a checkout where `@playwright/test` is not installed; in the fixture: **0 → 12** links | [tests](test/playwright-fixtures.test.ts), [fixture](test/fixtures/browser-fixtures/) |
 
 The first three rows compare graphs of the same pinned commits before and after the change. In that comparison no
 edge of any other kind changed, and resolved, unresolved and unknown-namespace counts are identical: these are
@@ -639,8 +640,8 @@ An agent trusts what it is handed, so a wrong answer costs more than a missing o
 
 | Check | State |
 |---|---|
-| Automated tests | **863**, all passing (`npm test`); a fixed bug gets a test that fails without the fix |
-| Source line coverage | **99.75%** (`npm run test:coverage`; the gate fails under 98%) |
+| Automated tests | **873**, all passing (`npm test`); a fixed bug gets a test that fails without the fix |
+| Source line coverage | **99.79%** (`npm run test:coverage`; the gate fails under 98%) |
 | Type check | `npm run typecheck` clean |
 | CI | [GitHub Actions](.github/workflows/ci.yml) runs the type check and the coverage gate on Node.js 22 and 24, on Linux, for every push to `main` and every pull request |
 | Fixtures | Small Clojure codebases under [test/fixtures](test/fixtures) with every expected graph row checked by hand |

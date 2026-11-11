@@ -271,13 +271,85 @@ function testsOf(r: Reader, resolve: ReturnType<typeof memberResolver>): Browser
   return tests;
 }
 
+const PLAYWRIGHT = '@playwright/test';
+// A name no project file has; the declaration below is served under it from memory and never written to the repository.
+const PLAYWRIGHT_TYPES_FILE = '__clojure-atlas-playwright-test.d.ts';
+
+// Stands in for @playwright/test where the project has no node_modules (a clean checkout, a CI build): without it
+// `test.extend<{ loginPage: LoginPage }>()` is untyped and a fixture has no class, so a test loses its page object links.
+// Fixtures are listed by name on purpose: an index signature would turn every property of `F & T` into any.
+const PLAYWRIGHT_TYPES = `declare module '${PLAYWRIGHT}' {
+  type Body<F> = (fixtures: F, testInfo: any) => any;
+  interface Declare<F> {
+    (title: string, body: Body<F>): void;
+    (title: string, details: any, body: Body<F>): void;
+  }
+  interface Hook<F> {
+    (body: Body<F>): void;
+    (title: string, body: Body<F>): void;
+  }
+  // test.skip('title', body) declares a test; test.skip(condition, 'reason') and test.skip() do not
+  type Modifier<F> = Declare<F> & ((...args: any[]) => void);
+  type Merged<L> = L extends [TestType<infer F>, ...infer Rest] ? F & Merged<Rest> : {};
+  interface BuiltIn {
+    page: any; context: any; browser: any; browserName: any; request: any; playwright: any;
+    baseURL: any; viewport: any; isMobile: any; hasTouch: any; locale: any; storageState: any;
+  }
+  export interface TestType<F> extends Declare<F> {
+    extend<T = {}, W = {}>(fixtures: any): TestType<F & T & W>;
+    only: Declare<F>;
+    skip: Modifier<F>;
+    fixme: Modifier<F>;
+    fail: Modifier<F>;
+    beforeAll: Hook<F>;
+    beforeEach: Hook<F>;
+    afterAll: Hook<F>;
+    afterEach: Hook<F>;
+    describe: any; step: any; use: any; info: any; slow: any; setTimeout: any; expect: any;
+  }
+  export const test: TestType<BuiltIn>;
+  export default test;
+  export function mergeTests<L extends any[]>(...tests: L): TestType<Merged<L>>;
+  export const expect: any, mergeExpects: any, defineConfig: any, devices: any;
+  export const chromium: any, firefox: any, webkit: any, request: any, selectors: any;
+  export type Page = any;
+  export type Frame = any;
+  export type Locator = any;
+  export type FrameLocator = any;
+  export type Browser = any;
+  export type BrowserContext = any;
+  export type APIRequestContext = any;
+  export type APIResponse = any;
+  export type Request = any;
+  export type Response = any;
+  export type Route = any;
+  export type Download = any;
+  export type Dialog = any;
+  export type TestInfo = any;
+  export type PlaywrightTestConfig = any;
+}
+`;
+
+// The program of one Playwright project. An ambient declaration of a module takes precedence over the installed package,
+// so the stand-in is added (as one more root file) only where the project does not resolve @playwright/test itself.
+function programOf(ts: Ts, dir: string, rootNames: string[], options: object): Node {
+  if (ts.resolveModuleName(PLAYWRIGHT, path.join(dir, 'index.ts'), options, ts.sys).resolvedModule) return ts.createProgram(rootNames, options);
+  const standIn = path.resolve(dir, PLAYWRIGHT_TYPES_FILE);
+  const host = ts.createCompilerHost(options);
+  const fromDisk = host.getSourceFile;
+  host.getSourceFile = (file: string, ...rest: unknown[]) => (path.resolve(file) === standIn
+    ? ts.createSourceFile(file, PLAYWRIGHT_TYPES, ts.ScriptTarget.ES2022)
+    : fromDisk.call(host, file, ...rest));
+  return ts.createProgram([...rootNames, standIn], options, host);
+}
+
 function readProject(ts: Ts, root: string, dir: string, files: readonly string[]): PlaywrightProject {
   const abs = (f: string) => path.join(root, f);
   const configPath = ts.findConfigFile(abs(dir), ts.sys.fileExists);
   const options = configPath
     ? ts.getParsedCommandLineOfConfigFile(configPath, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => undefined })?.options ?? {}
     : { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, allowJs: false };
-  const program = ts.createProgram(files.map(abs), { ...options, noEmit: true });
+  const program = programOf(ts, abs(dir), files.map(abs), { ...options, noEmit: true });
   const r: Reader = {
     ts, files, program, checker: program.getTypeChecker(),
     rel: (sf) => path.relative(root, sf.fileName).split(path.sep).join('/'),
@@ -298,7 +370,7 @@ export function readPlaywright(root: string, packageJsons: readonly string[], ty
   const out: Playwright = { projects: [], skipped: [] };
   for (const pkg of packageJsons) {
     const text = readFileSync(path.join(root, pkg), 'utf8');
-    if (!text.includes('"@playwright/test"')) continue;
+    if (!text.includes(`"${PLAYWRIGHT}"`)) continue;
     const dir = path.posix.dirname(pkg);
     let ts: Ts;
     try {
