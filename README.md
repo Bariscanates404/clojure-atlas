@@ -25,9 +25,7 @@ A personal project by **Barış Can Ateş** · MIT licensed · built on clj-kond
 [Quick start](#quick-start) · [Evidence bands](#reading-an-answer) · [Limits](#limits) ·
 [Measurements](#measurements) · [Full guide](docs/GUIDE.md)
 
-Translations of an earlier revision of this page (this English page is the current one):
-[Türkçe](README.tr.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) ·
-[日本語](README.ja.md) · [简体中文](README.zh-CN.md)
+English | [Türkçe](README.tr.md) | [Deutsch](README.de.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
 ## Why an agent should use it
 

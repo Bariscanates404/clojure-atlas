@@ -1,194 +1,264 @@
 # clojure-atlas
 
-**Agentic kodlama için geliştirildi. AI ajanınıza Clojure kod tabanınızın haritasını verin.**
+**Ajanlarla kod geliştirmek için tasarlandı: Clojure kod tabanınızın, yapay zekâ ajanınıza MCP üzerinden sunulan yapısal bir haritası.**
 
-Çağıranları ve veri sağlayıcılarını/tüketicilerini izleyin, fonksiyon sözleşmelerini **map argümanlarının içindeki anahtarlara kadar**
-inceleyin, re-frame event'lerini ve route'ları takip edin, bir değişiklikten etkilenen testleri belirleyin.
-clojure-atlas, **Clojure, ClojureScript ve `.cljc` kaynak kodunu** yerel bir kod grafiğine dönüştürür ve bunu kaynak konumları
-ve açık güven seviyeleriyle **13 MCP aracı** olarak sunar.
+Bir ajan Clojure, ClojureScript veya `.cljc` kodunu düzenlemeden önce fonksiyonu kimin çağırdığını, fonksiyonun hangi parametre kümesini aldığını, her çağıranın hangi map anahtarlarını geçirdiğini ve gövdenin hangilerini okuduğunu; hangi rotaların, re-frame olaylarının ve testlerin ona bağlı olduğunu bilmelidir. clojure-atlas bu haritayı makinenizde [clj-kondo](https://github.com/clj-kondo/clj-kondo) ile oluşturur ve **13 MCP aracı** üzerinden yanıt verir. Her satır `file:line` gösterir ve kanıtlanmış, sezgisel veya bilinmeyen olduğunu belirtir.
 
-**Kodlama ajanları için yardımcı bir araç** olarak geliştirildi: Atlas, kodu değiştirmeden önce ajanların ihtiyaç duyduğu
-yapısal bağlamı sağlar: kodun neye bağlı olduğu, tüketicilerinin hangi parametreleri ve map anahtarlarını beklediği ve hangi
-testlerin onunla ilgili olduğu.
+![clojure-atlas: sağlayıcı, map parametre kümesi, tüketici; MCP araçlarının arkasında yerel bir graf olarak çağrılar, olaylar, rotalar ve testler](docs/assets/atlas.svg)
 
-![clojure-atlas — provider to map parameter set to consumer; inspect contracts with signature_impact and key_flow](docs/assets/atlas.svg)
-
-[![License: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
+[![Sürekli entegrasyon](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml)
+[![Lisans: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
 [![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-91d5b6?style=flat-square&labelColor=17252b)](#gereksinimler)
 [![MCP: stdio](https://img.shields.io/badge/MCP-stdio-91d5b6?style=flat-square&labelColor=17252b)](#hızlı-başlangıç)
-[![Required npm runtime dependencies: 0](https://img.shields.io/badge/npm_runtime_dependencies-0-91d5b6?style=flat-square&labelColor=17252b)](#tasarım-gereği-yerel)
+[![Zorunlu npm çalışma zamanı bağımlılığı: 0](https://img.shields.io/badge/npm_runtime_dependencies-0-91d5b6?style=flat-square&labelColor=17252b)](#tasarımı-gereği-yerel)
 
-**Zorunlu npm çalışma zamanı bağımlılığı yok. Yerel analiz. For the sake of all Clojurians. (Tüm Clojure'cular için.)**
+**Zorunlu npm çalışma zamanı bağımlılığı yok. Yerel analiz.**
 
-**Barış Can Ateş**'in kişisel projesi · MIT lisanslı · [clj-kondo](https://github.com/clj-kondo/clj-kondo) üzerine kurulu.
+**Barış Can Ateş** tarafından geliştirilen kişisel bir proje · MIT lisanslı · clj-kondo üzerine kurulu.
+
+[Neden](#bir-ajan-neden-kullanmalı) · [Parametre kümeleri ve map anahtarları](#sağlayıcı--parametre-kümesi--tüketici) ·
+[Desteklenen teknoloji yığını](#dil-ve-framework-desteği) · [Örnekler](#yeniden-çalıştırabileceğiniz-gerçek-örnekler) ·
+[Hızlı başlangıç](#hızlı-başlangıç) · [Kanıt sınıfları](#bir-yanıtı-okuma) · [Sınırlamalar](#sınırlamalar) ·
+[Ölçümler](#ölçümler) · [Tam kılavuz](docs/GUIDE.md)
 
 [English](README.md) | Türkçe | [Deutsch](README.de.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
 
-[Yetenekler](#neler-yapabilirsiniz) · [Map sözleşmeleri](#map-anahtarlarına-kadar-sözleşmeler) · [Desteklenen yığın](#diller-ve-ekosistem-desteği) · [Örnekler](#çalışırken-görün) ·
-[Hızlı başlangıç](#hızlı-başlangıç) · [Kapsam](#kapsam) · [Nasıl test edilir](#atlas-nasıl-test-edilir) · [Tam kılavuz](docs/GUIDE.md)
+## Bir ajan neden kullanmalı
 
-## Neler yapabilirsiniz
+Metin araması bir yazılışı bulur. Bir çağrıyı callback'ten, bir map anahtarını tesadüfen aynı yazılan bir keyword'den veya re-frame olayı üzerinden ulaşılan bir handler'ı hiç kaydedilmemiş olandan ayıramaz. Tahminle düzenleme yapan bir ajan, hiç görmediği bir çağıranı bozar. Atlas, düzenlemeden önce ilişkileri ve her birinin kanıtını ona verir.
 
-Tanımadığınız bir projeyi keşfederken, bir refactor planlarken veya bir değişikliği incelerken kullanın. MCP istemciniz
-araçları çağırır; Atlas, kurabildiği ilişkileri `file:line` atıflarıyla döndürür.
-
-| Ajanınıza sorun… | Atlas ona şunu verir… | MCP araçları |
+| Ajanın sorusu | Atlas'ın yanıtında sundukları | MCP araçları |
 |---|---|---|
-| “Bunu kim çağırıyor ve değişikliğim neleri etkileyebilir?” | Doğrudan çağıranlar, değer referansları ve dolaylı bağımlılar | `callers`, `blast_radius` |
-| “Her çağıran hangi parametre kümesini veriyor ve fonksiyon neyi okuyor?” | Arity'ler, destructure edilen map anahtarları, varsayılan değerler, keyword argümanlar ve her çağrı noktasında verilen anahtarlar | `signature_impact` |
-| “Bu map anahtarını kim sağlıyor, kim tüketiyor?” | İç içe map'lerdeki literal anahtarlar ve anahtar yolları dahil anahtar üreticileri ve tüketicileri | `key_flow` |
-| “Bu yapılandırma satırında eksik bir anahtar var mı?” | Kardeş map satırlarında bulunup bunda olmayan anahtarlar | `key_siblings` |
-| “Bu endpoint'i ne işliyor? İzin nerede kontrol ediliyor?” | Route handler'ları, sıralı middleware'ler ve yapılandırılmış izin kontrolleri | `route_authz`, `permission_routes` |
-| “Bu re-frame event'i tetiklenince ne olur?” | Dispatch'ler, handler'lar, subscription'lar ve HTTP istekleri | `event_flow` |
-| “Bu veritabanı attribute'unu kim okuyor ya da yazıyor?” | Kanıtlanmış okuma ve yazmalar; belirsiz referanslar görünür tutulur | `attribute_usage` |
-| “Hangi testler bu değişiklikle ilgili?” | Statik birim testi bağlantıları, Playwright bağlantıları ve değişen dosya veya satırlar için bir inceleme bağlamı | `tests_for`, `tests_covering`, `context_for_change` |
-| “Bu graf aslında neyi biliyor?” | Kaynak commit, etkin adaptörler, kanıt sayıları ve kapsam uyarıları | `graph_info` |
+| Bunu kim çağırıyor ve değişikliğim nereye ulaşabilir? | Doğrudan çağıranlar, değer olarak kullanımlar ve callback'ler, geçişli bağımlılar | `callers`, `blast_radius` |
+| Fonksiyon hangi parametre kümesini alıyor ve her çağıran ne geçiriyor? | Ariteler, destructuring ile çıkarılan anahtarlar, `:or` varsayılanları ve isteğe bağlı anahtarlar, keyword argümanları, her çağrı noktasının geçirdiği anahtarlar | `signature_impact` |
+| Bir anahtar ekler, kaldırır veya zorunlu kılarsam hangi çağıranlar etkilenir? | Yeni bir zorunlu anahtarı geçirmeyen, kaldırılmış bir anahtarı hâlâ geçiren veya kaldırılmış bir ariteyi kullanan çağıranlar | `added_keys`, `removed_keys`, `arities` veya `base_graph` ile `signature_impact` |
+| Bu map anahtarını kim üretiyor ve kim tüketiyor? | Keyword'ün üretildiği ve tüketildiği noktalar | `key_flow` |
+| Bu yapılandırma satırında benzer satırlarda bulunan bir anahtar eksik mi? | Literal bir tabloda, benzer satırların çoğunda bulunan bir anahtarı içermeyen satırlar | `key_siblings` |
+| Bu endpoint'i ne işliyor ve izin nerede kontrol ediliyor? | Handler, sıralı middleware, projenin bildirdiği izin kontrolleri | `route_authz`, `permission_routes` |
+| Bu re-frame olayı tetiklendiğinde ne oluyor? | Dispatch noktaları, handler, abonelikler, HTTP istekleri | `event_flow` |
+| Bu veritabanı özniteliğini kim okuyor veya yazıyor? | Kanıtlanmış okumalar ve yazmalar; kanıtlanmamış referanslar görünür tutulur | `attribute_usage` |
+| Hangi testler bu değişiklikle ilişkili? | Statik olarak bağlanan birim testleri ve Playwright testleri, değişen satırlar için inceleme bağlamı | `tests_for`, `tests_covering`, `context_for_change` |
+| Bu graf ne biliyor ve neleri kaçırdı? | Kaynak commit, etkin adaptörler, kanıt sayıları, kapsam uyarıları | `graph_info` |
 
-Bir çağrı, bir callback ve aynı yazılışa sahip bir keyword farklı şeylerdir. Atlas bu ayrımları modeller;
-Clojure'un kayıtlarını (registration) ve veri odaklı bağlantılarını da buna dahildir. Ajanınıza, düzenlemeden önce inceleyebileceği kanıt verir.
+Atlas, bakılacak yeri gösterir. Bunun bir hata olup olmadığına siz ve ajanınız karar verirsiniz.
 
-### Yayına çıkmadan önce yakalamanıza yardımcı olduğu hatalar
+## Sağlayıcı → parametre kümesi → tüketici
 
-Her satır, herkese açık bir projedeki gerçek bir yanıttır; tam döküm için bağlantıyı izleyin.
-
-| Olası hata | Şununla sorun | Atlas ne gösterdi (gerçek örnek) |
-|---|---|---|
-| Bir yapılandırma veya veri satırında kardeş satırlarının sahip olduğu bir anahtar eksik | `key_siblings` | re-frame: bir query tablosunun 2 satırında, 4 kardeş satırın 3'ünde bulunan `:re-frame/lifecycle` yok ([döküm](docs/GUIDE.md#key_siblings)) |
-| Yeni zorunlu bir anahtar mevcut çağıranları bozuyor | `signature_impact` ile `added_keys` | polylith-realworld: `login!` `:tenant-id` isterse, 3 çağıran onsuz bir literal map geçiyor ve 1 çağıran Atlas'ın göremediği bir map'i iletiyor ([döküm](#bir-map-argümanının-içindeki-sözleşmeyi-inceleyin)) |
-| Bir çağıran yanlış arity geçiyor, ya da fonksiyonun hiç okumadığı bir anahtar geçiyor, ya da destructure ettiği bir anahtarı atlıyor | `signature_impact` | integrant: `init`, 38 çağıran ve her iki arity'ye karşı kontrol edildi; yapılan aramalar adıyla belirtilerek “no finding” ([döküm](docs/GUIDE.md#signature_impact)) |
-| Bir endpoint'te middleware veya izin kontrolü eksik | `route_authz`, `permission_routes` | polylith-realworld: `POST /api/articles` ve 11 sarmalayıcısı sırayla, en son `wrap-authorization`; bildirilmiş bir model olmadan izinler dürüstçe “not extracted” ([döküm](docs/GUIDE.md#route_authz)) |
-| Hiçbir şeyin yazmadığı bir anahtar okunuyor (çoğunlukla bir yazım hatası veya yeniden adlandırılmış anahtar) | `key_flow` | compojure: `:compojure/path` için 1 üretici (`assoc-path`) ve 2 tüketici var ([döküm](docs/GUIDE.md#key_flow)) |
-| Bir veritabanı attribute'unu yazan beklenmedik bir yazıcı | `attribute_usage` | mount: `:order/bid` için kanıtlanmış 2 yazıcı var, biri test kodunda, okuyucu yok ([döküm](docs/GUIDE.md#attribute_usage)) |
-| Dispatch edilen bir event'in handler'ı yok, ya da bir handler beklenmedik event'ler tetikliyor | `event_flow` | re-frame todomvc: `:delete-todo` 2 noktadan dispatch ediliyor, bir kez işleniyor, hiçbir şey tetiklemiyor ([döküm](docs/GUIDE.md#event_flow)) |
-| Küçük bir değişiklik beklenenden daha uzağa yayılıyor | `blast_radius` | integrant: `ref?` üzerindeki bir değişiklik 6 seviyede 31 tanıma ulaşıyor ([döküm](docs/GUIDE.md#blast_radius)) |
-| Hiçbir testin ulaşmadığı değişen kod | `context_for_change`, `tests_for` | polylith-realworld: article store'un 60-80. satırları 3 tanıma, 9 dış çağırana ve 24 ilgili teste dokunuyor ([döküm](docs/GUIDE.md#context_for_change)) |
-
-Atlas bakılacak yeri gösterir; bunun bir hata olup olmadığına karar vermek size veya ajanınıza kalır.
-
-### Bir ajanın iş akışı
-
-1. **Yönelin:** anlık görüntüyü, etkin adaptörleri ve analiz boşluklarını kontrol etmek için `graph_info` kullanın.
-2. **Araştırın:** çağıranları, parametre sözleşmelerini, map anahtarı sağlayıcılarını/tüketicilerini ve bir değişikliğin olası etkisini inceleyin.
-3. **Planlayın ve doğrulayın:** etkilenen kodu ve ilgili testleri bulmak için `context_for_change` ve test araçlarını kullanın;
-   atıf yapılan kaynağı inceleyin, değişikliği yapın ve ilgili testleri çalıştırın. Sonraki tur için grafı yeniden oluşturun ve MCP sunucusunu yeniden başlatın.
-
-## Map anahtarlarına kadar sözleşmeler
-
-Atlas, **kaynakta görünen parametre sözleşmesini** incelenebilir kılar: bir çağıranın ne verdiği, bir fonksiyonun neyi
-destructure ettiği veya okuduğu ve önerilen bir değişikliğin hangi çağrı noktalarını etkilediği.
-
-| Seviye | Atlas ne gösterebilir |
-|---|---|
-| **Parametre kümesi** | Kabul edilen arity'ler, konumsal/rest parametreler ve `& {:keys [verbose]}` gibi keyword argümanlar |
-| **Map argümanının içindeki anahtarlar** | `{:keys [email password]}`, `:or` varsayılanları, `:as` takma adları, çağıranların verdiği literal anahtarlar ve fonksiyon gövdesindeki desteklenen okumalar |
-| **Sağlayıcı / tüketici** | Map literal'leri, `assoc` ve `assoc-in` gibi üreticiler; destructuring, keyword erişimi, `get` ve `get-in` gibi tüketiciler |
-| **Sözleşme değişiklikleri** | `signature_impact` ile `added_keys`, `removed_keys`, `arities` veya `base_graph` kullanılarak eklenen/kaldırılan anahtarlardan ya da değişen arity'lerden etkilenen çağrı noktaları |
-| **İç içe map'ler** | `key_flow` aracılığıyla iç içe map'lerdeki literal anahtar geçişleri, destructuring ve `(get-in cart [:meta :count])` gibi yollar |
-
-Kapsam **statik anahtar kullanımıdır**, değer/tip doğrulaması değil. `key_flow`, geçişleri belirli bir map'in kimliğine göre değil,
-keyword'e göre gruplar. `signature_impact`, iç içe destructuring veya `get-in` için dış anahtarı kaydeder, tam bir
-iç içe şemayı değil. Çalışma zamanında oluşturulan map'ler ve anahtarlar bilinmez kalabilir.
-
-## Diller ve ekosistem desteği
-
-**Çekirdek diller:** Clojure (`.clj`), ClojureScript (`.cljs`) ve paylaşılan kod (`.cljc`). EDN dosyaları, desteklenen
-yapılandırma ve veri formlarına katkıda bulunur. TypeScript (`.ts`) yalnızca isteğe bağlı Playwright entegrasyonu için okunur;
-bu, genel amaçlı bir JavaScript ya da TypeScript analizörü değildir.
-
-| Alan | Tanınan kütüphaneler / formlar | Bugün neler kapsanıyor |
-|---|---|---|
-| Çekirdek Clojure | Var'lar, çağrılar, değer kullanımları, callback'ler, multimethod'lar, protocol'ler | Tanımlar ve bağımlılık ilişkileri; dispatch adayları sezgiseldir |
-| Parametre ve map sözleşmeleri | `defn` arity'leri, map destructuring, keyword argümanlar, map literal'leri ve anahtar işlemleri | Çağıranın verdiği anahtar kümeleri, tüketilen anahtarlar, sağlayıcı/tüketici noktaları ve imza değişikliği etkisi |
-| Frontend durumu | **re-frame**, `re-frame.alpha` dahil | Event/subscription kayıtları, dispatch, subscription girdileri ve subscriber'lar |
-| Backend yönlendirme | **Compojure**, **Reitit**, **Pedestal** tablo route'ları | Yollar, bağlanmış route kopyaları ve handler'lar; Pedestal service-map interceptor'ları çıkarılmaz |
-| Middleware | **Ring**, Compojure `wrap-routes`, Reitit route verisi ve `ring-handler` | Dıştaki sarmalayıcılar dahil sıralı zincirler; çıkarım yapılan zincirler sezgisel olarak işaretlenir |
-| Route yetkilendirmesi | Projede tanımlı izin anahtarları, middleware'ler ve fonksiyonlar | Küçük bir `.clojure-atlas.edn` bildirimi gerektirir |
-| Tarayıcı yönlendirme | **Reitit frontend**, **Secretary** | Grafta istemci route düğümleri; bunları listeleyen özel bir MCP aracı henüz yok |
-| HTTP istekleri | **cljs-ajax**, **cljs-http**, `js/fetch`, istek effect map'leri | İstek noktaları ve backend route'larıyla metot ve yola göre eşleşmeler |
-| Veri | **Datomic**, **DataScript**, **XTDB v1 / Crux** | Attribute'lar, transaction yazmaları, query/pull okumaları ve belirsiz referanslar |
-| Sistem yaşam döngüsü | **Integrant**, **Mount**, **Component** | Sistem anahtarları, kayıtlar ve bağımlılık kenarları; Integrant yapılandırma çıkarımı ref'lere dayanır |
-| Şemalar | **clojure.spec / cljs.spec**, **Malli** | Kayıtlı spec şemaları ve var'larda tutulan Malli şemaları; Malli registry'leri desteklenmez |
-| Testler ve UI | **clojure.test / cljs.test**, **Playwright**, literal Hiccup seçicileri | Statik test bağlantıları; Playwright page object'leri ve `.ts` testleri için isteğe bağlı TypeScript 5 gerekir |
-| Proje düzeni | **deps.edn**, **Leiningen**, **shadow-cljs**, **Babashka**, **Boot**, **Polylith** düzenleri | Kaynak keşfi ve modül/component'e göre gruplama; build alias'ları ve görev çalıştırma analiz edilmez |
-
-Framework adaptörleri belirli kaynak formlarını tanır, bir kütüphanenin olası her kullanımını değil. `graph_info`,
-**sizin** projenizde nelerin mevcut olduğunu ve etkinleştirildiğini bildirir. Fulcro, Pathom, HoneySQL ve next.jdbc gibi depolar
-ölçüm korpusundadır, ancak orada bulunmaları özel framework veya SQL analizinin uygulandığı anlamına **gelmez**.
-Bu adaptörler, bidi, compojure-api ve diğer boşluklar için [yol haritasına](ROADMAP.md) bakın.
-
-## Çalışırken görün
-
-Bu alıntılar, herkese açık projelerin [commit edilmiş örnek graflarından](examples/) gelir. Çağrı bir
-MCP araç çağrısıdır, kabuk komutu değil. `[S]` statik olarak kanıtlanmış, `[H]` sezgisel anlamına gelir.
-
-### Bir map argümanının içindeki sözleşmeyi inceleyin
-
-polylith-realworld'de `login!` **tek bir map argümanı** alır ve **`:email` ile `:password`** anahtarlarını destructure eder.
-Atlas bu anahtar kümesini, çağıranlarının verdiği argümanların yanında gösterir:
+Çoğu aracın inemediği ayrıntı düzeyi budur: yalnızca *`line-total` fonksiyonunu kimin çağırdığı* değil, çağrının hangi anahtarları aktardığı ve fonksiyonun bunlardan hangilerini okuduğu. Örnek, bu depodaki bir fixture'dır: [test/fixtures/keys/src/cart/core.clj](test/fixtures/keys/src/cart/core.clj).
 
 ```text
-signature_impact {"fn": "clojure.realworld.user.core/login!", "group_by": "none"}
+ PROVIDER (a call site)            PARAMETER SET (the function head)     CONSUMER (the body)
+ cart.core/summary, line 23        cart.core/line-total, line 8          line 9
+
+ (line-total {:price 1             [{:keys [price qty]                   (* price qty
+              :qty 2        ──►      :or   {qty 1}               ──►        (get item :discount 1))
+              :coupon "x"})          :as   item}]
+
+ passes  :price :qty :coupon       takes :price :qty (:qty optional)     reads :price :qty :discount
+
+                 └─ :coupon is passed and never read: listed as an extra key, not as a finding
+```
+
+```text
+signature_impact {"fn": "cart.core/line-total"}
+```
+
+```text
+SIGNATURE_IMPACT cart.core/line-total — 2 caller(s) in 1 component(s), 1 UNKNOWN (1 via apply/partial/value); arities 1; no finding; 1 call(s) pass an extra key the function never reads (no finding: a map is open)
+counts: extra=1 [S1]  arities=1 [S1]  callers=2 [S1 ?1]
+note: 1 use(s) through apply, partial or as a value: their arity and keys are not provable
+findings: none (searched: arity mismatches, required destructured keys no caller passes, passed keys that look like a misspelling of a key the function reads)
+extra keys (1)
+  1. cart.core/summary passes :coupon which line-total never reads  src/cart/core.clj:23 [S]
+arities (1)
+  1. [{:keys [price qty] :as item}]  src/cart/core.clj:8 [S]  (1 caller(s); optional: :qty)
+callers (2 S1 ?1)
+  1. cart.core/summary: arity 1, arg0 {:price :qty :coupon}  src/cart/core.clj:23 [S]
+  UNKNOWN: cart.core/checkout uses line-total via map at src/cart/core.clj:16 (arity and arguments decided at runtime) — not provable; evidence at src/cart/core.clj:16
+next: blast_radius(var="cart.core/line-total", depth=2)
+```
+
+Clojure'da bir map parametresi açıktır ve yanıt buna göre oluşturulur:
+
+| Anahtar türü | Anlamı | Atlas nasıl raporlar |
+|---|---|---|
+| **Zorunlu** | Destructuring ile çıkarılır, `:or` varsayılanı yoktur ve gövde onu ne sınar ne de yerine alternatif bir değer kullanır | Hiçbir çağıran geçirmiyorsa bir bulgudur; yenisi çağıranları "etkilenen" yapar |
+| **İsteğe bağlı** | `:or` varsayılanı vardır, varsayılanla okunur (`(get m :k d)`), varlığı sorgulanır (`(contains? m :k)`) veya yalnızca değerin sınandığı ya da alternatif değer kullanıldığı yerlerde kullanılır (`(or k d)`, `(if k …)`, `(when-let [x k] …)`) | Aritede `optional:` olarak listelenir; eksik olması hiçbir zaman bulgu değildir |
+| **Fazladan** | Çağıran geçirir, fonksiyon hiç okumaz | `extra keys` altında listelenir. Hiçbir şeyi bozmaz. Yalnızca fonksiyonun okuduğu ve o çağrıda eksik olan bir anahtarın yazım hatasına benziyorsa bulgudur (`:username` yanında `:usrname`); bu durumda HEURISTIC olur |
+| **Kanıtlanamayan** | Map iletilir, yerel bir değişkende tutulur veya parametre başka bir fonksiyona aktarılır | Gerekçesiyle birlikte UNKNOWN |
+
+Bir değişikliği yapmadan önce neye yol açacağını sorun:
+
+```text
+signature_impact {"fn": "cart.core/line-total", "added_keys": [":currency"]}
+```
+
+```text
+SIGNATURE_IMPACT cart.core/line-total — 1 caller(s) affected by the change (new keys: :currency); 2 caller(s) in 1 component(s), 1 UNKNOWN (1 via apply/partial/value); arities 1; no finding; 1 call(s) pass an extra key the function never reads (no finding: a map is open)
+[... trimmed ...]
+affected by the change (1)
+  1. cart.core/summary does not pass :currency  src/cart/core.clj:23 [S]  (argument 0 passes {:price :qty :coupon})
+[... trimmed ...]
+```
+
+`added_keys`, değişikliğin **zorunlu kılmaya** başladığı anahtarları ifade eder. `base_graph` ile iki graf karşılaştırıldığında, yeni gövdenin yalnızca isteğe bağlı olarak okuduğu bir anahtar hiçbir çağıranı etkilemez.
+
+Ve bir anahtarı proje boyunca takip edin:
+
+```text
+key_flow {"key": ":total"}
+```
+
+```text
+KEY_FLOW :total — 2 producer(s), 1 consumer(s) in 1 component(s); 0 site(s) in tests
+counts: producers=2 [S1 H1]  consumers=1 [S1]
+note: key_flow: switched on by keywords in code
+note: a key read or written only dynamically (held in a local, built with keyword, merged from another map) is not tracked
+note: :total is unqualified: every map using that name is joined here
+producers (2 S1 H1)
+  1. cart.core/summary (map-literal)  src/cart/core.clj:21 [S]
+  2. cart.core/checkout (assoc)  src/cart/core.clj:16 [H]  heuristic match
+consumers (1)
+  1. cart.core/summary (keyword-fn)  src/cart/core.clj:21 [S]
+in tests: none
+```
+
+**Bu düzey neyi ifade eder, neyi etmez:**
+
+- Kaynaktan okunan statik anahtar kullanımıdır. Tip kontrolü veya şema doğrulaması değildir; hiçbir değer incelenmez.
+- `key_flow`, **keyword geçişleri** üzerinde çalışır. `:total` kullanan her map'i birleştirir; tek bir map'i oluşturulduğu yerden okunduğu yere kadar izlemez.
+- İç içe map'ler yol duyarlı değildir. `{:meta {:count 1}}`, `:meta` ve `:count` anahtarlarını iki ayrı anahtar olarak üretir; `(get-in cart [:meta :count])` ikisini de tüketir. `signature_impact`, iç içe destructuring ve `get-in` için yalnızca **dış anahtarı** kaydeder.
+- İletilen, birleştirilen, `keyword` ile oluşturulan veya yerel bir değişkende tutulan map UNKNOWN olur ve yanıt bunu belirtir.
+
+## Dil ve framework desteği
+
+**Diller:** Clojure (`.clj`), ClojureScript (`.cljs`) ve paylaşılan kod (`.cljc`). EDN dosyaları aşağıda listelenen yapılandırma ve veri formlarını sağlar. TypeScript (`.ts`) yalnızca isteğe bağlı Playwright entegrasyonu için okunur; Atlas bir JavaScript veya TypeScript analizörü değildir.
+
+| Alan | Tanınanlar | Elde ettikleriniz | Sınırlamalar |
+|---|---|---|---|
+| Temel Clojure | Var'lar, çağrılar, değer olarak kullanımlar, callback'ler, multimethod'lar, protokoller, record'lar | Tanımlar ve bağımlılık ilişkileri | Dispatch adayları sezgiseldir; çalışma zamanında çözümlenen var'lar izlenmez |
+| Parametre kümeleri | `defn`/`defn-` ariteleri, map destructuring, `:or`, `:as`, `& {:keys […]}`, `schema.core/defn`, clj-kondo yapılandırmanızın `defn` olarak lint ettiği makrolar | Alınan anahtarlar, isteğe bağlı anahtarlar, her çağrı noktasının geçirdiği anahtarlar, imza değişikliğinin etkisi | İç içe kalıplarda yalnızca dış anahtar; parametreleri platforma göre değişen bir `.cljc` fonksiyonuna imza verilmez; makroyla tanımlanmış bir fonksiyona ilişkin bulgular sezgiseldir |
+| Map anahtarları | Map literal'ları, `assoc`, `assoc-in`, `update`, `hash-map`, `dissoc`, keyword ile erişim, `get`, `get-in`, `select-keys`, `contains?`, destructuring | Her keyword için üretme, tüketme ve kaldırma noktaları; literal tablolardaki benzer satır eksikleri | Map kimliği değil, keyword geçişleri; threading içindeki konumlar sezgiseldir; listelenmemiş bir binding makrosunda `:keys` içermeyen kalıp literal olarak okunur |
+| Makrolar | Projenin `.clj-kondo/config.edn` dosyasındaki `:lint-as` ve hook'lar, ayrıca `.clojure-atlas.edn` içindeki `:lint-as` | clj-kondo'ya öğretilmiş bir makronun içindeki kullanımlar kanıtlanmıştır | Öğretilmemiş bir makronun içindeki kullanımlar sezgiseldir ve hangi makro olduğu belirtilir |
+| Frontend durumu | `re-frame.alpha` dahil **re-frame** | Olay ve abonelik kayıtları, dispatch'ler, abonelik girdileri, aboneler | Olay kimliği hesaplanan bir dispatch UNKNOWN olur; `reg-fx` ve cofx handler'larının yaptıkları ve `:fx` sırası izlenmez |
+| Backend yönlendirmesi | **Compojure**, **Reitit**, **Pedestal** tablo rotaları | Yollar, bağlanmış rota kopyaları, handler'lar | bidi, compojure-api ve Pedestal ayrıntılı map rotaları okunmaz |
+| Middleware | **Ring**, Compojure `wrap-routes`, Reitit rota verileri ve `ring-handler` | Dış sarmalayıcılar dahil sıralı zincirler | Zincirler sezgiseldir; Pedestal service-map interceptor'ları okunmaz; okunamayan sarmalama UNKNOWN olarak raporlanır |
+| Rota yetkilendirmesi | Projenizin bildirdiği izin anahtarları, middleware ve fonksiyonlar | Hangi rotaların hangi izni kontrol ettiği | Küçük bir `.clojure-atlas.edn` gerekir; yoksa yanıt "kanıtlanamıyor" olur, asla "yok" olmaz |
+| Tarayıcı yönlendirmesi | **Reitit frontend**, **Secretary** | Graftaki istemci rotası düğümleri | Henüz hiçbir MCP aracı bunları listelemez |
+| HTTP istekleri | **cljs-ajax**, **cljs-http**, `js/fetch`, istek effect map'leri | Metot ve yola göre backend rotalarıyla birleştirilen istek noktaları | Çalışma zamanında oluşturulan bir URL birleştirilemeyebilir |
+| Veri | **Datomic**, **DataScript**, **XTDB v1 / Crux** | Öznitelikler, transaction yazmaları, sorgu ve pull okumaları | Kanıtlanmamış referanslar UNKNOWN satırları olarak tutulur; SQL (next.jdbc, HoneySQL) analizi yoktur |
+| Sistem yaşam döngüsü | **Integrant**, **Mount**, **Component** | Sistem anahtarları, kayıtlar, bağımlılık kenarları | Referans içermeyen Integrant sistemleri okunmaz |
+| Şemalar | **clojure.spec / cljs.spec**, **Malli** | Kayıtlı spec'ler, var'larda tutulan Malli şemaları | Malli registry'leri okunmaz; şemalar map'lere karşı doğrulanmaz |
+| Testler | **clojure.test / cljs.test**, **Playwright**, literal Hiccup seçicileri | Statik test bağlantıları | Playwright için isteğe bağlı TypeScript 5 gerekir; tip argümanı olmadan `test.extend` ile gelen bir fixture'ın sınıfı yoktur, bu yüzden bağlanmaz; koda HTTP veya `resolve` üzerinden ulaşan testler bağlanmaz |
+| Proje düzeni | **deps.edn**, **Leiningen**, **shadow-cljs**, **Babashka**, **Boot**, **Polylith** | Kaynak keşfi, bileşene göre gruplama | Build alias'ları ve görevleri analiz edilmez |
+
+Bir adaptör, bir kütüphanenin her kullanımını değil belirli kaynak formlarını tanır. `graph_info`, **sizin** projenizde hangi adaptörlerin etkinleştiğini raporlar. Fulcro, Pathom, HoneySQL ve next.jdbc ölçüm korpusunda yer alır; bu, özel adaptörleri olduğu anlamına gelmez. Eksikler [yol haritasında](ROADMAP.md) listelenir.
+
+## Yeniden çalıştırabileceğiniz gerçek örnekler
+
+Aşağıdaki alıntılar, herkese açık projelerin [corpus.json](corpus.json) içinde sabitlenmiş commit'lerinden oluşturulan ve [`examples/` içine commit edilmiş graflar](examples/) üzerindeki gerçek sunucu çıktılarıdır. `[S]` kanıtlanmış, `[H]` sezgisel, `[?]` bilinmeyen anlamına gelir. Her bloğun ilk satırı, ajanınızın yaptığı MCP araç çağrısıdır. Birini MCP istemcisi olmadan kendiniz çalıştırmak için bu deponun bir klonundan:
+
+```sh
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"signature_impact","arguments":{"fn":"clojure.realworld.user.core/login!","group_by":"none"}}}' \
+  | node src/cli.ts mcp --graph examples/polylith-realworld.json.gz \
+  | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).result.content[0].text'
+```
+
+Yukarıdaki `cart` yanıtları, `node src/cli.ts build test/fixtures/keys -o /tmp/cart.json.gz` komutundan ve `--graph /tmp/cart.json.gz` ile aynı pipe'tan gelir.
+
+### Bir fonksiyonun parametre kümesi ve yanında çağıranların geçirdikleri
+
+polylith-realworld içinde `login!` tek bir map alır ve destructuring ile `:email` ve `:password` anahtarlarını çıkarır:
+
+```text
+signature_impact {"fn": "clojure.realworld.user.core/login!", "group_by": "none", "limit": 3}
 ```
 
 ```text
 SIGNATURE_IMPACT clojure.realworld.user.core/login! — 4 caller(s) in 1 component(s); arities 1; no finding
 counts: arities=1 [S1]  callers=4 [S4]
-[... trimmed ...]
+findings: none (searched: arity mismatches, required destructured keys no caller passes, passed keys that look like a misspelling of a key the function reads)
 arities (1)
   1. [{:keys [email password]}]  components/user/src/clojure/realworld/user/core.clj:50 [S]  (4 caller(s))
 callers (4 S4)
   1. clojure.realworld.user.interface/login!: arity 1, arg0 symbol login-input (keys unknown)  components/user/src/clojure/realworld/user/interface.clj:6 [S]
   2. clojure.realworld.user.core-test/login--invalid-password--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:34 [S]
-[... trimmed ...]
+  3. clojure.realworld.user.core-test/login--user-not-found--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:27 [S]
+  +1 more (next page: offset=3 section="callers")
+next: blast_radius(var="clojure.realworld.user.core/login!", depth=2)
 ```
 
-Literal map'in anahtar kümesi görünür; `login-input` olarak geçirilen map bilinmez kalır. O satırdaki `[S]`,
-çağrı ilişkisini kanıtlar, çalışma zamanındaki map'in içeriğini değil.
+Literal bir map anahtarlarını gösterir. `login-input` olarak geçirilen map bilinmeyen kalır: o satırdaki `[S]`, çalışma zamanındaki bir map'in içeriğini değil çağrıyı kanıtlar.
 
 <details>
-<summary><strong>Parametre sözleşmesini değiştirin: login! ayrıca :tenant-id isterse ne olur?</strong></summary>
+<summary><strong><code>login!</code>, <code>:tenant-id</code> anahtarını zorunlu kılmaya başlarsa ne olur?</strong></summary>
 
 ```text
-signature_impact {"fn": "clojure.realworld.user.core/login!", "added_keys": [":tenant-id"], "group_by": "none"}
+signature_impact {"fn": "clojure.realworld.user.core/login!", "added_keys": [": tenant-id"], "group_by": "none", "limit": 4}
 ```
 
 ```text
 SIGNATURE_IMPACT clojure.realworld.user.core/login! — 3 caller(s) affected by the change (new keys: :tenant-id); 4 caller(s) in 1 component(s); arities 1; no finding
 counts: affected=4 [S3 ?1]  arities=1 [S1]  callers=4 [S4]
-[... trimmed ...]
+affected by the change (4 S3 ?1)
   1. clojure.realworld.user.core-test/login--invalid-password--return-negative-result does not pass :tenant-id  components/user/test/clojure/realworld/user/core_test.clj:34 [S]  (argument 0 passes {:email :password})
-[... trimmed ...]
+  2. clojure.realworld.user.core-test/login--user-not-found--return-negative-result does not pass :tenant-id  components/user/test/clojure/realworld/user/core_test.clj:27 [S]  (argument 0 passes {:email :password})
+  3. clojure.realworld.user.core-test/login--valid-input--return-positive-result does not pass :tenant-id  components/user/test/clojure/realworld/user/core_test.clj:42 [S]  (argument 0 passes {:email :password})
+  UNKNOWN: clojure.realworld.user.interface/login! may not pass :tenant-id at components/user/src/clojure/realworld/user/interface.clj:6 (argument 0 is not a literal map; its keys are not provable) — not provable; evidence at components/user/src/clojure/realworld/user/interface.clj:6
+findings: none (searched: arity mismatches, required destructured keys no caller passes, passed keys that look like a misspelling of a key the function reads)
+arities (1)
+  1. [{:keys [email password]}]  components/user/src/clojure/realworld/user/core.clj:50 [S]  (4 caller(s))
+callers (4 S4)
+  1. clojure.realworld.user.interface/login!: arity 1, arg0 symbol login-input (keys unknown)  components/user/src/clojure/realworld/user/interface.clj:6 [S]
+  2. clojure.realworld.user.core-test/login--invalid-password--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:34 [S]
+  3. clojure.realworld.user.core-test/login--user-not-found--return-negative-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:27 [S]
+  4. clojure.realworld.user.core-test/login--valid-input--return-positive-result: arity 1, arg0 {:email :password}  components/user/test/clojure/realworld/user/core_test.clj:42 [S]
+next: blast_radius(var="clojure.realworld.user.core/login!", depth=2)
 ```
 
-Üç literal-map çağıranın hepsi önerilen anahtarı atlıyor. Dördüncü çağıran `login-input`'u iletiyor, dolayısıyla
-etkisi **UNKNOWN**'dur. Bu varsayımsal bir sözleşme değişikliğidir; araç kaynağı değiştirmez. “No finding”
-mevcut imzayı ifade eder; `affected` bölümü önerilen değişikliği anlatır.
+Literal map geçiren üç çağıran yeni anahtarı içermez. Dördüncüsü `login-input` aktarır; bu yüzden satırı UNKNOWN olur. Hiçbir şey değiştirilmez; bu, henüz yapmadığınız bir değişiklik hakkında bir sorudur.
 
 </details>
 
 <details>
-<summary><strong>Proje genelinde :email'in sağlayıcılarını ve tüketicilerini bulun</strong></summary>
+<summary><strong><code>:email</code> üretenler ve tüketenler</strong></summary>
 
 ```text
-key_flow {"key": ":email", "group_by": "none", "limit": 2}
+key_flow {"key": ": email", "group_by": "none", "limit": 3}
 ```
 
 ```text
 KEY_FLOW :email — 9 producer(s), 5 consumer(s) in 1 component(s); 23 site(s) in tests
 counts: producers=9 [S9]  consumers=5 [S5]  tests=23 [S23]
-[... trimmed ...]
+note: key_flow: switched on by keywords in code
+note: UNKNOWN: 3 other use(s) of :email as a value or an argument — not provable as produce or consume; evidence: textual occurrences of :email
+note: a key read or written only dynamically (held in a local, built with keyword, merged from another map) is not tracked
+note: :email is unqualified: every map using that name is joined here
+producers (9 S9)
+  1. clojure.realworld.user.core/register! (map-literal)  components/user/src/clojure/realworld/user/core.clj:60 [S]  fan-in 5
+  2. clojure.realworld.user.core/register! (map-literal)  components/user/src/clojure/realworld/user/core.clj:64 [S]  fan-in 5
+  3. clojure.realworld.user.core/login! (map-literal)  components/user/src/clojure/realworld/user/core.clj:56 [S]  fan-in 4
+  +6 more (next page: offset=3 section="producers")
+consumers (5 S5)
+  1. clojure.realworld.user.core/register! (destructure)  components/user/src/clojure/realworld/user/core.clj:58 [S]  fan-in 5
+  2. clojure.realworld.user.core/login! (destructure)  components/user/src/clojure/realworld/user/core.clj:50 [S]  fan-in 4
+  3. clojure.realworld.user.core/update-user! (destructure)  components/user/src/clojure/realworld/user/core.clj:80 [S]  fan-in 4
+  +2 more (next page: offset=3 section="consumers")
+in tests (23 S23)
+  1. clojure.realworld.user.core-test/login--invalid-password--return-negative-result (map-literal) produces  components/user/test/clojure/realworld/user/core_test.clj:32 [S]
+  2. clojure.realworld.user.core-test/login--invalid-password--return-negative-result (map-literal) produces  components/user/test/clojure/realworld/user/core_test.clj:34 [S]
+  3. clojure.realworld.user.core-test/login--user-not-found--return-negative-result (map-literal) produces  components/user/test/clojure/realworld/user/core_test.clj:27 [S]
+  +20 more (next page: offset=3 section="tests")
 ```
 
-Sonuç, `register!` içindeki map-literal üreticilerini ve `login!` dahil destructuring tüketicilerini kaynak
-konumlarıyla listeler. `:email` nitelikli olmadığından, bu keyword'ü kullanan her map birlikte gruplanır; bu,
-belirli bir üreticinin map'inin belirli bir tüketiciye ulaştığını kanıtlamaz.
+`:email` namespace ile nitelenmemiştir; bu yüzden keyword'ü kullanan her map burada gruplanır. Bu, bir üreticinin map'inin bir tüketiciye ulaştığını kanıtlamaz.
 
 </details>
 
 <details>
-<summary><strong>Refactor öncesi çağıranları bulun</strong></summary>
+<summary><strong>Refactoring öncesi çağıranlar</strong></summary>
 
-**Soru:** `integrant.core/dependent-keys` fonksiyonunu kim çağırıyor?
+integrant'tan:
 
 ```text
 callers {"var": "integrant.core/dependent-keys"}
@@ -210,10 +280,12 @@ next: blast_radius(var="integrant.core/dependent-keys", depth=2)  tests_for(symb
 </details>
 
 <details>
-<summary><strong>Bir re-frame event'ini dispatch noktaları ve handler'ı boyunca izleyin</strong></summary>
+<summary><strong>Bir re-frame olayı: dispatch noktaları ve handler</strong></summary>
+
+re-frame'den:
 
 ```text
-event_flow {"name": ":delete-todo"}
+event_flow {"name": ": delete-todo"}
 ```
 
 ```text
@@ -226,47 +298,51 @@ event :delete-todo: dispatched by (2 S2)
     2. todomvc.views/todo-item  examples/todomvc/src/todomvc/views.cljs:47 [S]
 event :delete-todo: handler (1)
   1. :delete-todo event handler  examples/todomvc/src/todomvc/events.cljs:188 [S]  entry: event handler
-[... trimmed ...]
+event :delete-todo: handler dispatches: none (searched: dispatches edges out of the handler)
+event :delete-todo: handler requests: none (searched: issues_request edges out of the handler)
+next: tests_for(symbol=":delete-todo")
 ```
 
-Bağlantı bir event keyword'ü üzerinden kurulur; bu yüzden yalnızca adlandırılmış bir fonksiyonun çağıranlarına bakmak onu kaçırırdı.
+Bağlantı bir olay keyword'ü üzerinden kurulur; dolayısıyla adlandırılmış bir fonksiyonun çağıranlarını aramak bunu kaçırır.
 
 </details>
 
 <details>
-<summary><strong>Bir endpoint'in önündeki middleware'i ve Atlas'ın neyi kontrol edemediğini görün</strong></summary>
+<summary><strong>Bir endpoint'in önündeki middleware ve kontrol edilemeyenler</strong></summary>
 
-polylith-realworld'den; burada route'lar ayrı bir tanımda Ring middleware ile sarmalanıyor:
+polylith-realworld'den:
 
 ```text
-route_authz {"route": "POST /api/articles"}
+route_authz {"route": "POST /api/articles", "limit": 3}
 ```
 
 ```text
 ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
 counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
 note: capability route_authz is absent: an empty answer is not proof of absence
-[... trimmed ...]
+note: POST /api/articles @clojure.realworld.rest-api.api/private-routes: 11 sibling route(s) in bases/rest-api/src/clojure/realworld/rest_api/api.clj: 0 check a permission, 0 exempt, 0 neither, 11 unknown (not provable from this graph)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): verdict not provable: route authz not in this graph (1)
+  1. POST /api/articles @clojure.realworld.rest-api.api/private-routes  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
   1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
 POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
   1. clojure.realworld.rest-api.middleware/wrap-cors  bases/rest-api/src/clojure/realworld/rest_api/api.clj:61 [H]  heuristic match  (#0 wrapper)
   2. ring.middleware.json/wrap-json-response  bases/rest-api/src/clojure/realworld/rest_api/api.clj:60 [H]  heuristic match  (#1 wrapper)
-[... trimmed ...]
-  10. clojure.realworld.rest-api.middleware/wrap-auth-user  bases/rest-api/src/clojure/realworld/rest_api/api.clj:46 [H]  heuristic match  (#9 wrapper)
-  +1 more (next page: offset=10 section="middleware")
+  3. clojure.realworld.rest-api.middleware/wrap-exceptions  bases/rest-api/src/clojure/realworld/rest_api/api.clj:59 [H]  heuristic match  (#2 wrapper)
+  +8 more (next page: offset=3 section="middleware")
 POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): permissions: not extracted (route_authz is absent)
+POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): exempt: not extracted (route_authz is absent)
+next: tests_covering(target="POST /api/articles")
 ```
 
-Handler kanıtlanmıştır; on bir sarmalayıcı sırayla bulunur ancak `[H]` ile işaretlenir, çünkü middleware kompozisyonu
-çalışma zamanı kodudur. Proje izin kuralı bildirmediğinden Atlas, route'un izin kontrolü olmadığını iddia etmek yerine
-**not extracted** der.
+Handler kanıtlanmıştır. Sarmalayıcılar sırasıyla bulunur ve middleware bileşimi çalışma zamanı kodu olduğundan `[H]` ile işaretlenir. Proje izin kuralı bildirmediği için yanıt "kontrol yok" değil, **çıkarılmadı** olur.
 
 </details>
 
 <details>
-<summary><strong>Dürüst bir ıskalama: kullanılan ama hiç tanımlanmayan bir ad</strong></summary>
+<summary><strong>Dürüstçe belirtilen bir eksik: kullanılan ama hiç tanımlanmayan bir ad</strong></summary>
 
-next.jdbc'den; burada bir makro, clj-kondo'nun açamadığı yardımcı fonksiyonlar üretiyor:
+Bir makronun clj-kondo'nun açamadığı fonksiyonları ürettiği next.jdbc'den:
 
 ```text
 callers {"var": "next.jdbc.types/as-other"}
@@ -278,19 +354,17 @@ note: next.jdbc.types/as-other is used at test/next/jdbc/sql_test.clj:290, test/
 note: use a fully qualified name (ns/name)
 ```
 
-“Bulunamadı, yazımı kontrol edin” demek yerine yanıt, adın nerede kullanıldığını ve nasıl görünür kılınacağını gösterir.
-Makro için bir `:lint-as` girdisiyle aynı soru kanıtlanmış bir tanım döndürür
-([proje yapılandırması](docs/GUIDE.md#project-configuration)).
+Yanıt, adın nerede kullanıldığını ve nasıl görünür kılınacağını gösterir. Makro için bir `:lint-as` girdisiyle aynı soru kanıtlanmış bir tanım döndürür ([proje yapılandırması](docs/GUIDE.md#project-configuration)). next.jdbc korpustadır, commit edilmiş örnek graflar arasında değildir.
 
 </details>
 
 <details>
-<summary><strong>Değişen satırları inceleme bağlamına ve ilgili testlere dönüştürün</strong></summary>
+<summary><strong>İnceleme bağlamına ve ilgili testlere dönüştürülen değişmiş satırlar</strong></summary>
 
 polylith-realworld'den:
 
 ```text
-context_for_change {"changes": ["components/article/src/clojure/realworld/article/store.clj:60-80"]}
+context_for_change {"changes": ["components/article/src/clojure/realworld/article/store.clj:60-80"], "limit": 3}
 ```
 
 ```text
@@ -299,52 +373,44 @@ counts: changed symbols=3 [S3]  callers outside the diff=9 [S9]  tests to run=24
 [... trimmed ...]
 ```
 
-Tam yanıt; üç değişen tanımı, diff dışındaki dokuz çağıranı ve component'lere göre gruplanmış 24 ilgili testi listeler.
-`LOW`, grafın yaptığı kontrolleri tanımlar; bir güvenlik garantisi değildir.
+Tam yanıt, değişen üç tanımı, diff dışındaki dokuz çağıranı ve ilgili 24 testi listeler ([tam transkript](docs/GUIDE.md#context_for_change)). `LOW`, grafın yapabildiği kontrolleri tanımlar. Bir güvenlik garantisi değildir.
 
 </details>
 
-[Daha fazla gerçek örnek](examples/README.md) · [Tüm araçlar ve tam çıktılar](docs/GUIDE.md#tools)
+[Daha fazla transkript](examples/README.md) · [Tam yanıtıyla her araç](docs/GUIDE.md#tools)
 
 ## Hızlı başlangıç
 
-**Ön koşullar:** Node.js **22.18+** ve Git. JVM veya Babashka çalışma zamanı gerekmez.
+**Ön koşullar:** Node.js **22.18+** ve Git. JVM ve Babashka gerekmez.
 
 ### 1. Kurun ve bir graf oluşturun
 
-**Analiz etmek istediğiniz Clojure projesinin** kök dizininden çalıştırın:
+**Analiz etmek istediğiniz Clojure projesinin** kök dizininden:
 
 ```sh
-# Install the reviewed source revision (Git installation builds the CLI).
-npm install --save-dev \
-  'git+https://github.com/Bariscanates404/clojure-atlas.git#8634d33e3ed59d420eead61a9c596f752d1fe789'
-
+npm install --save-dev 'git+https://github.com/Bariscanates404/clojure-atlas.git'
 npx clojure-atlas build
 ```
 
-Paket şu anda npm'de yayımlanmış değildir; yukarıdaki Git kurulumunu kullanın. Depo özel olduğu sürece depoya erişim
-gerekir. Kaynaktan kurulum, CLI'yi derlemek için TypeScript ve Node tip tanımlarını kullanır; bunlar derleme zamanı
-bağımlılıklarıdır ve zorunlu npm çalışma zamanı bağımlılığının olmamasından ayrıdır.
+Paket npm registry'de değildir; Git'ten kurulur ve kurulum CLI'ı derler. İncelediğiniz revizyonu sabitlemek için URL'ye `#<commit-sha>` ekleyin. TypeScript ve Node tip tanımları yalnızca bu derleme adımında gerekir; kurulu CLI'ın zorunlu npm çalışma zamanı bağımlılığı yoktur.
 
-Graf `.clojure-atlas/graph.json.gz` dosyasına kaydedilir. İlk build, sabitlenmiş clj-kondo ikili dosyasını indirir ve doğrular;
-sonraki analizler önbellekteki ikili dosyayı kullanır. `.clojure-atlas/` dizinini projenizin `.gitignore` dosyasına ekleyin.
+Graf `.clojure-atlas/graph.json.gz` konumuna yazılır. İlk build sabitlenmiş clj-kondo binary'sini indirir ve SHA-256 değerini kontrol eder; sonraki build'ler önbellekteki binary'yi kullanır. `.clojure-atlas/` dizinini `.gitignore` dosyanıza ekleyin.
 
 ### 2. MCP istemcinizi bağlayın
 
-Claude Code için proje yapılandırmasını önce önizleyin, sonra yazın:
+Claude Code için önce proje yapılandırmasını önizleyin, ardından yazın:
 
 ```sh
 npx clojure-atlas init         # preview .mcp.json
-npx clojure-atlas init --yes   # write it; keep existing servers
+npx clojure-atlas init --yes   # write it; existing servers are kept
 ```
 
-Sunucuyu istemcinizde etkinleştirin, ardından projenizdeki tam nitelikli bir `ns/name` üzerinde `graph_info` ve `callers`
-kullanmasını isteyin.
+Ardından ajandan `graph_info` çağırmasını ve projenizden tam nitelikli bir `ns/name` üzerinde `callers` çağırmasını isteyin.
 
 <details>
-<summary><strong>Başka bir MCP istemcisini yapılandırın</strong></summary>
+<summary><strong>Başka bir MCP istemcisi</strong></summary>
 
-Atlas **stdio üzerinden MCP** kullanır. İstemciyi, onu proje kökünüzden başlatacak şekilde yapılandırın:
+Atlas, **stdio üzerinden MCP** kullanır. Projenizin kök dizininden başlatın:
 
 ```json
 {
@@ -357,86 +423,101 @@ Atlas **stdio üzerinden MCP** kullanır. İstemciyi, onu proje kökünüzden ba
 }
 ```
 
-İstemci sunucuları başka bir yerde başlatıyorsa, kurulu CLI, graf ve depo için istemcinin çalışma dizini ayarını
-veya mutlak yolları kullanın. İstemci yapılandırma biçimleri farklılık gösterebilir.
+İstemci sunucuları başka bir yerde başlatıyorsa çalışma dizinini ayarlayın veya CLI, graf ve depo için mutlak yollar kullanın. Yapılandırma biçimleri istemciler arasında farklılık gösterir.
 
 </details>
 
 ### 3. Değişikliklerden sonra yeniden oluşturun
 
 ```sh
-npx clojure-atlas build       # refresh the snapshot
-npx clojure-atlas coverage   # inspect resolution counts and unresolved names
+npx clojure-atlas build      # refresh the snapshot
+npx clojure-atlas coverage   # resolution counts and unresolved names
 ```
 
-İzleme (watch) modu yoktur. `--repo` ile, çalışma ağacı artık grafla eşleşmediğinde sorgular `STALE` uyarısı verir.
-Yeni grafı yüklemesi için yeniden oluşturduktan sonra MCP sunucusunu yeniden başlatın.
+Watch modu yoktur. `--repo` kullanıldığında çalışma ağacı artık grafla eşleşmiyorsa yanıtlar `STALE` ile başlar. Yeni grafı yüklemesi için yeniden oluşturmadan sonra MCP sunucusunu yeniden başlatın.
 
-**Zaten clj-kondo yapılandırmanız var mı?** Atlas, projenin `.clj-kondo/config.edn` dosyasını, makro eşlemeleri ve
-hook'ları dahil uygular. İsteğe bağlı bir `.clojure-atlas.edn`, özel route makroları ve yetkilendirme kuralları ekler.
-[Proje yapılandırması](docs/GUIDE.md#project-configuration) ve [yetkilendirme fixture'ı](test/fixtures/authz/.clojure-atlas.edn) bölümlerine bakın.
+**Makrolar ve clj-kondo yapılandırmanız.** Atlas, `:lint-as` ve hook'lar dahil projenin `.clj-kondo/config.edn` yapılandırmasını uygular. `defn` olarak lint edilen makro bir imza alır; clj-kondo'ya öğretilmemiş makronun içindeki kullanımlar sezgisel olur ve yanıt makronun adını belirtir. İsteğe bağlı `.clojure-atlas.edn`, rota makroları ve yetkilendirme kuralları ekler: [proje yapılandırması](docs/GUIDE.md#project-configuration), [yetkilendirme fixture'ı](test/fixtures/authz/.clojure-atlas.edn).
 
-## Bir yanıt nasıl okunur
+## Bir yanıtı okuma
 
-| İşaret | Anlamı | Nasıl kullanılır |
+| İşaret | Anlamı | Nasıl kullanılmalı |
 |---|---|---|
-| `[S]` — `STATIC_PROVEN` | clj-kondo tarafından çözümlendi veya literal bir kaynak formundan belirlendi | Atıf yapılan kaynak konumunu izleyin |
-| `[H]` — `HEURISTIC` | Bir addan, sarmalayıcıdan, thread edilmiş yuvadan veya dispatch adayından çıkarıldı | İlişkiyi kaynakta doğrulayın |
-| `[?]` — `UNKNOWN` | Statik olarak karara bağlanamaz | Bunu bir analiz sınırı olarak değerlendirin |
+| `[S]` `STATIC_PROVEN` | clj-kondo tarafından çözümlenmiş veya literal bir kaynak formundan okunmuş | Gösterilen `file:line` konumuna gidin |
+| `[H]` `HEURISTIC` | Bir addan, sarmalayıcıdan, threading konumundan, dispatch adayından veya Atlas'ın içini göremediği bir makrodan çıkarılmış | Buna dayanarak işlem yapmadan önce gösterilen satırı açın |
+| `[?]` `UNKNOWN` | Statik olarak belirlenemez | Bunu grafın bildiklerinin sınırı olarak değerlendirin |
 
-**Boş bir sonuç otomatik olarak yokluğun kanıtı değildir.** Atlas “hiçbiri bulunamadı”, “tanım bulunamadı” ve “yetenek
-mevcut değil” durumlarını birbirinden ayırır. `DEGRADED` eksik analizi, `STALE` güncelliğini yitirmiş bir anlık
-görüntüyü bildirir. Sıfır test sayısı, statik bir bağlantı bulunmadığı anlamına gelir; kodun test edilmediği anlamına gelmez.
+**Boş bir yanıt, yokluğun kanıtı değildir.** Atlas, "hiçbiri bulunamadı", "tanım bulunamadı" ve "bu grafta yetenek yok" durumlarını ayırır. `DEGRADED`, analizin bir bölümünün eksik olduğunu; `STALE`, anlık görüntünün eski olduğunu bildirir. Sıfır test, kodun test edilmediği değil, statik bir bağlantı bulunamadığı anlamına gelir.
+[Kanıt sınıfları ve yokluk hakkında ayrıntılar](docs/GUIDE.md#bands-and-absence)
 
-Dinamik dispatch, çalışma zamanında oluşturulan sembol'ler ve proje makroları grafın görebildiklerini sınırlayabilir. Okunamayan
-middleware unknown olarak bildirilir. Route izinleri açık proje yapılandırması gerektirir.
-[Kanıt ve yokluk](docs/GUIDE.md#bands-and-absence) · [Bilinen sınırlar](docs/GUIDE.md#limits)
+## Sınırlamalar
 
-## Tasarım gereği yerel
+> [!WARNING]
+> **Atlas'ın kaçırabilecekleri. Boş bir yanıta güvenmeden önce bunu okuyun.**
+>
+> - **clj-kondo'ya öğretilmemiş bir makronun oluşturduğu tanımlar.** Projedeki bir `defthing` veya clj-kondo yapılandırması sunmayan bir kütüphane DSL'i, grafın içermediği var'lar tanımlar: çağıranları *çözümlenmemiş* görünür ve böyle bir makronun içindeki kod yalnızca sezgiseldir. DataScript'in korpusta 89.9% çözümleme oranına sahip olmasının nedeni budur. Makroyu clj-kondo'ya öğretin (`.clj-kondo/config.edn` içinde `:lint-as` veya bir hook), yeniden oluşturun; geri gelirler. Yanıt makronun adını belirtir.
+> - **Çalışma zamanında belirlenen her şey.** Hesaplanan bir sembolden `resolve` ile bulunan var, bir map'ten seçilen fonksiyon, `apply` veya `partial` arkasındaki argüman sayısı, `keyword` ile oluşturulan anahtar, birleştirilen veya iletilen map. Bunlar UNKNOWN olarak raporlanır, asla tahmin edilmez.
+> - **Dispatch.** Multimethod veya protokol çağrısının hedefleri kanıt değil, adaydır.
+> - **`ns` formu olmayan betikler** (REPL eğitimleri): day-of-datomic 74.3% çözümleme oranına sahiptir.
+> - **clj-kondo'nun ayrıştıramadığı dosyalar ve 2 MB üzerindeki dosyalar.** Tanımları eksik olur; bu durumda her yanıt `DEGRADED` ile başlar ve bu dosyaları adlandırır.
 
-Çekirdek CLI'nin **zorunlu npm çalışma zamanı bağımlılığı yoktur**. Node'un standart kütüphanesini, Clojure analizi için
-clj-kondo'yu ve depo meta verileri için Git'i kullanır. Grafı yerel olarak oluşturur ve sorgular; Atlas hesabı, barındırılan
-dizin veya bulut hizmeti gerekmez.
+- **Yalnızca statik.** Çalışma zamanında çözümlenen var'lar, veriye göre seçilen fonksiyonlar ve `keyword` ile oluşturulan anahtarlar izlenmez.
+- **Map anahtarları keyword geçişleridir** ve iç içe map'ler, [yukarıda](#sağlayıcı--parametre-kümesi--tüketici) anlatıldığı gibi dış anahtarları sağlar. Yol duyarlı veri akışı yoktur.
+- **İsteğe bağlı anahtarlar gövdenin yapısından okunur.** Fonksiyon içinde yeniden bağlanan bir ad izlenmez; bu yüzden isteğe bağlı olmayan bir anahtar isteğe bağlı olarak adlandırılabilir. Tersi olmaz.
+- **Makrolar.** clj-kondo bir makronun içini yalnızca `:lint-as` girdisi veya hook ile görür. Atlas'ın listelemediği bir binding makrosundaki `:keys` içermeyen binding kalıbı, map literal'ı olarak okunur.
+- **Middleware ve izinler.** Zincirler sezgiseldir; rota izinleri `.clojure-atlas.edn` gerektirir.
+- **Artımlı build yoktur.** Değişikliklerden sonra yeniden oluşturun.
+- **Windows test edilmemiştir.**
+
+Tam liste [kılavuzda](docs/GUIDE.md#limits), planlananlar [yol haritasında](ROADMAP.md) yer alır.
+
+## Tasarımı gereği yerel
+
+Temel CLI'ın **zorunlu npm çalışma zamanı bağımlılığı yoktur**. Node'un standart kütüphanesini, analiz için clj-kondo'yu ve depo meta verileri için Git'i kullanır. Graf makinenizde oluşturulur ve sorgulanır: hesap yok, barındırılan indeks yok, telemetri yok.
 
 ### Gereksinimler
 
 | Bileşen | Rol |
 |---|---|
-| Node.js 22.18+ | CLI'yi ve MCP sunucusunu çalıştırır |
-| clj-kondo 2025.10.23 | Yerel analizör; bir kez indirilir ve önbelleğe alınır, arşiv SHA-256'sı sabitlenmiştir |
-| Git | Kaynaktan kurulum, izlenen dosya kontrolleri ve anlık görüntü/eskime bilgisi |
-| TypeScript 5 — çalışma zamanında isteğe bağlı | Playwright page object ve test analizi; Atlas'ın yanına `npm i -D typescript@5` ile kurun |
+| Node.js 22.18+ | CLI'ı ve MCP sunucusunu çalıştırır |
+| clj-kondo 2025.10.23 | Yerel analizör; bir kez indirilip önbelleğe alınır, arşiv SHA-256 değeri sabitlenmiştir |
+| Git | Git üzerinden kurulum, izlenen dosya kontrolleri, anlık görüntü ve güncellik bilgisi |
+| TypeScript 5, isteğe bağlı | Yalnızca Playwright page-object ve test analizi; Atlas'ın yanına `npm i -D typescript@5` |
 
-Sabitlenmiş ikili dosyalar macOS arm64/x64, Linux arm64/x64 ve Windows x64 için mevcuttur. Geliştirme ve korpus
-ölçümlerinde macOS arm64 kullanıldı; **Windows test edilmemiştir**. İndirme mümkün değilse, bir proxy arkasında olmak
-dahil, Atlas `PATH` üzerindeki çalışan bir `clj-kondo`'ya geri dönebilir. [Platform ve önbellek ayrıntıları](docs/GUIDE.md#requirements).
+macOS arm64/x64, Linux arm64/x64 ve Windows x64 için sabitlenmiş binary'ler mevcuttur. Geliştirme ve korpus ölçümleri macOS arm64 üzerinde yapıldı. İndirme mümkün değilse, örneğin proxy arkasında, Atlas `PATH` üzerindeki bir `clj-kondo` kullanmaya geçer. [Platform ve önbellek ayrıntıları](docs/GUIDE.md#requirements)
 
 ### Güvenlik
 
-Küçük bir bağımlılık yüzeyi yardımcı olur, ancak **zorunlu npm bağımlılığının olmaması sıfır tedarik zinciri riski anlamına gelmez**.
+Az bağımlılık saldırı yüzeyini azaltır. Tedarik zinciri garantisi **vermez**.
 
-- İndirilen clj-kondo arşivleri sabitlenmiş bir SHA-256'ya karşı kontrol edilir. Eşleşmeyen bir indirme reddedilir;
-  `PATH` üzerindeki yedek çalıştırılabilir dosyaya ayrıca güvenilir ve o sabitlenmiş arşiv karmasına karşı doğrulanmaz.
-- Atlas, analiz edilen uygulamanın JVM'ini, kabuk betiklerini veya Node kodunu başlatmaz. **Proje clj-kondo hook'ları
-  clj-kondo tarafından yorumlanır**, dolayısıyla bir depoyu analiz ederken yapılandırması güvendiğiniz kodun parçasıdır.
-- MCP sunucusu grafı okur ve salt okunur Git kontrolleri kullanır. Bu kontroller için Git komut hook'ları, filtre sürücüleri
-  ve fsmonitor devre dışıdır; Git ve clj-kondo alt süreçlerinin zaman aşımı vardır.
-- Atlas sonuçları yerel olarak stdio üzerinden sunar. Seçtiğiniz AI/MCP istemcisinin bu sonuçları nasıl ele aldığı ayrı
-  bir gizlilik sınırıdır.
+- İndirilen clj-kondo arşivi sabitlenmiş SHA-256 ile karşılaştırılır ve eşleşmezse reddedilir. `PATH` üzerinden alınan `clj-kondo`, kurduğunuz haliyle güvenilir kabul edilir; bu hash ile karşılaştırılmaz.
+- Atlas, analiz edilen uygulamanın JVM'ini, shell betiklerini veya Node kodunu başlatmaz. **Projenin clj-kondo hook'ları clj-kondo tarafından yorumlanır**; dolayısıyla bir depoyu analiz ederken bu yapılandırma güvendiğiniz koddur.
+- MCP sunucusu grafı okur; Git hook'ları, filter driver'lar ve fsmonitor devre dışıyken, zaman aşımı sınırlarıyla salt okunur Git kontrolleri çalıştırır.
+- Sonuçlar stdio üzerinden yerel olarak sunulur. Yapay zekâ istemcinizin bunlarla ne yaptığı ayrı bir gizlilik sınırıdır.
 
-Bunlar uygulama özellikleridir, bir güvenlik denetimi sertifikasyonu değildir. [Ayrıntılı yürütme modeli](docs/GUIDE.md#security).
+Bunlar uygulamanın özellikleridir; bir güvenlik denetiminin sonucu değildir.
+[Çalıştırma modeli](docs/GUIDE.md#security)
 
-## Kapsam
+## Ölçümler
 
-[corpus.json](corpus.json) içinde her biri bir commit'e sabitlenmiş **26 herkese açık depo** üzerinde ölçüldü. Korpus
-Babashka, Logseq, Metabase, Penpot, re-frame, Reitit ve daha küçük kütüphaneleri içerir. Tam sonuçlar
-[docs/COVERAGE.md](docs/COVERAGE.md) içindedir.
+Her biri [corpus.json](corpus.json) içinde bir commit'e sabitlenmiş **26 herkese açık depoda** ölçüldü. Tam tablo: [docs/COVERAGE.md](docs/COVERAGE.md).
 
-**Çözümleme oranı belirli bir şeyi ölçer:** tanınan proje ad alanlarına atfedilen var kullanımları için
-`resolved / (resolved + unresolved)`. Kütüphane kullanımları ve **bilinmeyen ad alanı kullanımları bu paydanın dışındadır**.
-Anlaşılan tüm kodu, çıkarılan tüm framework davranışını veya çalışma zamanı doğruluğunu ölçmez.
+| Bir bakışta | |
+|---|---|
+| Grafa dönüştürülebilen depolar | **26 / 26**, çökme yok, 0 düşürülen kenar |
+| Okunan içeriğin boyutu | 10,158 kaynak dosyası, 141,604 tanım, 1,927,681 kenar |
+| Proje namespace'lerinde tanımına bağlanan var kullanımları | **601,991 / 602,877 (99.85%)**; 886 çözümlenmemiş |
+| Depo başına | medyan 100.0%; 24 / 26 depo 99.3% veya üzerinde; altındaki ikisi 89.9% ve 74.3% |
+| clj-kondo'nun herhangi bir namespace'e atayamadığı semboller | **18,517**, sayılır ve gösterilir; bağlanmaz ve orana dahil edilmez |
+| clj-kondo'nun tam ayrıştıramadığı dosyalar | 24 |
+| Yanıtları elle kontrol edilmiş benchmark | 14 / 14 pozitif soru, 7 / 7 yokluk sorusu |
 
-| Depo | Resolved | Unresolved | Çözümleme oranı | Bilinmeyen ad alanı (ham sayı, hariç) |
+Bu sayılar, bu projelerde kodun *statik* yapısının ne kadarının grafa ulaştığını gösterir. Sizin projeniz için bir vaat değildir: clj-kondo'ya öğretilmemiş makrolar üzerine kurulu bir kod tabanı, yapılandırılana kadar Metabase'den çok DataScript'e yakın olacaktır. `npx clojure-atlas coverage`, projeniz için aynı sayıları yazdırır.
+
+### Yanında sayılarıyla çözümleme oranı
+
+**Çözümleme oranı**, clj-kondo'nun bir proje namespace'ine atadığı var kullanımları için `resolved / (resolved + unresolved)` değeridir. Analizin doğruluğu değildir. Kütüphane kullanımları ve **namespace'i bilinmeyen kullanımlar** bunun dışındadır: clj-kondo'nun herhangi bir namespace'e atayamadığı semboller, bilmediği bir makronun bağladığı yerel değişkenler veya grafın kaçırdığı var kullanımları olabilir. Statik olarak bunları ayırmanın yolu yoktur; bu yüzden ham sayı olarak gösterilir ve hiçbir zaman orana katılmazlar.
+
+| Depo | Çözümlenmiş | Çözümlenmemiş | Çözümleme oranı | Bilinmeyen namespace (ham, oran dışında) |
 |---|---:|---:|---:|---:|
 | Metabase | 311,181 | 111 | 100.0% | 9,522 |
 | Penpot | 124,814 | 13 | 100.0% | 1,888 |
@@ -450,59 +531,56 @@ Anlaşılan tüm kodu, çıkarılan tüm framework davranışını veya çalış
 | Integrant | 442 | 0 | 100.0% | 0 |
 | DataScript † | 4,392 | 496 | 89.9% | 1,255 |
 | day-of-datomic † | 84 | 29 | 74.3% | 1 |
-| **Tüm 26 depo** | | | **medyan 100.0%; 26 depodan 24'ü 99.3% veya üzeri** | |
+| **26 deponun tamamı** | | | **medyan 100.0%; 24 / 26 depo 99.3% veya üzerinde** | **toplam 18,517** |
 
-† [docs/COVERAGE.md](docs/COVERAGE.md#repos-under-95-resolution-rate-or-with-unknown-namespace-usages-above-5-of-resolved)
+† [docs/COVERAGE.md içinde açıklanmıştır](docs/COVERAGE.md#repos-under-95-resolution-rate-or-with-unknown-namespace-usages-above-5-of-resolved)
 
-Oranlar bir ondalığa yuvarlanmıştır. Bunları her zaman **hem** unresolved hem de bilinmeyen ad alanı sayılarıyla birlikte okuyun.
-Bilinmeyen adlar, kaçırılan var kullanımlarının yanı sıra alışılmadık makrolarla bağlanan yerel değişkenleri de içerebilir; analizör
-bunları güvenilir biçimde ayıramaz.
+**Tanımın değişmesi bir iyileşme değildir.** Bu projenin ilk kapsam raporu `resolved + unresolved + unknown` değerine bölüyor ve Babashka'yı 87.0% gösteriyordu. Bugünkü 99.6%, yukarıdaki tanımı kullanır. Bu farkın neredeyse tamamı paydadan kaynaklanır: namespace'i bilinmeyen kullanımlar orandan çıkarıldı, çözümlenmiş hale gelmediler ve 2,176 tanesi hâlâ son sütundadır. İki tanımın oranlarını birbiriyle karşılaştırmayın.
 
-**Metrik değişiklikleri analizör iyileştirmesi değildir.** Önceki rakamlar farklı bir payda kullanıyordu. Babashka'nın
-bildirilen daha yüksek oranı büyük ölçüde bilinmeyen ad alanı sembollerinin dışarıda bırakılmasını yansıtır, yeni çözümlenen kodu değil.
-Bu tanımlar arasındaki karşılaştırmalar denk değildir; yukarıdaki ham sayılar bilerek görünür bırakılmıştır.
+### Çıkarımın gerçekte kazandırdıkları
 
-### Gerçek çıkarım iyileştirmeleri
+Atlas'ın okuduklarındaki değişiklikler; her biri bir fixture veya testle, yukarıdaki orandan ayrı tutulmuştur.
 
-Bunlar, çözümleme oranı tanımından ayrı olarak, Atlas'ın okuyabildiği şeydeki somut değişikliklerdir:
-
-| İyileştirme | Gözlemlenebilir sonuç | Kanıt |
+| Değişiklik | Ölçülen sonuç | Kanıt |
 |---|---|---|
-| Dıştaki Ring/Compojure middleware'ini okuma | polylith-realworld: `POST /api/articles` için **0 → 11** middleware girdisi | [Benchmark q13](docs/BENCHMARK.md#positive-questions), [fixture](test/fixtures/ring-middleware/) |
-| Başka bir ad alanındaki frontend route tablolarını okuma | Logseq: **0 → 17** istemci route düğümü | [Kapsam](docs/COVERAGE.md), [benchmark q14](docs/BENCHMARK.md#positive-questions) |
-| `re-frame.alpha`'yı tanıma | Alpha ad alanı üzerinden yapılan kayıtlar ve dispatch'ler çıkarılır | [Benchmark geçmişi](docs/BENCHMARK.md), [fixture](test/fixtures/reframe/src/app/alpha.cljs) |
-| Projenin clj-kondo yapılandırmasını uygulama | Projenin makro eşlemeleri ve hook'ları analize katılır | [Yapılandırma fixture'ı](test/fixtures/project-config/), [testler](test/config.test.ts) |
+| Map literal'ını binding kalıbından ayırma | Korpustaki 26 depoda: **5,475** üretici noktası kazanıldı (döndürülen vektördeki map'ler, hiccup, rota verileri, `(d/transact conn [{…}])`); **703** keyword değeri artık kanıtlanmış "destructure" tüketicileri olarak listelenmiyor; **5,268** `:keys` / `:as` / `:or` girdisi artık üretilmiş anahtar olarak listelenmiyor | [testler](test/keys-adapter.test.ts), fixture'lar: [authz](test/fixtures/authz/), [veri](test/fixtures/data/), [reframe](test/fixtures/reframe/) |
+| Yalnızca clj-kondo'nun aynı parametreleri saydığı yerlerde imza kaydetme | `defn` olarak lint edilen bir form üzerinden tanımlanan **532** fonksiyon imza kazandı (Metabase'de 216); parametreleri platforma göre değişen **22** `.cljc` fonksiyonu artık yanlış imza almıyor (DataScript'in `first-seq` fonksiyonu `[xs xs]` olarak okunuyordu); `s/defn` anotasyonları artık parametre sayılmıyor | [testler](test/signatures.test.ts) |
+| Düz bir parametrenin nasıl kullanıldığını okuma | Okumaları tamamen bilinen düz parametreler: **3,496 → 4,184** (parametreyi destructuring ile ayıran bir `let`, `(-> m :k)`, `contains?`) | [testler](test/signatures.test.ts) |
+| Dış Ring/Compojure middleware'ini okuma | polylith-realworld: `POST /api/articles` için **0 → 11** middleware girdisi | [benchmark q13](docs/BENCHMARK.md#positive-questions), [fixture](test/fixtures/ring-middleware/) |
+| Başka bir namespace'teki frontend rota tablolarını okuma | Logseq: **0 → 17** istemci rotası düğümü | [kapsam](docs/COVERAGE.md), [benchmark q14](docs/BENCHMARK.md#positive-questions) |
+| `re-frame.alpha` tanıma | alpha namespace'i üzerinden kayıtlar ve dispatch'ler çıkarılır | [fixture](test/fixtures/reframe/src/app/alpha.cljs) |
+| Projenin clj-kondo yapılandırmasını uygulama | Projenin `:lint-as` girdileri ve hook'ları analize katılır | [fixture](test/fixtures/project-config/), [testler](test/config.test.ts) |
+| Playwright fixture'larını projenin `node_modules`'ı olmadan tipleme | Page object'lerini `test.extend<…>` fixture'larından alan testler, `@playwright/test` kurulu olmayan bir checkout'ta page object üyelerine bağlanır; fixture'da: **0 → 12** bağlantı | [testler](test/playwright-fixtures.test.ts), [fixture](test/fixtures/browser-fixtures/) |
+
+İlk üç satır, aynı sabitlenmiş commit'lerin değişiklik öncesi ve sonrası graflarını karşılaştırır. Bu karşılaştırmada başka türden hiçbir kenar değişmedi; çözümlenmiş, çözümlenmemiş ve namespace'i bilinmeyen sayıları aynıdır: bunlar çözümleme oranındaki değil, map anahtarları ve parametreler hakkında okunanlardaki değişikliklerdir.
 
 ### Benchmark
 
-Kayıtlı benchmark **14/14 pozitif soruyu** ve **7/7 yokluk sorusunu** geçer; beklenen yanıtlar kaynağa karşı elle
-kontrol edilmiştir. Bu, küçük bir regresyon benchmark'ıdır, genel bir doğruluk tahmini değildir. On üç pozitif yanıt
-MCP araçlarını kullanır; istemci route sorusu graf düğümlerini doğrudan okur, çünkü henüz istemci route'larını listeleyen bir araç yoktur.
-[Sorular, sonuçlar ve metodoloji](docs/BENCHMARK.md).
+Kaydedilen benchmark, **14 / 14 pozitif soruyu** (beklenen 40 / 40 satır bulundu) ve **7 / 7 yokluk sorusunu** geçer. Yanıtları kaynakla elle karşılaştırılmış küçük bir regresyon benchmark'ıdır; projeniz için bir doğruluk tahmini değildir. [Sorular, sonuçlar ve yöntem](docs/BENCHMARK.md)
 
 ## Atlas nasıl test edilir
 
-Ajanların güvendiği bir araç ilişki uydurmamalıdır. Bu sürümden önce kod şunlardan geçti:
+Bir ajan kendisine verilene güvenir; bu yüzden yanlış yanıtın maliyeti eksik yanıttan daha yüksektir.
 
-| Kontrol | Sonuç |
+| Kontrol | Durum |
 |---|---|
-| Otomatik testler | **831**, hepsi geçiyor; düzeltilen her hatanın, düzeltmeden önce başarısız olan bir testi var |
-| Kaynak satır kapsamı | **99.75%**; CI 98%'in altında başarısız olur |
-| Hata avları | Modül başına bir inceleyici, çalıştırılabilir yeniden üretimlerle yanlış yanıtları aradı; **85** kanıtlanmış hata bulundu ve düzeltildi |
-| Bağımsız incelemeler | Kodu yazmamış inceleyicilerce **altı** tur; modül başına doğruluk, temizlik, kurallar ve testler puanlandı, her modül 5 üzerinden en az 4 alana kadar |
-| Gerçek depolar | **26** herkese açık proje çökme olmadan ve **0** düşen kenarla derleniyor (altısında önceden 690'dı) |
-| Güvenilmeyen depolar | Düşmanca fixture'lar; Git ayarlarının, filtre sürücülerinin, submodule'lerin, proje TypeScript'inin, tuhaf dosya adlarının ve takılan clj-kondo hook'larının hiçbir şey çalıştırmadığını ve hiçbir şeyi kilitlemediğini kontrol eder; çalıştırılabilir dosya araması depo dizinini atlar (birim testli; Windows'un kendisi test edilmemiştir) |
-| Referans doğruluk | Yukarıdaki [benchmark](docs/BENCHMARK.md): 14 pozitif ve 7 yokluk sorusu, yanıtlar elle kontrol edildi |
+| Otomatik testler | **873**, tamamı geçiyor (`npm test`); düzeltilen her hata, düzeltme olmadan başarısız olan bir test alır |
+| Kaynak satırı kapsamı | **99.79%** (`npm run test:coverage`; eşik kontrolü 98% altında başarısız olur) |
+| Tip kontrolü | `npm run typecheck` sorunsuz |
+| Sürekli entegrasyon | [GitHub Actions](.github/workflows/ci.yml), `main` dalına her push ve her pull request için Linux üzerinde Node.js 22 ve 24 ile tip kontrolünü ve kapsam eşiği kontrolünü çalıştırır |
+| Fixture'lar | [test/fixtures](test/fixtures) altında, beklenen her graf satırı elle kontrol edilmiş küçük Clojure kod tabanları |
+| Gerçek depolar | Herkese açık 26 proje çökmeden ve 0 düşürülen kenarla oluşturulur |
+| Benchmark | Yanıtları elle kontrol edilmiş pozitif sorular ve yokluk soruları ([docs/BENCHMARK.md](docs/BENCHMARK.md)) |
+| Bağımsız inceleme | Değişikliği yazmamış incelemeciler, çalıştırılabilir hata örnekleriyle yanlış yanıtları arar; doğrulanan her kusur bir testle düzeltilir |
+| Güvenilmeyen depolar | Kötü amaçlı fixture'lar; Git ayarlarının, filter driver'ların, submodule'lerin, projenin TypeScript'inin, tuhaf dosya adlarının ve takılı kalan clj-kondo hook'larının hiçbir şey çalıştırmadığını veya takılı bırakmadığını kontrol eder |
 
-En önemlileri yokluk soruları: Atlas'ın, “yok” gibi okunan boş bir liste yerine, gerçek bu olduğunda “not found”, “not extracted”
-veya “degraded” dediğini kontrol ederler.
+En çok yokluk soruları önem taşır: Atlas'ın, "yok" gibi okunan boş bir liste yerine, gerçeğin bu olduğu durumlarda "bulunamadı", "çıkarılmadı" veya "bozulmuş" dediğini kontrol ederler. Başarılı bir test paketi ve benchmark, bu fixture'lar ve depolar hakkında kanıttır. Sizin deponuzda doğru yanıtı garanti etmezler; her satırdaki kanıt sınıfını okuyun.
 
 ## Katkıda bulunma
 
-**Let's build our Clojure X-ray tool together! (Clojure röntgen aracımızı birlikte geliştirelim!)**
+**Clojure röntgen aracımızı birlikte geliştirelim!**
 
-Yararlı bir katkı, küçücük bir Clojure örneğiyle başlayabilir: “bu kütüphane şu iki şeyi birbirine bağlıyor ve Atlas
-bunu görmeli.” Bir fixture ile beklenen graf satırlarını ekleyin ya da adaptörünün yazılmasına yardım edin. İkisi de memnuniyetle karşılanır.
+Yararlı bir katkı küçücük bir Clojure örneği olabilir: "bu kütüphane şu iki şeyi birbirine bağlıyor ve Atlas bunu görmeli." Bir fixture ve beklediğiniz graf satırlarını ekleyin veya adaptörü yazın. İkisi de memnuniyetle karşılanır; Atlas'ın size yanlış veya yanıltıcı yanıt verdiği bir örnek de öyle.
 
 ```sh
 npm ci
@@ -511,14 +589,11 @@ npm run test:coverage   # 98% source line-coverage gate
 npm run typecheck
 ```
 
-CLI, Node ile kolay dağıtım için TypeScript ile yazılmıştır; Clojure analizini clj-kondo yapar.
-[Katkıda bulunma kılavuzu](CONTRIBUTING.md) · [Yol haritası](ROADMAP.md) · [Araç referansı](docs/GUIDE.md)
+CLI, düz Node olarak dağıtılabilmesi için TypeScript ile yazılmıştır; Clojure analizini clj-kondo yapar.
+[Katkıda bulunanlar kılavuzu](CONTRIBUTING.md) · [Yol haritası](ROADMAP.md) · [Araç başvuru kılavuzu](docs/GUIDE.md)
 
-## Katkı verenler ve lisans
+## Emeği geçenler ve lisans
 
-**Barış Can Ateş** tarafından oluşturuldu. Bu depodaki belgeler ve özgün çizimler dahil [MIT lisanslıdır](LICENSE).
-Michiel Borkent'in **[clj-kondo](https://github.com/clj-kondo/clj-kondo)** projesi üzerine kurulmuştur;
-kodlama ajanlarına arayüz olarak **[MCP](https://modelcontextprotocol.io)** kullanır. Korpus ve örneklerde kullanılan herkese açık
-projelerin yazarlarına teşekkürler. Bu projeler ve bağımlılıklar kendi lisanslarını korur.
+**Barış Can Ateş** tarafından oluşturuldu. Dokümantasyon ve görseller dahil [MIT lisanslıdır](LICENSE). Michiel Borkent'in **[clj-kondo](https://github.com/clj-kondo/clj-kondo)** projesi üzerine kurulmuştur; kodlama ajanlarına arayüz olarak **[MCP](https://modelcontextprotocol.io)** kullanılır. Korpustaki ve örneklerdeki herkese açık projelerin yazarlarına teşekkürler; bu projeler kendi lisanslarını korur.
 
-*For the sake of all Clojurians.*
+*Tüm Clojure topluluğu için.*
