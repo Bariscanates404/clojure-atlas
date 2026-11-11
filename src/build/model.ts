@@ -1,7 +1,7 @@
 // What the core and every adapter share: the read-only build context, the rows they return, and how a usage
 // finds the node it belongs to (its var, else the top-level form that holds it, else its namespace).
 import type { GraphEdge, GraphNode } from '../mcp/graph.ts';
-import { keywordName, type Analysis, type Keyword, type Span, type VarDef, type VarUse } from './analysis.ts';
+import { CORE_NS, UNKNOWN_NS, keywordName, type Analysis, type Keyword, type Span, type VarDef, type VarUse } from './analysis.ts';
 import type { ProjectConfig } from './config.ts';
 import type { Playwright } from './typescript.ts';
 import { contains, kids, readForms, textOf, walk, type Form } from './reader.ts';
@@ -67,10 +67,7 @@ export type Owner = (site: Site) => string;
 
 const LANGUAGE_NS = /^(clojure|cljs)\.(core|string|set|walk|test|edn|zip|data|pprint|repl|template|spec\.alpha|core\.async)$/;
 
-// the namespace kondo gives a symbol it cannot resolve: special forms, macros it does not know, unbound names
-export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
-
-export const CORE_NS = /^(clojure|cljs)\.core$/;
+export { CORE_NS, UNKNOWN_NS };
 
 const SPECIAL_FORMS = new Set(['def', 'if', 'do', 'let*', 'letfn*', 'loop*', 'recur', 'fn*', 'quote', 'var', 'throw', 'try', 'catch',
   'finally', 'monitor-enter', 'monitor-exit', 'new', 'set!', '.', 'case*', 'deftype*', 'reify*', 'import*', '&']);

@@ -101,18 +101,38 @@ describe('a map literal in a body and a binding pattern are told apart', () => {
       ['consumes_key key::j static_proven', 'consumes_key key::k static_proven']);
   });
 
-  it('reads the schema after :- as data, in the parameters and as the result of s/defn and mu/defn', async () => {
+  const keyRoles = async (files: Record<string, string>) => {
+    const doc = await graphOf(files);
+    return ['produces_key', 'consumes_key'].flatMap((kind) => edgeRows(doc, kind).filter((r) => r.includes('app.k/')).map((r) => `${kind} ${r.replace(/^\S+ -> /, '')}`)).sort();
+  };
+
+  it('reads a pattern without :keys in when-first, and in a library let or go-loop called through an alias', async () => {
     assert.deepEqual(
-      await roles('(mu/defn f :- [:map {:closed true}] [a :- [:map [:in {:default :none} :int]] {x :k} :- {:opt :val}] [{:body [a x]}])'),
+      await keyRoles({ 'src/app/k.clj': `(ns app.k (:require [clojure.core.async :as a] [promesa.core :as p]))
+(defn g [xs s] [(when-first [{y :wf :as m} xs] [y m]) (a/go-loop [{x :gl :as m} s] [x m]) (p/let [{z :pl :as m} s] [z m])])` }),
+      ['consumes_key key::gl static_proven', 'consumes_key key::pl static_proven', 'consumes_key key::wf static_proven'],
+    );
+  });
+
+  it('reads the schema after :- as data, in the parameters and as the result of s/defn', async () => {
+    assert.deepEqual(
+      await keyRoles({ 'src/app/k.clj': `(ns app.k (:require [schema.core :as s]))
+(s/defn f :- [:map {:closed true}] [a :- [:map [:in {:default :none} :int]] {x :k} :- {:opt :val}] [{:body [a x]}])` }),
       ['consumes_key key::k static_proven', 'produces_key key::body static_proven', 'produces_key key::closed static_proven',
         'produces_key key::default static_proven', 'produces_key key::opt static_proven'],
     );
   });
 
-  it('reads a pattern without :keys in when-first, go-loop and a let macro called through an alias', async () => {
+  it('does not take a project function, a keyword or an unresolved alias for a binding form because of its name', async () => {
     assert.deepEqual(
-      await roles('(defn g [xs s] [(when-first [{y :wf :as m} xs] [y m]) (a/go-loop [{x :gl :as m} s] [x m]) (p/let [{z :pl :as m} s] [z m])])'),
-      ['consumes_key key::gl static_proven', 'consumes_key key::pl static_proven', 'consumes_key key::wf static_proven'],
+      await keyRoles({
+        'src/app/my.clj': '(ns app.my)\n(defn for [pairs x] [pairs x])\n(defmacro let [bindings & body] `(clojure.core/let ~bindings ~@body))',
+        'src/app/k.clj': `(ns app.k (:require [app.my :as my]))
+(defn g [s] [(my/for [{:role :admin} 1] 2) (:x/let [{:kw :head} 1]) (nope/let [{:un :resolved} 1]) (my/let [{v :mac} s] v)])`,
+      }),
+      // :x/let in call position is a lookup of that key; the project's own let macro binds like let
+      ['consumes_key key::mac static_proven', 'consumes_key key::x/let static_proven', 'produces_key key::kw static_proven',
+        'produces_key key::role static_proven', 'produces_key key::un static_proven'],
     );
   });
 

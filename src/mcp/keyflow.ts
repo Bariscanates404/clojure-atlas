@@ -167,10 +167,13 @@ interface Findings {
   unprovable: string[];
 }
 
-// Whether a key reads like a slip of another: a short edit apart, on names long enough for that to mean something.
+// Whether a key reads like a slip of another: one letter changed (:ib for :id), a short edit apart on names long
+// enough for that to mean something, or the same name under another namespace.
 const looksLike = (a: string, b: string): boolean => {
   const [x, y] = [localName(a), localName(b)];
-  return a !== b && Math.min(x.length, y.length) >= 3 && editDistance(x, y) <= 2 && editDistance(x, y) < Math.min(x.length, y.length) - 1;
+  const oneLetter = x.length === y.length && x.length >= 2 && [...x].filter((c, i) => c !== y[i]).length === 1;
+  const d = editDistance(x, y);
+  return a !== b && (oneLetter || (Math.min(x.length, y.length) >= 3 && d <= 2 && d < Math.min(x.length, y.length) - 1));
 };
 
 // A key counts as never passed only when every caller is known. A use as a value is a `references` edge whose via is
@@ -232,7 +235,8 @@ function signatureFindings(g: Graph, fn: GraphNode, arities: ArityDesc[], calls:
           label: `${x.c.caller} passes ${slips.map((s) => s.k).join(' ')} which ${shortName(fn)} never reads`,
           finding: 'unread',
           band: weakest(x.passed?.band ?? 'heuristic', 'heuristic'),
-          detail: `${shortName(fn)} reads ${slips.map((s) => s.meant).join(' ')}, which this call does not pass: a misspelling?`,
+          detail: `${shortName(fn)} reads ${slips.map((s) => s.meant).join(' ')}, which this call does not pass: ` +
+            `${slips.every((s) => localName(s.k) === localName(s.meant ?? '')) ? 'the same name under another namespace?' : 'a misspelling?'}`,
         }));
         if (plain.length) out.extra.push(edgeRow(g, x.c.edge.from, x.c.edge, {
           label: `${x.c.caller} passes ${plain.join(' ')} which ${shortName(fn)} never reads`,
@@ -273,9 +277,11 @@ function affectedByChange(g: Graph, fn: GraphNode, head: ArityDesc[], base: Arit
   if (base) {
     const bk = keysOf(base);
     const hk = keysOf(head);
-    added = [...new Set([...added, ...[...requiredKeys(head)].filter((k) => !bk.has(k))])];
+    // required now, and before the change either not read at all or only optional
+    const wasSoft = optionalKeys(base);
+    added = [...new Set([...added, ...[...requiredKeys(head)].filter((k) => !bk.has(k) || wasSoft.has(k))])];
     removed = [...new Set([...removed, ...[...bk].filter((k) => !hk.has(k))])];
-    const eased = [...optionalKeys(head)].filter((k) => !bk.has(k));
+    const eased = [...optionalKeys(head)].filter((k) => !bk.has(k) && !requiredKeys(head).has(k));
     if (eased.length) summary.push(`new optional keys (a default, a test or a fallback in the body; no caller has to pass them): ${eased.join(' ')}`);
     const gone = base.filter((ba) => !head.some((ha) => ha.variadic === ba.variadic && fixedCount(ha) === fixedCount(ba)));
     if (gone.length) summary.push(`arities removed: ${gone.map(arityText).join(', ')}`);
@@ -368,6 +374,7 @@ export function signatureImpact(g: Graph, query: string, opts: { base?: Graph; c
     return nodeRow(fn, {
       id: `${fn.id}@${i}`,
       label: arityText(a),
+      ...(viaMacro ? { band: 'heuristic' as Band } : {}),
       detail: `${calls.filter((c) => c.arity === a).length} caller(s)${soft.length ? `; optional: ${soft.join(' ')}` : ''}` +
         `${a.params.some(passesMapOn) ? '; passes a map parameter on' : ''}`,
     });

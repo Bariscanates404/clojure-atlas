@@ -82,6 +82,7 @@ describe('forms that define a function without being a plain defn', () => {
     assert.deepEqual(findings(g), ['unread: app.s/g passes :bdy which f never reads']);
     // the macro may add or drop parameters when it expands: nothing it yields is STATIC_PROVEN
     assert.deepEqual(signatureImpact(g, 'app.s/f').sections.find((s) => s.name === 'findings')?.rows.map((r) => r.band), ['heuristic']);
+    assert.deepEqual(signatureImpact(g, 'app.s/f').sections.find((s) => s.name === 'arities')?.rows.map((r) => r.band), ['heuristic']);
     assert.ok(signatureImpact(g, 'app.s/f').notes.some((n) => /app\.m\/defhandler/.test(n) && /defn/.test(n)), JSON.stringify(signatureImpact(g, 'app.s/f').notes));
   });
 
@@ -210,5 +211,23 @@ describe('a map parameter is open: optional keys and extra keys', () => {
     assert.match(eased.verdict, /0 caller\(s\) affected by the change \(new optional keys .*: :tenant-id\)/);
     const required = await impact('(defn f [{:keys [id tenant-id]}] [id tenant-id])', '(f {:id 1})', base);
     assert.deepEqual(rowsOf(required, 'affected by the change'), ['static_proven: app.s/g does not pass :tenant-id']);
+  });
+
+  it('a change that drops the fallback or the default of a key affects the callers that do not pass it', async () => {
+    const call = '(f {:id 1})';
+    const noFallback = await impact('(defn f [{:keys [id b]}] (str id b))', call, '(defn f [{:keys [id b]}] (str id (or b 1)))');
+    assert.deepEqual(rowsOf(noFallback, 'affected by the change'), ['static_proven: app.s/g does not pass :b']);
+    const noDefault = await impact('(defn f [{:keys [id b]}] (str id b))', call, '(defn f [{:keys [id b] :or {b 1}}] (str id b))');
+    assert.deepEqual(rowsOf(noDefault, 'affected by the change'), ['static_proven: app.s/g does not pass :b']);
+    const stillRead = await impact('(defn f [{:keys [id b]}] (str id b))', '(f {:id 1 :b 2})', '(defn f [{:keys [id] :as m}] (str id (:b m)))');
+    assert.deepEqual(rowsOf(stillRead, 'affected by the change'), []);
+  });
+
+  it('sees a one-letter slip of a two-letter key, and names a namespace mix-up for what it is', async () => {
+    const slip = await impact('(defn f [{:keys [id name]}] (str (or id 0) name))', '(f {:ib 1 :name "n"})');
+    assert.deepEqual(rowsOf(slip, 'findings'), ['unread: app.s/g passes :ib which f never reads']);
+    const mixed = await impact('(defn f [{:user/keys [name]}] (or name ""))', '(f {:account/name "n"})');
+    assert.match(mixed.sections.find((s) => s.name === 'findings')?.rows[0]?.detail ?? '', /the same name under another namespace\?/);
+    assert.deepEqual(rowsOf(await impact('(defn f [{:keys [x]}] (or x 0))', '(f {:y 1})'), 'findings'), []);
   });
 });

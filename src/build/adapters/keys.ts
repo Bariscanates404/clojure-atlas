@@ -67,17 +67,30 @@ function placeOf(ctx: Context, file: string, f: Form): { parent: Form; index: nu
   return at;
 }
 
+// The binding or fn-like form a list calls, by the name of its head. A head written through a namespace alias
+// (p/let, mu/defn, async/go-loop) counts by its bare name unless it is a plain function of the project: a library or
+// a project macro named after a core binding form binds like it, the project's own function `for` does not. A head
+// that is not a symbol, or an aliased one clj-kondo did not resolve, is no form at all.
+function formHead(ctx: Context, file: string, list: Form): string | undefined {
+  const head = kids(list)[0];
+  if (head?.t !== 'symbol') return undefined;
+  if (!head.text.includes('/')) return head.text;
+  const use = ctx.useAt(file, head.row, head.col);
+  const def = use && ctx.defs.get(`${use.to}/${use.name}`);
+  return !use || (def && !def.macro) ? undefined : headName(list);
+}
+
 // What a vector binds: pairs of target and value (the binding vector of a let-style form) or parameters (of a fn-like
 // form, or of one arity of it). A vector anywhere else, a function's body included, binds nothing: it is data.
 function bindingVector(ctx: Context, file: string, vec: Form): 'pairs' | 'params' | undefined {
   const at = placeOf(ctx, file, vec);
   if (!at || at.parent.t !== 'list') return undefined;
-  const head = headName(at.parent);
+  const head = formHead(ctx, file, at.parent);
   if (head && BINDING_FORMS.has(head)) return at.index === 1 ? 'pairs' : undefined;
   if (head && FN_FORMS.has(head)) return paramsIndex(at.parent, head) === at.index ? 'params' : undefined;
   // one arity of a multi-arity fn: ([a {:keys [b]}] ...)
   const grand = at.index === 0 ? placeOf(ctx, file, at.parent)?.parent : undefined;
-  const fn = grand?.t === 'list' ? headName(grand) : undefined;
+  const fn = grand?.t === 'list' ? formHead(ctx, file, grand) : undefined;
   return grand && fn && FN_FORMS.has(fn) && paramsIndex(grand, fn) < 0 ? 'params' : undefined;
 }
 

@@ -240,13 +240,15 @@ export function normalize(raw: Raw): Analysis {
   return withoutProtocolParams(withoutRichComments({ nsDefs, nsUses, varDefs, varUses, keywords, protocolImpls, syntaxErrors }));
 }
 
-const CORE_NAMESPACE = /^(clojure|cljs)\.core$/;
-const UNKNOWN_NAMESPACE = 'clj-kondo/unknown-namespace';
+export const CORE_NS = /^(clojure|cljs)\.core$/;
+
+// the namespace kondo gives a symbol it cannot resolve: special forms, macros it does not know, unbound names
+export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
 
 // The calls of one clojure.core macro, by file: kondo gives such a call the span of its whole form.
 function macroCalls(a: Analysis, name: string): Map<string, VarUse[]> {
   const byFile = new Map<string, VarUse[]>();
-  for (const u of a.varUses) if (u.macro && u.name === name && CORE_NAMESPACE.test(u.to)) byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
+  for (const u of a.varUses) if (u.macro && u.name === name && CORE_NS.test(u.to)) byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
   return byFile;
 }
 
@@ -274,7 +276,7 @@ function withoutProtocolParams(a: Analysis): Analysis {
   if (protocols.size === 0) return a;
   return {
     ...a,
-    varUses: a.varUses.filter((u) => u.to !== UNKNOWN_NAMESPACE || !(protocols.get(u.file) ?? []).some((p) => contains(p, u.row, u.col))),
+    varUses: a.varUses.filter((u) => u.to !== UNKNOWN_NS || !(protocols.get(u.file) ?? []).some((p) => contains(p, u.row, u.col))),
   };
 }
 

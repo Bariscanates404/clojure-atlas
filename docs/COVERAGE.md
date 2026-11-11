@@ -23,32 +23,32 @@ How to read the columns:
 
 | repo | files expected | files analyzed | syntax-error files | definitions | resolved | unresolved | resolution rate | unknown namespace | multimethods | implementations | events | routes | data_attributes | system | schemas | key_flow | key_tables | client_routes | requests | selectors | browser_tests | unknown edges | dropped edges | build | graph |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| babashka | 661 | 656 | 2 | 6464 | 15264 | 61 | 99.6% | 2176 | 448 | 738 | 0 | 0 | 20 | 4 | 384 | 19503 | 221 | 0 | 0 | 0 | 0 | 153 | 0 | 10.1 s | 752 KB |
-| biff | 146 | 146 | 1 | 1250 | 2449 | 13 | 99.5% | 20 | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5265 | 30 | 0 | 0 | 0 | 0 | 133 | 0 | 3.6 s | 175 KB |
-| cider-nrepl | 130 | 130 | 0 | 1149 | 3091 | 22 | 99.3% | 186 | 57 | 55 | 0 | 0 | 0 | 0 | 0 | 5281 | 45 | 0 | 0 | 0 | 0 | 93 | 0 | 4.0 s | 163 KB |
-| clj-kondo | 429 | 427 | 12 | 2744 | 10743 | 26 | 99.8% | 251 | 116 | 721 | 1 | 2 | 0 | 4 | 8 | 22897 | 99 | 0 | 0 | 0 | 0 | 37 | 0 | 5.0 s | 500 KB |
-| compojure | 11 | 11 | 0 | 87 | 250 | 0 | 100.0% | 0 | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.5 s | 13 KB |
-| datascript | 67 | 67 | 1 | 1018 | 4392 | 496 | 89.9% | 1255 | 15 | 326 | 0 | 0 | 1424 | 0 | 0 | 3850 | 52 | 0 | 0 | 0 | 0 | 135 | 0 | 4.5 s | 165 KB |
-| day-of-datomic | 43 | 43 | 0 | 127 | 84 | 29 | 74.3% | 1 | 0 | 1 | 0 | 0 | 395 | 0 | 0 | 397 | 0 | 0 | 0 | 0 | 0 | 125 | 0 | 2.4 s | 17 KB |
-| fulcro | 140 | 140 | 0 | 2699 | 9834 | 16 | 99.8% | 919 | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11304 | 74 | 0 | 0 | 0 | 0 | 82 | 0 | 4.9 s | 386 KB |
-| honeysql | 20 | 20 | 0 | 504 | 2578 | 0 | 100.0% | 14 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2245 | 3 | 0 | 0 | 0 | 0 | 6 | 0 | 1.9 s | 76 KB |
+| babashka | 661 | 656 | 2 | 6464 | 15264 | 61 | 99.6% | 2176 | 448 | 738 | 0 | 0 | 20 | 4 | 384 | 19503 | 221 | 0 | 0 | 0 | 0 | 153 | 0 | 9.4 s | 752 KB |
+| biff | 146 | 146 | 1 | 1250 | 2449 | 13 | 99.5% | 20 | 23 | 4 | 0 | 8 | 0 | 0 | 6 | 5265 | 30 | 0 | 0 | 0 | 0 | 133 | 0 | 2.3 s | 175 KB |
+| cider-nrepl | 130 | 130 | 0 | 1149 | 3091 | 22 | 99.3% | 186 | 57 | 55 | 0 | 0 | 0 | 0 | 0 | 5281 | 45 | 0 | 0 | 0 | 0 | 93 | 0 | 2.5 s | 163 KB |
+| clj-kondo | 429 | 427 | 12 | 2744 | 10743 | 26 | 99.8% | 251 | 116 | 721 | 1 | 2 | 0 | 4 | 8 | 22897 | 99 | 0 | 0 | 0 | 0 | 37 | 0 | 5.9 s | 500 KB |
+| compojure | 11 | 11 | 0 | 87 | 250 | 0 | 100.0% | 0 | 2 | 36 | 0 | 0 | 0 | 0 | 0 | 209 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.2 s | 13 KB |
+| datascript | 67 | 67 | 1 | 1018 | 4392 | 496 | 89.9% | 1255 | 15 | 326 | 0 | 0 | 1424 | 0 | 0 | 3850 | 52 | 0 | 0 | 0 | 0 | 135 | 0 | 4.3 s | 165 KB |
+| day-of-datomic | 43 | 43 | 0 | 127 | 84 | 29 | 74.3% | 1 | 0 | 1 | 0 | 0 | 395 | 0 | 0 | 397 | 0 | 0 | 0 | 0 | 0 | 125 | 0 | 2.5 s | 17 KB |
+| fulcro | 140 | 140 | 0 | 2699 | 9834 | 16 | 99.8% | 919 | 28 | 89 | 0 | 0 | 0 | 0 | 26 | 11304 | 74 | 0 | 0 | 0 | 0 | 82 | 0 | 6.3 s | 386 KB |
+| honeysql | 20 | 20 | 0 | 504 | 2578 | 0 | 100.0% | 14 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 2245 | 3 | 0 | 0 | 0 | 0 | 6 | 0 | 2.7 s | 76 KB |
 | integrant | 7 | 7 | 0 | 138 | 442 | 0 | 100.0% | 0 | 52 | 12 | 0 | 0 | 0 | 69 | 0 | 492 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 1.0 s | 21 KB |
-| logseq | 1088 | 1088 | 0 | 18099 | 69041 | 0 | 100.0% | 162 | 324 | 313 | 0 | 0 | 25169 | 0 | 131 | 87306 | 627 | 17 | 0 | 0 | 0 | 22903 | 0 | 15.1 s | 3.4 MB |
-| malli | 93 | 93 | 0 | 1372 | 7797 | 52 | 99.3% | 226 | 849 | 2134 | 0 | 0 | 0 | 0 | 93 | 9145 | 77 | 0 | 0 | 0 | 0 | 10 | 0 | 4.2 s | 293 KB |
-| metabase | 4460 | 4460 | 0 | 68325 | 311181 | 111 | 100.0% | 9522 | 10174 | 3461 | 0 | 15 | 0 | 2 | 543 | 389079 | 6356 | 0 | 0 | 0 | 0 | 4775 | 0 | 82.2 s | 13.4 MB |
-| mount | 47 | 47 | 0 | 222 | 913 | 0 | 100.0% | 3 | 0 | 9 | 0 | 2 | 30 | 56 | 0 | 293 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2.0 s | 32 KB |
+| logseq | 1088 | 1088 | 0 | 18099 | 69041 | 0 | 100.0% | 162 | 324 | 313 | 0 | 0 | 25169 | 0 | 131 | 87306 | 627 | 17 | 0 | 0 | 0 | 22903 | 0 | 20.4 s | 3.4 MB |
+| malli | 93 | 93 | 0 | 1372 | 7797 | 52 | 99.3% | 226 | 849 | 2134 | 0 | 0 | 0 | 0 | 93 | 9145 | 77 | 0 | 0 | 0 | 0 | 10 | 0 | 5.8 s | 293 KB |
+| metabase | 4460 | 4460 | 0 | 68325 | 311181 | 111 | 100.0% | 9522 | 10174 | 3461 | 0 | 15 | 0 | 2 | 543 | 389016 | 6356 | 0 | 0 | 0 | 0 | 4775 | 0 | 79.3 s | 13.4 MB |
+| mount | 47 | 47 | 0 | 222 | 913 | 0 | 100.0% | 3 | 0 | 9 | 0 | 2 | 30 | 56 | 0 | 293 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 2.2 s | 32 KB |
 | next-jdbc | 38 | 38 | 0 | 337 | 2230 | 6 | 99.7% | 1 | 2 | 417 | 0 | 0 | 0 | 0 | 92 | 1179 | 4 | 0 | 0 | 0 | 0 | 4 | 0 | 2.2 s | 70 KB |
-| pathom3 | 53 | 53 | 0 | 907 | 3815 | 0 | 100.0% | 4 | 8 | 109 | 0 | 0 | 0 | 0 | 27 | 11670 | 368 | 0 | 0 | 0 | 0 | 0 | 0 | 4.1 s | 229 KB |
-| pedestal | 230 | 230 | 1 | 2083 | 5035 | 22 | 99.6% | 283 | 13 | 598 | 0 | 115 | 0 | 24 | 180 | 5107 | 12 | 0 | 0 | 0 | 0 | 20 | 0 | 4.7 s | 270 KB |
-| penpot | 1558 | 1558 | 0 | 25341 | 124814 | 13 | 100.0% | 1888 | 1582 | 2629 | 0 | 0 | 0 | 423 | 193 | 150852 | 451 | 0 | 1 | 0 | 1102 | 2604 | 0 | 31.3 s | 4.7 MB |
-| polylith-realworld | 51 | 51 | 0 | 372 | 871 | 0 | 100.0% | 0 | 0 | 0 | 0 | 253 | 0 | 0 | 0 | 1378 | 21 | 0 | 0 | 0 | 0 | 28 | 0 | 2.0 s | 50 KB |
-| re-frame | 70 | 70 | 0 | 762 | 2629 | 0 | 100.0% | 47 | 6 | 73 | 362 | 0 | 0 | 0 | 7 | 1738 | 4 | 2 | 0 | 0 | 0 | 119 | 0 | 2.2 s | 116 KB |
-| reagent | 65 | 65 | 0 | 829 | 2841 | 0 | 100.0% | 85 | 5 | 124 | 0 | 0 | 0 | 0 | 0 | 1506 | 2 | 0 | 0 | 0 | 0 | 12 | 0 | 2.2 s | 100 KB |
-| reitit | 133 | 133 | 0 | 944 | 3654 | 0 | 100.0% | 14 | 30 | 618 | 8 | 557 | 0 | 4 | 146 | 9802 | 111 | 20 | 0 | 0 | 0 | 4 | 0 | 3.6 s | 207 KB |
-| ring | 72 | 72 | 0 | 634 | 1485 | 0 | 100.0% | 58 | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2044 | 8 | 0 | 0 | 0 | 0 | 2 | 0 | 2.1 s | 88 KB |
-| shadow-cljs | 320 | 320 | 3 | 2389 | 5051 | 16 | 99.7% | 909 | 465 | 186 | 0 | 0 | 0 | 0 | 227 | 11894 | 46 | 0 | 0 | 0 | 0 | 8 | 0 | 7.1 s | 384 KB |
-| usermanager | 7 | 7 | 0 | 49 | 70 | 0 | 100.0% | 10 | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 92 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.6 s | 7 KB |
-| xtdb-v1 | 226 | 226 | 4 | 2759 | 11437 | 3 | 100.0% | 483 | 275 | 2051 | 152 | 0 | 1821 | 13 | 203 | 14317 | 158 | 0 | 0 | 0 | 0 | 480 | 0 | 6.8 s | 541 KB |
+| pathom3 | 53 | 53 | 0 | 907 | 3815 | 0 | 100.0% | 4 | 8 | 109 | 0 | 0 | 0 | 0 | 27 | 11680 | 368 | 0 | 0 | 0 | 0 | 0 | 0 | 5.4 s | 229 KB |
+| pedestal | 230 | 230 | 1 | 2083 | 5035 | 22 | 99.6% | 283 | 13 | 598 | 0 | 115 | 0 | 24 | 180 | 5107 | 12 | 0 | 0 | 0 | 0 | 20 | 0 | 4.6 s | 270 KB |
+| penpot | 1558 | 1558 | 0 | 25341 | 124814 | 13 | 100.0% | 1888 | 1582 | 2629 | 0 | 0 | 0 | 423 | 193 | 150852 | 451 | 0 | 1 | 0 | 1102 | 2604 | 0 | 33.0 s | 4.7 MB |
+| polylith-realworld | 51 | 51 | 0 | 372 | 871 | 0 | 100.0% | 0 | 0 | 0 | 0 | 253 | 0 | 0 | 0 | 1378 | 21 | 0 | 0 | 0 | 0 | 28 | 0 | 3.9 s | 50 KB |
+| re-frame | 70 | 70 | 0 | 762 | 2629 | 0 | 100.0% | 47 | 6 | 73 | 362 | 0 | 0 | 0 | 7 | 1738 | 4 | 2 | 0 | 0 | 0 | 119 | 0 | 2.7 s | 116 KB |
+| reagent | 65 | 65 | 0 | 829 | 2841 | 0 | 100.0% | 85 | 5 | 124 | 0 | 0 | 0 | 0 | 0 | 1506 | 2 | 0 | 0 | 0 | 0 | 12 | 0 | 2.5 s | 100 KB |
+| reitit | 133 | 133 | 0 | 944 | 3654 | 0 | 100.0% | 14 | 30 | 618 | 8 | 557 | 0 | 4 | 146 | 9802 | 111 | 20 | 0 | 0 | 0 | 4 | 0 | 4.0 s | 207 KB |
+| ring | 72 | 72 | 0 | 634 | 1485 | 0 | 100.0% | 58 | 17 | 353 | 0 | 0 | 0 | 0 | 0 | 2044 | 8 | 0 | 0 | 0 | 0 | 2 | 0 | 3.6 s | 88 KB |
+| shadow-cljs | 320 | 320 | 3 | 2389 | 5051 | 16 | 99.7% | 909 | 465 | 186 | 0 | 0 | 0 | 0 | 227 | 11894 | 46 | 0 | 0 | 0 | 0 | 8 | 0 | 7.0 s | 384 KB |
+| usermanager | 7 | 7 | 0 | 49 | 70 | 0 | 100.0% | 10 | 0 | 7 | 0 | 7 | 0 | 4 | 0 | 92 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.2 s | 7 KB |
+| xtdb-v1 | 226 | 226 | 4 | 2759 | 11437 | 3 | 100.0% | 483 | 275 | 2051 | 152 | 0 | 1821 | 13 | 203 | 14317 | 158 | 0 | 0 | 0 | 0 | 480 | 0 | 6.7 s | 541 KB |
 
 ## Repos under 95% resolution rate, or with unknown-namespace usages above 5% of resolved
 
@@ -136,7 +136,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### metabase
 - most frequent unresolved: `metabase.auth-identity.provider/authenticate` 48, `metabase.auth-identity.provider/login!` 19, `metabase.util.secret/expose` 12, `metabase-enterprise.remote-sync.source.protocol/->ingestable` 7, `metabase.auth-identity.provider/validate` 7, `metabase.models.interface/to-json` 7, `metabase.events.impl/publish-event!` 5, `metabase.test/with-dynamic-redefs` 2, `dev.deps-graph/find-requires` 1, `metabase.actions.actions/perform-action!*` 1, `metabase.lib.field.resolution/options-metadata*` 1, `metabase.search.ingestion/spec-index-query` 1
 - most frequent unknown: `_` 430, `_conn` 293, `_model` 276, `card-id` 270, `user-id` 242, `<>` 195, `k` 190, `db-id` 186, `topic` 153, `convo-id` 143, `id` 142, `group-id` 124, `card` 120, `event` 111, `tenant-id` 111
-- adapters: multimethods (defmethod) 10174 edges, implementations (protocol implementations) 3461 edges, events off, routes (compojure) 15 edges, data_attributes off, system (integrant) 2 edges, schemas (malli, spec) 543 edges, key_flow (keywords in code) 389079 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
+- adapters: multimethods (defmethod) 10174 edges, implementations (protocol implementations) 3461 edges, events off, routes (compojure) 15 edges, data_attributes off, system (integrant) 2 edges, schemas (malli, spec) 543 edges, key_flow (keywords in code) 389016 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
 
 ### mount
 - most frequent unresolved: none
@@ -151,7 +151,7 @@ Both shrink when the repo ships a clj-kondo config for its macros, or when `.clo
 ### pathom3
 - most frequent unresolved: none
 - most frequent unknown: `String` 1, `Throwable` 1, `a` 1, `attribute-errors` 1
-- adapters: multimethods (defmethod) 8 edges, implementations (protocol implementations) 109 edges, events off, routes off, data_attributes off, system off, schemas (spec) 27 edges, key_flow (keywords in code) 11670 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
+- adapters: multimethods (defmethod) 8 edges, implementations (protocol implementations) 109 edges, events off, routes off, data_attributes off, system off, schemas (spec) 27 edges, key_flow (keywords in code) 11680 edges, key_tables (map literals in code) 0 edges, client_routes off, requests (ClojureScript sources) 0 edges, selectors off, browser_tests off
 
 ### pedestal
 - most frequent unresolved: `io.pedestal.log/-register` 4, `io.pedestal.http.route.sawtooth.impl/create-matcher-from-routes` 2, `io.pedestal.log/counter` 2, `io.pedestal.log/log-span` 2, `server-sent-events.server/service-instance` 2, `io.pedestal.http.route.definition/defroutes` 1, `io.pedestal.http.route.sawtooth.impl/report-conflicts` 1, `io.pedestal.log/finish-span` 1, `io.pedestal.log/gauge` 1, `io.pedestal.log/histogram` 1, `io.pedestal.log/meter` 1, `io.pedestal.log/metric-registry` 1, `io.pedestal.log/span` 1, `io.pedestal.log/tag-span` 1, `server-sent-events.server/create-server` 1

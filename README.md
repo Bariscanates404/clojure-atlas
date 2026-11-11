@@ -10,6 +10,7 @@ re-frame events and tests are connected to it. clojure-atlas builds that map on 
 
 ![clojure-atlas: provider, map parameter set, consumer; calls, events, routes and tests as a local graph behind MCP tools](docs/assets/atlas.svg)
 
+[![CI](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
 [![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-91d5b6?style=flat-square&labelColor=17252b)](#requirements)
 [![MCP: stdio](https://img.shields.io/badge/MCP-stdio-91d5b6?style=flat-square&labelColor=17252b)](#quick-start)
@@ -493,6 +494,21 @@ old. Zero tests means no static link was found, not that the code is untested.
 
 ## Limits
 
+> [!WARNING]
+> **What Atlas can miss. Read this before you trust an empty answer.**
+>
+> - **Definitions created by a macro clj-kondo is not taught.** A project `defthing`, or a library DSL that ships
+>   no clj-kondo config, defines vars the graph does not contain: their callers show up as *unresolved*, and code
+>   inside such a macro is only heuristic. This is why DataScript resolves 89.9% in the corpus. Teach clj-kondo the
+>   macro (`:lint-as` or a hook in `.clj-kondo/config.edn`), rebuild, and they are back. The answer names the macro.
+> - **Anything decided at runtime.** A var found with `resolve` from a computed symbol, a function picked out of a
+>   map, the argument count behind `apply` or `partial`, a key built with `keyword`, a map that is merged or
+>   forwarded. These are reported as UNKNOWN, never guessed.
+> - **Dispatch.** The targets of a multimethod or protocol call are candidates, not proof.
+> - **Scripts without an `ns` form** (REPL tutorials): day-of-datomic resolves 74.3%.
+> - **Files clj-kondo cannot parse, and files over 2 MB.** Their definitions are missing; every answer then starts
+>   with `DEGRADED` and names them.
+
 - **Static only.** Vars resolved at runtime, functions chosen by data and keys built with `keyword` are not
   followed.
 - **Map keys are keyword occurrences**, and nested maps contribute outer keys, as described
@@ -547,6 +563,20 @@ These are properties of the implementation, not the result of a security audit.
 Measured on **26 public repositories**, each pinned to a commit in [corpus.json](corpus.json). Full table:
 [docs/COVERAGE.md](docs/COVERAGE.md).
 
+| At a glance | |
+|---|---|
+| Repositories that build into a graph | **26 of 26**, no crash, 0 dropped edges |
+| Size of what was read | 10,158 source files, 141,604 definitions, 1,927,681 edges |
+| Var usages in project namespaces linked to their definition | **601,991 of 602,877 (99.85%)**; 886 unresolved |
+| Per repository | median 100.0%; 24 of 26 at 99.3% or more; the two below are 89.9% and 74.3% |
+| Symbols clj-kondo could not attribute to any namespace | **18,517**, counted and shown, not linked and not in the rate |
+| Files clj-kondo could not fully parse | 24 |
+| Benchmark with hand-checked answers | 14 of 14 positive questions, 7 of 7 absence questions |
+
+These numbers say how much of the code's *static* structure reaches the graph on these projects. They are not a
+promise about yours: a codebase built on macros clj-kondo is not taught will sit nearer DataScript than Metabase
+until it is configured. `npx clojure-atlas coverage` prints the same counts for your project.
+
 ### Resolution rate, with the counts beside it
 
 **Resolution rate** is `resolved / (resolved + unresolved)` for var usages clj-kondo attributes to a project
@@ -584,7 +614,7 @@ Changes in what Atlas reads, each with a fixture or test, kept apart from the ra
 
 | Change | Measured result | Evidence |
 |---|---|---|
-| Tell a map literal from a binding pattern | Over the 26 corpus repos: **5,475** producer sites gained (maps in a returned vector, hiccup, route data, `(d/transact conn [{…}])`); **703** keyword values no longer listed as proven "destructure" consumers; **5,126** `:keys` / `:as` / `:or` entries no longer listed as produced keys | [tests](test/keys-adapter.test.ts), fixtures [authz](test/fixtures/authz/), [data](test/fixtures/data/), [reframe](test/fixtures/reframe/) |
+| Tell a map literal from a binding pattern | Over the 26 corpus repos: **5,475** producer sites gained (maps in a returned vector, hiccup, route data, `(d/transact conn [{…}])`); **703** keyword values no longer listed as proven "destructure" consumers; **5,268** `:keys` / `:as` / `:or` entries no longer listed as produced keys | [tests](test/keys-adapter.test.ts), fixtures [authz](test/fixtures/authz/), [data](test/fixtures/data/), [reframe](test/fixtures/reframe/) |
 | Record a signature only where clj-kondo counts the same parameters | **532** functions defined through a form linted as `defn` gained a signature (216 in Metabase); **22** `.cljc` functions whose parameters differ per platform no longer get a wrong one (DataScript's `first-seq` was read as `[xs xs]`); `s/defn` annotations are no longer counted as parameters | [tests](test/signatures.test.ts) |
 | Read how a plain parameter is used | Plain parameters whose reads are fully known: **3,496 → 4,184** (a `let` that destructures the parameter, `(-> m :k)`, `contains?`) | [tests](test/signatures.test.ts) |
 | Read outer Ring/Compojure middleware | polylith-realworld: **0 → 11** middleware entries for `POST /api/articles` | [benchmark q13](docs/BENCHMARK.md#positive-questions), [fixture](test/fixtures/ring-middleware/) |
@@ -609,9 +639,10 @@ An agent trusts what it is handed, so a wrong answer costs more than a missing o
 
 | Check | State |
 |---|---|
-| Automated tests | **860**, all passing (`npm test`); a fixed bug gets a test that fails without the fix |
+| Automated tests | **863**, all passing (`npm test`); a fixed bug gets a test that fails without the fix |
 | Source line coverage | **99.75%** (`npm run test:coverage`; the gate fails under 98%) |
 | Type check | `npm run typecheck` clean |
+| CI | [GitHub Actions](.github/workflows/ci.yml) runs the type check and the coverage gate on Node.js 22 and 24, on Linux, for every push to `main` and every pull request |
 | Fixtures | Small Clojure codebases under [test/fixtures](test/fixtures) with every expected graph row checked by hand |
 | Real repositories | 26 public projects build without a crash and with 0 dropped edges |
 | Benchmark | Positive and absence questions with answers checked by hand ([docs/BENCHMARK.md](docs/BENCHMARK.md)) |
