@@ -557,6 +557,9 @@ programs are started from an absolute path found on PATH, never from the analyze
 - **Unparsable files and files over 2 MB**: their definitions and calls are missing from the graph. Every answer
   then starts with a `DEGRADED` line naming them.
 - **Pedestal service-map interceptors** are not read, so the middleware of every pedestal route is UNKNOWN.
+- **Child routes passed as arguments** to a reitit route function are served where the function places the
+  parameter, when it has one arity and a plain parameter (or rest parameter) takes them. Otherwise, or when the
+  function binds that name again (`let`, `fn`) or the parameter never reaches its route tree, their path below the call reads `{?}`: `/api{?}/send`, never `/api/send`.
 - **Route authorization** needs `.clojure-atlas.edn`. Without it, route_authz says "not provable" and
   permission_routes reports the capability as absent.
 - **Not supported yet**: bidi routes, compojure-api, pedestal verbose map routes, malli registries, integrant

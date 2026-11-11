@@ -16,6 +16,8 @@ project is used. Each item lands with a fixture and the coverage and benchmark t
 - a test-hook class rendered outside `:class` (a custom prop, a string built with `str`, a branch of `if`) is not seen as rendered.
 - Windows: a pinned clj-kondo binary exists, but the build and server have not been verified on Windows.
 - Proxy support for the clj-kondo download. Today, behind a proxy, put clj-kondo on PATH.
+- child routes passed to a multi-arity route function, to a destructured parameter, or spread by `apply` into a
+  fixed parameter: their path below the call is shown as `{?}`; binding them needs the arity chosen by argument count.
 
 ## Known gaps in parameter sets and map keys
 

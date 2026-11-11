@@ -4,10 +4,10 @@
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { isTestFile } from '../../shared/testfile.ts';
 import type { VarUse } from '../analysis.ts';
-import { contains, flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
+import { contains, flatChildren, formAt, headName, kids, textOf as text, unwrap, type Form } from '../reader.ts';
 import { CORE_NS, defId, groupBy, UNKNOWN_NS, type Adapter, type Context, type Owner } from '../model.ts';
-import { COMPOJURE, entries, entry, isRoute, isRouteGroup, joinPath, keywordOf } from './route-data.ts';
-import { addChecks, NO_AUTHZ, routeDataAuthz, type Authz, type Check, type Permission } from './route-authz.ts';
+import { COMPOJURE, entries, entry, isRoute, joinPath, keywordOf } from './route-data.ts';
+import { addChecks, definitionForm, NO_AUTHZ, routeDataAuthz, type Authz, type Check, type Permission } from './route-authz.ts';
 import { wrappingOf, type Wrapper } from './ring-wrap.ts';
 
 const COMPOJURE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'ANY']);
@@ -125,14 +125,18 @@ function interceptorChain(ctx: Context, file: string, items: readonly Form[]): {
   return { guards: chainOf(ctx, file, items.slice(0, -1)).links, handlers: handlerLinks(ctx, file, items[items.length - 1]) };
 }
 
+// The clojure.core name a call's head resolves to.
+function coreHead(ctx: Context, file: string, f: Form): string | undefined {
+  const head = f.t === 'list' ? f.children[0] : undefined;
+  const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
+  return use && CORE_NS.test(use.to) ? use.name : undefined;
+}
+
 // The elements of an interceptor chain written as a vector, or as (conj interceptors ... handler), pedestal's idiom
 // for adding a handler to shared interceptors; null for any other form.
 function chainElements(ctx: Context, file: string, f: Form): Form[] | null {
   if (f.t === 'vector') return flatChildren(f);
-  if (f.t !== 'list') return null;
-  const head = f.children[0];
-  const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
-  return use && CORE_NS.test(use.to) && use.name === 'conj' ? f.children.slice(1) : null;
+  return coreHead(ctx, file, f) === 'conj' ? kids(f).slice(1) : null;
 }
 
 // ---------- middleware around the routing table ----------
@@ -225,12 +229,40 @@ function compojureRoutes(ctx: Context): Route[] {
 // pedestal terse routes: ^:interceptors [...] beside the route data
 const isInterceptorVector = (f: Form): boolean => f.t === 'meta' && keywordOf(f.children[0]) === ':interceptors' && unwrap(f).t === 'vector';
 
+// A route's path: a literal, or a symbol naming a var whose value is one, also through vars that name other vars.
+function pathOf(ctx: Context, file: string, f: Form, seen: ReadonlySet<string> = new Set()): string | undefined {
+  const u = unwrap(f);
+  if (u.t === 'string') return u.text;
+  const def = u.t === 'symbol' ? ctx.defAt(file, u.row, u.col) : undefined;
+  const d = def && !seen.has(def) ? definitionForm(ctx, def) : undefined;
+  return def && d && !d.params ? pathOf(ctx, d.file, d.value, new Set([...seen, def])) : undefined;
+}
+
+const isRouteIn = (ctx: Context, file: string, f: Form): boolean => isRoute(f)
+  || (f.t === 'vector' && f.children.length > 1 && unwrap(f.children[0]).t === 'symbol' && /^(\/|$)/.test(pathOf(ctx, file, f.children[0]) ?? 'x'));
+
+const isRouteGroupIn = (ctx: Context, file: string, f: Form): boolean => f.t === 'vector' && flatChildren(f).some((x) => isRouteIn(ctx, file, unwrap(x)));
+
 // (into ["/x" data] children) or (conj ["/x" data] child ...): one route with more children
 function appendsToRoute(ctx: Context, file: string, f: Form): boolean {
-  if (f.t !== 'list' || !f.children[1] || !isRoute(unwrap(f.children[1]))) return false;
-  const head = f.children[0];
-  const use = head && head.t === 'symbol' ? ctx.useAt(file, head.row, head.col) : undefined;
-  return !!use && CORE_NS.test(use.to) && (use.name === 'into' || use.name === 'conj');
+  const name = f.t === 'list' && f.children[1] && isRouteIn(ctx, file, unwrap(f.children[1])) ? coreHead(ctx, file, f) : undefined;
+  return name === 'into' || name === 'conj';
+}
+
+interface RouteCall {
+  def: string;
+  args: Form[];
+  // (apply f a coll): the last argument is a collection of arguments
+  spread: boolean;
+}
+
+// (f args) or (apply f args) where f is a route function.
+function routeCall(ctx: Context, file: string, f: Form, fns: ReadonlyMap<string, unknown>): RouteCall | undefined {
+  const spread = coreHead(ctx, file, f) === 'apply';
+  const [head, ...args] = kids(f).slice(spread ? 1 : 0);
+  const u = f.t === 'list' && head ? unwrap(head) : undefined;
+  const def = u && u.t === 'symbol' ? ctx.defAt(file, u.row, u.col) : undefined;
+  return def && fns.has(def) ? { def, args, spread } : undefined;
 }
 
 interface Scope {
@@ -246,41 +278,62 @@ interface Scope {
   stack: string[];
   // what wraps the tree could not be read
   unknown: boolean;
+  // the parameters of the route functions being mounted, bound to the arguments of the call that mounts them
+  env: Env;
 }
+
+// Argument forms a parameter stands for, read in the caller's file and environment.
+interface Binding {
+  forms: Form[];
+  file: string;
+  env: Env;
+  reached: boolean;
+}
+
+type Env = ReadonlyMap<string, Binding>;
 
 interface RouteFn {
   file: string;
   roots: Form[];
 }
 
+// The forms a definition returns: its last form, or the last form of each arity of a multi-arity defn.
+function returnedValues(form: Form): Form[] {
+  const xs = kids(form).slice(2).map(unwrap);
+  const arities = xs.filter((x) => x.t === 'list' && x.children[0] && unwrap(x.children[0]).t === 'vector');
+  return arities.length && !xs.some((x) => x.t === 'vector') ? arities.map((a) => unwrap(kids(a)[kids(a).length - 1])) : xs.slice(-1);
+}
+
 // Each definition whose body holds route vectors: a function or var returning a route tree. It may live in a file
 // that never names the routing library and only returns data a router file mounts. A definition whose whole value
-// is another route function, or a call of one (a Polylith interface), stands for it.
+// is another route function, or a call of one (a Polylith interface, in any of its arities), stands for it.
 function routeFunctions(ctx: Context): Map<string, RouteFn> {
   const out = new Map<string, RouteFn>();
-  const valueOf = new Map<string, { file: string; value: Form }>();
+  const valuesOf = new Map<string, { file: string; values: Form[] }>();
   for (const d of ctx.defs.values()) {
     const form = formAt(ctx.forms(d.file), d.row, d.col);
     if (!form) continue;
     const roots: Form[] = [];
     const visit = (f: Form): void => {
       const u = unwrap(f);
-      if (isRoute(u) || isRouteGroup(u) || appendsToRoute(ctx, d.file, u)) roots.push(u);
+      if (isRouteIn(ctx, d.file, u) || isRouteGroupIn(ctx, d.file, u) || appendsToRoute(ctx, d.file, u)) roots.push(u);
       else kids(u).forEach(visit);
     };
     kids(form).forEach(visit);
     const full = `${d.ns}/${d.name}`;
     if (roots.length) out.set(full, { file: d.file, roots });
-    const last = kids(form)[kids(form).length - 1];
-    if (!roots.length && last && kids(form).length >= 3) valueOf.set(full, { file: d.file, value: unwrap(last) });
+    else if (kids(form).length >= 3) valuesOf.set(full, { file: d.file, values: returnedValues(form) });
   }
+  const standsFor = (file: string, v: Form): boolean => {
+    const def = v.t === 'symbol' ? ctx.defAt(file, v.row, v.col) : undefined;
+    return def ? out.has(def) : !!routeCall(ctx, file, v, out);
+  };
   for (let grew = true; grew;) {
     grew = false;
-    for (const [full, { file, value }] of valueOf) {
-      const target = value.t === 'list' ? unwrap(value.children[0] ?? value) : value;
-      const def = target.t === 'symbol' ? ctx.defAt(file, target.row, target.col) : undefined;
-      if (out.has(full) || !def || !out.has(def)) continue;
-      out.set(full, { file, roots: [target] });
+    for (const [full, { file, values }] of valuesOf) {
+      const roots = values.filter((v) => standsFor(file, v));
+      if (out.has(full) || !roots.length) continue;
+      out.set(full, { file, roots });
       grew = true;
     }
   }
@@ -295,6 +348,33 @@ function mountsIn(ctx: Context, file: string, f: Form, fns: ReadonlyMap<string, 
     return def && fns.has(def) ? [def] : [];
   }
   return u.t === 'vector' || u.t === 'list' || u.t === 'cond' ? flatChildren(u).flatMap((x) => mountsIn(ctx, file, x, fns)) : [];
+}
+
+const REBINDERS = /^(let|loop|for|doseq|binding|with-open|(when|if)-(let|some|first)|fn\*?)$/;
+
+// A name the function binds again, (let [child ...] ...) or (fn [child] ...), no longer stands for its argument.
+function rebinds(f: Form, name: string): boolean {
+  const u = unwrap(f);
+  const fnLike = /^fn/.test(headName(u) ?? '');
+  const vec = REBINDERS.test(headName(u) ?? '') ? kids(u).slice(1, 3).map(unwrap).find((x) => x.t === 'vector') : undefined;
+  const here = !!vec && flatChildren(vec).some((x, i) => (fnLike || i % 2 === 0) && unwrap(x).t === 'symbol' && text(unwrap(x)) === name);
+  return here || kids(u).some((x) => rebinds(x, name));
+}
+
+// A call's arguments bound to the plain-symbol parameters of the one arity of the function it calls. With apply the
+// last argument is a collection of further arguments, so only a rest parameter after every given one can take it.
+function bind(params: Form | undefined, body: Form | undefined, call: RouteCall, file: string, env: Env): Map<string, Binding> {
+  const out = new Map<string, Binding>();
+  const ps = params ? flatChildren(params).map(unwrap) : [];
+  const amp = ps.findIndex((p) => p.t === 'symbol' && p.text === '&');
+  const fixed = amp < 0 ? ps : ps.slice(0, amp);
+  const given = call.spread ? call.args.slice(0, -1) : call.args;
+  const set = (p: Form | undefined, forms: Form[]) => {
+    if (p?.t === 'symbol' && forms.length && !(body && rebinds(body, p.text))) out.set(p.text, { forms, file, env, reached: false });
+  };
+  fixed.forEach((p, i) => set(p, given.slice(i, i + 1)));
+  if (amp >= 0 && given.length >= fixed.length) set(ps[amp + 1], call.args.slice(fixed.length));
+  return out;
 }
 
 // The route trees a data-routing build walks, with the route functions mounted so far and the forms already visited.
@@ -312,7 +392,7 @@ function routeWalker(ctx: Context, fns: ReadonlyMap<string, RouteFn>): Walker {
 
   const route = (v: Form, file: string, scope: Scope, appended: readonly Form[] = []): void => {
     const xs = [...flatChildren(v), ...appended];
-    const path = joinPath(scope.prefix, text(unwrap(xs[0])) ?? '');
+    const path = joinPath(scope.prefix, pathOf(ctx, file, xs[0]) ?? '');
     const emit = (method: string, handlers: Link[], guards: Guard[], authz: Authz) =>
       out.push({ method, path, mount: '', base: scope.base, file, line: v.row, library: scope.library, handlers, guards, authz,
         ...(scope.unknown ? { middlewareUnknown: true } : {}) });
@@ -361,17 +441,39 @@ function routeWalker(ctx: Context, fns: ReadonlyMap<string, RouteFn>): Walker {
     for (const x of xs.slice(1)) nested(x, file, inner);
   };
 
-  // a route, a group of routes, a call or conditional holding them, or a route function or var to mount here
+  const mount = (def: string, scope: Scope, env: Env): void => {
+    const fn = fns.get(def);
+    if (!fn || scope.stack.includes(def)) return;
+    mounted.add(def);
+    for (const r of fn.roots) nested(r, fn.file, { ...scope, stack: [...scope.stack, def], env });
+  };
+
+  // An argument no parameter carried into the tree is served below this call at a path not known here.
+  const mountCall = (call: RouteCall, file: string, scope: Scope): void => {
+    const d = definitionForm(ctx, call.def);
+    const env = bind(d?.params, d?.value, call, file, scope.env);
+    mount(call.def, scope, env);
+    const carried = new Set([...env.values()].filter((b) => b.reached).flatMap((b) => b.forms));
+    const unknown: Scope = { ...scope, prefix: joinPath(scope.prefix, UNKNOWN_MOUNT) };
+    for (const a of call.args.filter((x) => !carried.has(x))) nested(a, file, unknown);
+  };
+
+  // a route, a group of routes, a call or conditional holding them, a route function or var to mount here, or a
+  // parameter of the route function being mounted, which stands for the arguments it was called with
   const nested = (f: Form, file: string, scope: Scope): void => {
     const u = unwrap(f);
     visited.add(`${file}:${u.row}:${u.col}`);
+    const call = routeCall(ctx, file, u, fns);
     if (u.t === 'symbol') {
       const def = ctx.defAt(file, u.row, u.col);
-      const fn = def ? fns.get(def) : undefined;
-      if (!def || !fn || scope.stack.includes(def)) return;
-      mounted.add(def);
-      for (const r of fn.roots) nested(r, fn.file, { ...scope, stack: [...scope.stack, def] });
-    } else if (isRoute(u)) route(u, file, scope);
+      const bound = ctx.useAt(file, u.row, u.col) ? undefined : scope.env.get(u.text);
+      if (def) mount(def, scope, new Map());
+      else if (bound) {
+        bound.reached = true;
+        for (const x of bound.forms) nested(x, bound.file, { ...scope, env: bound.env });
+      }
+    } else if (call) mountCall(call, file, scope);
+    else if (isRouteIn(ctx, file, u)) route(u, file, scope);
     else if (appendsToRoute(ctx, file, u)) {
       // (into ["/x" data] children) and (conj ["/x" data] child ...) build one route with more children
       route(unwrap(kids(u)[1]), file, scope, kids(u).slice(2));
@@ -401,11 +503,17 @@ function routerCalls(ctx: Context, files: ReadonlyMap<string, string>, walker: W
 
 // Route trees no router call reaches stand where they are written, in files that use a routing library.
 // The ones another route function mounts come last: mounting them there marks them, so they stand alone only when nobody does.
+// A root that names a route function whose trees were all walked already (a var holding the router) is that tree again.
 function standingTrees(ctx: Context, files: ReadonlyMap<string, string>, fns: ReadonlyMap<string, RouteFn>, walker: Walker, scopeAt: ScopeAt): void {
   const mountedByAnother = new Set([...fns].flatMap(([def, fn]) => fn.roots.flatMap((r) => mountsIn(ctx, fn.file, r, fns)).filter((m) => m !== def)));
+  const walked = (file: string, r: Form, seen: readonly string[]): boolean => {
+    const def = r.t === 'symbol' ? ctx.defAt(file, r.row, r.col) : routeCall(ctx, file, r, fns)?.def;
+    const fn = def && !seen.includes(def) ? fns.get(def) : undefined;
+    return walker.visited.has(`${file}:${r.row}:${r.col}`) || (!!def && !!fn && fn.roots.every((x) => walked(fn.file, x, [...seen, def])));
+  };
   for (const [def, fn] of [...fns].sort(([a], [b]) => Number(mountedByAnother.has(a)) - Number(mountedByAnother.has(b)))) {
     if (walker.mounted.has(def) || !files.has(fn.file) || isTestFile(fn.file)) continue;
-    for (const r of fn.roots) if (!walker.visited.has(`${fn.file}:${r.row}:${r.col}`)) walker.nested(r, fn.file, scopeAt(fn.file, def, [], [], true));
+    for (const r of fn.roots) if (!walked(fn.file, r, [def])) walker.nested(r, fn.file, scopeAt(fn.file, def, [], [], true));
   }
 }
 
@@ -418,7 +526,7 @@ function dataRoutes(ctx: Context, owner: Owner): Route[] {
   const fns = routeFunctions(ctx);
   const walker = routeWalker(ctx, fns);
   const scopeAt: ScopeAt = (file, base, guards, checks, unknown) =>
-    ({ prefix: '', guards, authz: NO_AUTHZ, checks, base, library: files.get(file) ?? '', stack: [], unknown });
+    ({ prefix: '', guards, authz: NO_AUTHZ, checks, base, library: files.get(file) ?? '', stack: [], unknown, env: new Map() });
   routerCalls(ctx, files, walker, owner, scopeAt);
   standingTrees(ctx, files, fns, walker, scopeAt);
   return walker.routes;
