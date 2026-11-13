@@ -13,7 +13,7 @@ re-frame events and tests are connected to it. clojure-atlas builds that map on 
 [![CI](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Bariscanates404/clojure-atlas/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-91d5b6?style=flat-square&labelColor=17252b)](LICENSE)
 [![Node.js: 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-91d5b6?style=flat-square&labelColor=17252b)](#requirements)
-[![MCP: stdio](https://img.shields.io/badge/MCP-stdio-91d5b6?style=flat-square&labelColor=17252b)](#quick-start)
+[![MCP: stdio and HTTP](https://img.shields.io/badge/MCP-stdio%20%2F%20HTTP-91d5b6?style=flat-square&labelColor=17252b)](#quick-start)
 [![Required npm runtime dependencies: 0](https://img.shields.io/badge/npm_runtime_dependencies-0-91d5b6?style=flat-square&labelColor=17252b)](#local-by-design)
 
 **Zero required npm runtime dependencies. Local analysis.**
@@ -469,7 +469,62 @@ npx clojure-atlas coverage   # resolution counts and unresolved names
 ```
 
 There is no watch mode. With `--repo`, answers start with `STALE` when the working tree no longer matches the
-graph. Restart the MCP server after a rebuild so it loads the new graph.
+graph. Restart the stdio MCP server after a rebuild so it loads the new graph. The shared HTTP server below
+picks up rebuilt graphs without restarting agent sessions.
+
+### Many agent sessions on one codebase (agent swarms)
+
+With stdio, every agent session starts its own Atlas process, loads its own copy of the graph and keeps serving
+that copy until it is restarted. When you run 10–15 sessions at once, start **one shared local server** instead:
+
+```sh
+npx clojure-atlas build                                   # once, or let your pipeline publish the graph
+npx clojure-atlas serve --repo /absolute/path/to/project  # foreground; Ctrl-C or SIGTERM stops it
+```
+
+The server listens on `http://127.0.0.1:7979/mcp` (loopback only) and prints the path of a private bearer-token
+file; it never prints the token. The first start creates the file (`~/.cache/clojure-atlas/http-token` by
+default) and later starts reuse it, so client configuration stays valid across restarts.
+
+**Connect every session once.** For Claude Code, at user scope so the token never lands in a project file:
+
+```sh
+claude mcp add --transport http --scope user clojure-atlas http://127.0.0.1:7979/mcp \
+  --header "Authorization: Bearer $(cat ~/.cache/clojure-atlas/http-token)"
+```
+
+Any MCP client that speaks Streamable HTTP and can send an `Authorization` header works the same way:
+[client configuration](docs/GUIDE.md#connect-your-agents).
+
+**What the swarm gets:**
+
+- **One graph in memory**, shared by every session, not one copy per agent.
+- **Rebuilds without restarts.** Run `npx clojure-atlas build` whenever the code moves: by hand, after a pull or
+  merge, or in a pipeline on the same machine. The next query from any session uses the new graph; queries
+  already running finish on the old one. A half-written or broken graph returns `503` rather than old data, and
+  the next valid build recovers it without reconnecting anyone.
+- **Sessions can start first.** Agents connect and list tools before the first build finishes; tool calls answer
+  once a graph is published.
+- **Worktrees side by side.** Give each agent its own worktree, build a graph in each, register them all, and
+  point each session at its own repo:
+
+  ```sh
+  npx clojure-atlas serve --repo /work/app --repo /work/app-agent-1 --repo /work/app-agent-2
+  # each session uses http://127.0.0.1:7979/mcp?repo=/work/app-agent-1 (URL-encode special characters)
+  ```
+
+  Only registered repos can be selected (up to 32), and a relative `base_graph` is read from the selected repo.
+- **A pipeline artifact.** `serve --graph /data/atlas/project.json.gz --repo /work/project` serves a graph your
+  build job publishes; `build -o` writes a temporary file and renames it into place, so readers never see half.
+- **A quick look:** `curl -s -H "Authorization: Bearer $(cat ~/.cache/clojure-atlas/http-token)"
+  http://127.0.0.1:7979/status` lists each graph, its source sha, reload generation and last load error.
+
+Atlas does not watch your source or rebuild by itself; the `STALE` header still tells agents when the working tree
+has moved past the graph. All sessions share one Node process: memory is shared, queries take turns, so a very
+expensive query or a large reload briefly delays the others. The server adds no npm runtime dependency, and the
+stdio `mcp` command and `init` work as before. Details, limits and the security boundary:
+[shared local HTTP server](docs/GUIDE.md#shared-local-http-server). The shared-session workflow comes from
+Peter (PEZ) Strömberg's [Babashka wrapper](https://github.com/PEZ/my-bbg#clojure-atlas).
 
 **Macros and your clj-kondo config.** Atlas applies the project's `.clj-kondo/config.edn`, `:lint-as` and hooks
 included. A macro linted as `defn` gets a signature; a macro clj-kondo is not taught makes the usages inside it
@@ -551,7 +606,9 @@ Few dependencies reduce the surface. They do **not** make a supply-chain guarant
   repository.
 - The MCP server reads the graph and runs read-only Git checks, with Git hooks, filter drivers and fsmonitor
   disabled and with timeouts.
-- Results are served locally over stdio. What your AI client does with them is a separate privacy boundary.
+- Results are served locally, over stdio or, with `serve`, over loopback HTTP behind a private bearer token with
+  Host and Origin checks. Local HTTP still is not zero risk: any process holding the token can query every
+  registered repo. What your AI client does with the results is a separate privacy boundary.
 
 These are properties of the implementation, not the result of a security audit.
 [Execution model](docs/GUIDE.md#security)
@@ -638,7 +695,7 @@ An agent trusts what it is handed, so a wrong answer costs more than a missing o
 
 | Check | State |
 |---|---|
-| Automated tests | **873**, all passing (`npm test`); a fixed bug gets a test that fails without the fix |
+| Automated tests | **895**, all passing (`npm run test:coverage`); a fixed bug gets a test that fails without the fix |
 | Source line coverage | **99.79%** (`npm run test:coverage`; the gate fails under 98%) |
 | Type check | `npm run typecheck` clean |
 | CI | [GitHub Actions](.github/workflows/ci.yml) runs the type check and the coverage gate on Node.js 22 and 24, on Linux, for every push to `main` and every pull request |

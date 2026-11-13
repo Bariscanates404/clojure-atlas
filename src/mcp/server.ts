@@ -18,6 +18,8 @@ const SERVER_NAME = 'clojure-atlas';
 export interface ServerOptions extends StalenessOptions {
   // directory a base_graph must live in (the served graph's directory); unset: only the file name is checked
   graphDir?: string;
+  // directory a relative base_graph is resolved against (a shared server's selected repo); unset: the working directory
+  baseDir?: string;
 }
 
 const common = {
@@ -50,7 +52,7 @@ function baseGraph(file: string, opts: ServerOptions): Graph {
   if (!/\.json(\.gz)?$/.test(name)) throw new Error(`base_graph ${name}: not a code-graph file (.json or .json.gz)`);
   let real: string;
   try {
-    real = realpathSync(file);
+    real = realpathSync(opts.baseDir === undefined ? file : path.resolve(opts.baseDir, file));
   } catch (err) {
     process.stderr.write(`clojure-atlas: base_graph not found: ${(err as Error).message}\n`);
     throw new Error(`base_graph ${name}: no such file`);
@@ -261,7 +263,7 @@ export function callTool(g: Graph, name: string, args: Args, opts: ServerOptions
 }
 
 interface GraphContext {
-  graph: Graph;
+  graph?: Graph;
   opts: ServerOptions;
 }
 
@@ -269,9 +271,14 @@ const server = stdioServer<GraphContext>({
   name: SERVER_NAME,
   version: VERSION,
   listTools: toolList,
-  callTool: (ctx, name, args) => callTool(ctx.graph, name, args, ctx.opts),
+  callTool: (ctx, name, args) => {
+    if (!ctx.graph) throw new Error('no graph is loaded');
+    return callTool(ctx.graph, name, args, ctx.opts);
+  },
 });
 
 export const handleMessage = (g: Graph, msg: unknown, opts: ServerOptions = {}): unknown => server.handleMessage({ graph: g, opts }, msg);
+// initialize, ping, tools/list and notifications never read the graph: the HTTP server answers them before a graph exists.
+export const handleGraphlessMessage = (msg: unknown): unknown => server.handleMessage({ opts: {} }, msg);
 export const handleLine = (g: Graph, line: string, opts: ServerOptions = {}): unknown => server.handleLine({ graph: g, opts }, line);
 export const serveStdio = (g: Graph, opts: ServerOptions = {}): void => server.serve({ graph: g, opts });

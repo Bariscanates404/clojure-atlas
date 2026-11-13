@@ -22,6 +22,8 @@ on `main`.
 - Reading or writing files outside the analyzed repository and Atlas's own cache directory.
 - The clj-kondo download: a binary that is run without matching the pinned SHA-256.
 - A crafted graph file or MCP request that crashes the server or makes it use unbounded memory or time.
+- The local HTTP server accepting requests without its bearer token, bypassing Host/Origin validation, or
+  accessing a repository that was not registered at startup. See the [HTTP access boundaries](docs/GUIDE.md#transport-and-access-boundaries).
 
 ## What is not
 

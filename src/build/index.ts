@@ -1,6 +1,7 @@
 // `clojure-atlas build`: the I/O shell around the pure builder. Lists the files, runs kondo, reads the sources,
 // assembles the graph and writes it (gzipped when the name ends in .gz).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { ADAPTERS } from './adapters/index.ts';
@@ -47,5 +48,13 @@ export async function buildGraph(dir: string, readTs: typeof readPlaywright = re
 export function writeGraph(doc: AtlasDocument, out: string): void {
   mkdirSync(path.dirname(out), { recursive: true });
   const json = JSON.stringify(doc);
-  writeFileSync(out, out.endsWith('.gz') ? gzipSync(json) : json);
+  // Same-directory rename publishes a complete snapshot to shared servers, including concurrent builds.
+  const temporary = `${out}.${randomUUID()}.partial`;
+  try {
+    const mode = (statSync(out, { throwIfNoEntry: false })?.mode ?? 0o600) & 0o777;
+    writeFileSync(temporary, out.endsWith('.gz') ? gzipSync(json) : json, { flag: 'wx', mode });
+    renameSync(temporary, out);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
 }

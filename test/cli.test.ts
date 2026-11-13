@@ -87,6 +87,12 @@ describe('command line parsing', () => {
     assert.deepEqual(parseCommand(['coverage']), { cmd: 'coverage', graph: '.clojure-atlas/graph.json.gz' });
     assert.deepEqual(parseCommand(['init', '--yes']), { cmd: 'init', yes: true });
     assert.deepEqual(parseCommand(['init']), { cmd: 'init', yes: false });
+    assert.deepEqual(parseCommand(['serve']), { cmd: 'serve', repos: ['.'], port: 7979 });
+    assert.deepEqual(parseCommand(['serve', '--repo', 'a', '--repo', 'b', '--port', '0']), { cmd: 'serve', repos: ['a', 'b'], port: 0 });
+    assert.deepEqual(parseCommand(['serve', '--graph', 'g.json', '--token-file', 'secret', '--max-distance', '2']),
+      { cmd: 'serve', repos: [], port: 7979, graph: 'g.json', tokenFile: 'secret', maxDistance: 2 });
+    assert.deepEqual(parseCommand(['serve', '--graph', 'g.gz', '--repo', 'a', '--port', '9000']),
+      { cmd: 'serve', repos: ['a'], graph: 'g.gz', port: 9000 });
   });
 
   it('answers help and version before anything else is looked at', () => {
@@ -111,6 +117,10 @@ describe('command line parsing', () => {
       [['mcp', '--max-distance', '5abc'], /non-negative integer, got 5abc/],
       [['mcp', '--max-distance', '1.9'], /non-negative integer, got 1\.9/],
       [['mcp', '--max-distance', '-1'], /--max-distance needs a value/],
+      [['serve', '--port', '65536'], /--port must/],
+      [['serve', '--port', '1.5'], /--port must/],
+      [['serve', '--port', 'nope'], /--port must/],
+      [['serve', '--graph', 'g', '--repo', 'a', '--repo', 'b'], /--graph can only/],
     ];
     for (const [argv, why] of bad) assert.throws(() => parseCommand(argv), (e) => e instanceof UsageError && why.test(e.message), argv.join(' '));
   });
