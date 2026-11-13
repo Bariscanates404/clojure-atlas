@@ -21,6 +21,3 @@ export const isRoute = (f: Form): boolean => f.t === 'vector' && f.children.leng
   && /^(\/|$)/.test(textOf(unwrap(f.children[0])) ?? 'x');
 
 export const isRouteGroup = (f: Form): boolean => f.t === 'vector' && flatChildren(f).some((x) => isRoute(unwrap(x)));
-
-// One spelling for path parameters (:id, {id}, *rest), so a path written either way matches.
-export const canonicalPath = (p: string) => p.replace(/\{[^}]*\}|:[^/]+|\*[^/]*/g, '{p}');

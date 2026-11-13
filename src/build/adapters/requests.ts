@@ -4,7 +4,8 @@
 import type { GraphEdge, GraphNode } from '../../mcp/graph.ts';
 import { flatChildren, formAt, kids, textOf, unwrap, walk, type Form } from '../reader.ts';
 import { groupBy, type Adapter, type Context, type Owner } from '../model.ts';
-import { canonicalPath, entry, keywordOf } from './route-data.ts';
+import { entry, keywordOf } from './route-data.ts';
+import { canonicalPath } from '../../shared/route-path.ts';
 import { routeId, serverRoutes } from './routes.ts';
 
 const CLIENT_FILE = /\.clj[sc]$/;

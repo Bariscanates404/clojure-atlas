@@ -399,6 +399,11 @@ interceptors of a pedestal service map are not read. A handler the graph cannot 
 `handler: not resolved (UNKNOWN)`. Here the permission verdict is "not provable", because this project declares
 no authorization model in `.clojure-atlas.edn`.
 
+When one router defines the same method and path more than once (reitit with `:conflicts nil`, or Compojure's
+first match), which definition serves is the router's choice. route_authz then says `not provable: N definitions
+share this method and path ...` and lists every permission and exemption declared across them at HEURISTIC; it
+never joins two definitions' permissions into one `AND`, and never calls one definition's check the route's.
+
 ### permission_routes
 
 Every route that checks a permission. Question: which routes in mount require `:admin`?
