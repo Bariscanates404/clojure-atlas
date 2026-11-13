@@ -14,6 +14,7 @@ For installation and a first query, start with the [quick start](../README.md#qu
 usage:
   clojure-atlas build [dir] [-o .clojure-atlas/graph.json.gz]
   clojure-atlas mcp [--graph .clojure-atlas/graph.json.gz] [--repo <clone>] [--max-distance N]
+  clojure-atlas serve [--repo <clone> ...] [--graph <file>] [--port 7979] [--token-file <file>] [--max-distance N]
   clojure-atlas coverage [graph]
   clojure-atlas init [--yes]
 ```
@@ -24,9 +25,12 @@ usage:
   past the graph's commit (default 20), or the graph's commit is ahead of `base` or diverged from it. The working-tree check
   is repeated at most every 3 seconds, so an edit shows from the first call after that.
 - `coverage` prints the coverage row of a graph and its most frequent unresolved names.
+- `serve` shares registered graphs between MCP clients over local HTTP and reloads rebuilt graphs on the
+  next request. See [shared local HTTP server](#shared-local-http-server).
 - `init` adds the server to the project `.mcp.json`.
 
-Rebuild the graph after you change code. A served graph does not update itself:
+Rebuild the graph after you change code. Neither transport rebuilds source automatically. Restart `mcp`
+(stdio) after rebuilding; `serve` loads a changed graph before answering the next request:
 
 ```
 STALE: the working tree is not the snapshot this graph describes (2 uncommitted file(s) now, 1 at build); rebuild with clojure-atlas build.
@@ -35,6 +39,125 @@ STALE: the working tree is not the snapshot this graph describes (2 uncommitted 
 The project's own `.clj-kondo` config is honored. An optional `.clojure-atlas.edn` in the project root adds what
 the generic adapters cannot guess: `:lint-as` for def-like macros, `:route-macros`, and the route authorization
 keys `:route-authz`, `:permission-middleware` and `:permission-fns`.
+
+## Shared local HTTP server
+
+Use this when several agent sessions work on the same codebase. One server process owns one in-memory
+snapshot of each registered graph; clients share it. The server reads existing graphs, without running
+clj-kondo or starting a build. The stdio `mcp` command and `init` configuration remain available.
+
+```sh
+clojure-atlas build /absolute/path/to/project
+clojure-atlas serve --repo /absolute/path/to/project
+```
+
+`serve` runs in the foreground, so it also fits a terminal, editor task or process supervisor. It binds only
+to `127.0.0.1`, on port `7979` by default; `--port 0` chooses a free port and prints it. Stop with Ctrl-C or
+SIGTERM. A second server on an occupied port fails instead of silently taking over.
+
+### Connect your agents
+
+The first start creates a random token in the user's cache directory and prints the **file path**, never the
+token. Later starts reuse that file. On macOS/Linux the default is
+`${XDG_CACHE_HOME:-$HOME/.cache}/clojure-atlas/http-token`; on Windows it is under `%LOCALAPPDATA%`.
+`--token-file /absolute/private/path/atlas-token` chooses another file and creates it if missing.
+On POSIX systems the file must have mode `600`; symbolic links are refused.
+
+Read the file locally and supply its contents as a bearer token in your client's HTTP configuration:
+
+```json
+{
+  "mcpServers": {
+    "clojure-atlas": {
+      "type": "http",
+      "url": "http://127.0.0.1:7979/mcp",
+      "headers": {
+        "Authorization": "Bearer <contents of the private token file>"
+      }
+    }
+  }
+}
+```
+
+Use your client's private/user-level configuration or secret/environment substitution; do not commit the
+token in a project `.mcp.json`. Client configuration formats differ. Use a stable port when configuring a
+long-running server. HTTP MCP clients must support setting the Authorization header.
+
+### Several repositories or worktrees
+
+```sh
+clojure-atlas serve --repo /work/app --repo /work/app-feature --port 7979
+```
+
+Clients select an explicitly registered repository with the `repo` query parameter:
+
+```text
+http://127.0.0.1:7979/mcp?repo=/work/app
+http://127.0.0.1:7979/mcp?repo=/work/app-feature
+```
+
+URL-encode paths containing spaces, `&` or other reserved characters. Without `repo`, `/mcp` selects the graph
+only when exactly one is registered. Repo paths are canonicalized, and arbitrary client-supplied paths cannot
+load another graph. Each worktree should have its own graph; one branch's graph does not describe another
+branch's working tree. Up to 32 repositories can be registered, with graphs loaded only on first use.
+Repo paths that differ only in letter case select the same repo where the file system ignores case (macOS and
+Windows defaults). A relative `base_graph` is resolved in the selected repo, as an agent working there writes
+it, and must still live in that graph's directory.
+
+Authenticated `GET /status` lists the registered paths, the last loaded source metadata, reload generation
+and any most recent load error. It does not trigger loading or rebuilding. All registered repos are visible
+to clients holding this server's token; this is a single-user local service, not a multi-tenant service.
+
+### Rebuilds and pipelines
+
+```sh
+# Start once; the graph may be published later by the build job.
+clojure-atlas serve --graph /data/atlas/project.json.gz --repo /work/project
+
+# In the build job on the same machine:
+clojure-atlas build /work/project -o /data/atlas/project.json.gz
+```
+
+`--graph` accepts a single custom graph file and can be combined with at most one `--repo`. Without `--repo`,
+the server uses the graph's metadata and cannot check the working tree. With neither flag, it registers the
+current directory's `.clojure-atlas/graph.json.gz`.
+
+`build` writes a unique temporary file beside the destination, then renames it into place. The HTTP server
+checks the file's identity, size and modification/change timestamps on each request, loads and validates a
+changed file, then switches snapshots. Requests already using the old snapshot keep it. It does not rerun
+analysis, reconnect clients or alter their tool list.
+
+If another pipeline downloads a graph from elsewhere, it must also stage the **complete** file beside the
+destination and rename it into place. A corrupt, incomplete or missing graph returns `503` until a valid
+replacement is available; new requests are never silently answered from the old snapshot. The error is also
+visible in `/status`. A source edit alone does not refresh the graph: the existing `STALE` checks still apply.
+
+Clients can connect before the first graph exists: `initialize`, `ping`, `tools/list` and notifications never
+read a graph, so sessions start normally and only tool calls return `503` until a valid graph is published.
+
+A newly created graph file is private to your user (mode `600`); rebuilding an existing file keeps its mode.
+If another user or container reads the graph, create it once and `chmod` it. A symlinked `-o` destination is
+replaced by the new file instead of written through.
+
+### Transport and access boundaries
+
+- Uses Node's `node:http`, with **zero added npm runtime dependencies**.
+- Implements stateless Streamable HTTP for MCP `2025-03-26` and `2025-06-18`, using JSON responses to POST.
+  Initialization negotiates one of those versions; unsupported version headers return `400`. This release
+  does not implement the `2026-07-28` protocol revision. Clients must support negotiating the earlier versions.
+- No `Mcp-Session-Id`, server-push streams or legacy HTTP+SSE endpoints. GET and DELETE on `/mcp` return `405`.
+  Each POST carries one JSON-RPC message; JSON-RPC batches (allowed by `2025-03-26`, removed in `2025-06-18`)
+  return `400`.
+- Requires the bearer token on both `/mcp` and `/status`, validates Host and Origin, and sends no CORS allow
+  headers. It checks that an Origin, when supplied, names this server's own localhost port.
+- Limits request bodies to 1 MiB and headers to 16 KiB, with request/header timeouts. Graph validation and
+  file-size limits remain in effect. Queries and graph loading run in one Node process, so an expensive query
+  or a large reload can delay other clients; this shares memory, not CPU-parallel workers.
+- No remote bind option, hosted service, outbound API call or automatic source upload. What a cloud AI client
+  sends to its model provider remains that client's responsibility, as with stdio.
+
+The shared-session and graph-refresh workflow was suggested by Peter (PEZ) Strömberg, whose
+[Babashka wrapper](https://github.com/PEZ/my-bbg#clojure-atlas) demonstrated the need.
 
 ## Project configuration
 

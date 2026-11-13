@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// clojure-atlas build | mcp | coverage | init: the command line over the builder and the MCP server.
+// clojure-atlas build | mcp | serve | coverage | init: the builder and MCP transports.
 import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,9 @@ import { buildGraph, DEFAULT_GRAPH, writeGraph } from './build/index.ts';
 import { coverageRow, coverageTable, pct } from './coverage.ts';
 import { GraphFormatError, loadGraph, type Graph } from './mcp/graph.ts';
 import { serveStdio } from './mcp/server.ts';
+import { GraphStore } from './mcp/graph-store.ts';
+import { createAtlasHttpServer, listenAtlasHttp, shutdownOnSignal } from './mcp/http.ts';
+import { defaultTokenFile, httpToken } from './mcp/http-token.ts';
 import { analyzerFor, cachedSnapshot, SNAPSHOT_TTL_MS, snapshotOf } from './snapshot.ts';
 import { VERSION } from './version.ts';
 import { shortSha } from './shared/sha.ts';
@@ -16,6 +19,7 @@ import { shortSha } from './shared/sha.ts';
 const USAGE = `usage:
   clojure-atlas build [dir] [-o ${DEFAULT_GRAPH}]
   clojure-atlas mcp [--graph ${DEFAULT_GRAPH}] [--repo <clone>] [--max-distance N]
+  clojure-atlas serve [--repo <clone> ...] [--graph <file>] [--port 7979] [--token-file <file>] [--max-distance N]
   clojure-atlas coverage [graph]
   clojure-atlas init [--yes]`;
 
@@ -26,12 +30,14 @@ export type Command =
   | { cmd: 'version' }
   | { cmd: 'build'; dir: string; out?: string }
   | { cmd: 'mcp'; graph: string; repo?: string; maxDistance?: number }
+  | { cmd: 'serve'; repos: string[]; graph?: string; port: number; tokenFile?: string; maxDistance?: number }
   | { cmd: 'coverage'; graph: string }
   | { cmd: 'init'; yes: boolean };
 
-const VALUED: Record<string, readonly string[]> = { build: ['-o'], mcp: ['--graph', '--repo', '--max-distance'], coverage: [], init: [] };
-const SWITCHES: Record<string, readonly string[]> = { build: [], mcp: [], coverage: [], init: ['--yes'] };
-const MAX_POSITIONAL: Record<string, number> = { build: 1, mcp: 0, coverage: 1, init: 0 };
+const VALUED: Record<string, readonly string[]> = { build: ['-o'], mcp: ['--graph', '--repo', '--max-distance'],
+  serve: ['--repo', '--graph', '--port', '--token-file', '--max-distance'], coverage: [], init: [] };
+const SWITCHES: Record<string, readonly string[]> = { build: [], mcp: [], serve: [], coverage: [], init: ['--yes'] };
+const MAX_POSITIONAL: Record<string, number> = { build: 1, mcp: 0, serve: 0, coverage: 1, init: 0 };
 
 // The command line as data. `--help`, `-h` and `--version` win over everything else; an unknown command or flag, a
 // flag without its value, a stray argument and a malformed number are usage errors, never guesses.
@@ -43,12 +49,14 @@ export function parseCommand(argv: string[]): Command {
   const values = new Map<string, string>();
   const switches = new Set<string>();
   const positional: string[] = [];
+  const repos: string[] = [];
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (VALUED[cmd].includes(a)) {
       const v = rest[++i];
       if (v === undefined || v.startsWith('-')) throw new UsageError(`${a} needs a value`);
       values.set(a, v);
+      if (a === '--repo') repos.push(v);
     } else if (SWITCHES[cmd].includes(a)) switches.add(a);
     else if (a.startsWith('-')) throw new UsageError(`unknown option ${a} for ${cmd}`);
     else positional.push(a);
@@ -59,6 +67,15 @@ export function parseCommand(argv: string[]): Command {
   if (cmd === 'init') return { cmd, yes: switches.has('--yes') };
   const md = values.get('--max-distance');
   if (md !== undefined && !/^\d+$/.test(md)) throw new UsageError(`--max-distance must be a non-negative integer, got ${md}`);
+  if (cmd === 'serve') {
+    const port = values.get('--port') ?? '7979';
+    if (!/^\d+$/.test(port) || Number(port) > 65535) throw new UsageError('--port must be an integer between 0 and 65535 (0 chooses a free port)');
+    if (values.has('--graph') && repos.length > 1) throw new UsageError('--graph can only be used with one --repo');
+    return { cmd, repos: repos.length ? repos : values.has('--graph') ? [] : ['.'], port: Number(port),
+      ...(values.has('--graph') ? { graph: values.get('--graph') } : {}),
+      ...(values.has('--token-file') ? { tokenFile: values.get('--token-file') } : {}),
+      ...(md !== undefined ? { maxDistance: Number(md) } : {}) };
+  }
   const repo = values.get('--repo');
   return { cmd: 'mcp', graph: values.get('--graph') ?? DEFAULT_GRAPH, ...(repo ? { repo } : {}), ...(md !== undefined ? { maxDistance: Number(md) } : {}) };
 }
@@ -136,6 +153,17 @@ async function main(argv: string[]): Promise<void> {
     process.stdout.write(`${VERSION}\n`);
   } else if (c.cmd === 'build') {
     await build(c.dir, c.out);
+  } else if (c.cmd === 'serve') {
+    const targets = c.graph ? [{ file: c.graph, repo: c.repos[0] }]
+      : c.repos.map((repo) => ({ file: path.join(repo, DEFAULT_GRAPH), repo }));
+    const store = new GraphStore(targets, c.maxDistance);
+    const tokenFile = path.resolve(c.tokenFile ?? defaultTokenFile());
+    const server = createAtlasHttpServer(store, httpToken(tokenFile));
+    const port = await listenAtlasHttp(server, c.port);
+    shutdownOnSignal(server);
+    process.stderr.write(`clojure-atlas: serving http://127.0.0.1:${port}/mcp (${targets.length} registered graph(s))\n`
+      + `Bearer token file: ${tokenFile} (keep private; configure Authorization: Bearer <token> in your MCP client)\n`
+      + 'Graphs load on first request and reload after replacement; /status lists loaded versions.\n');
   } else if (c.cmd === 'mcp') {
     const g = readGraph(c.graph);
     process.stderr.write(`clojure-atlas: ${g.doc.nodes.length} nodes, ${g.doc.edges.length} edges at ${shortSha(g.doc.source.sha)}\n`);
