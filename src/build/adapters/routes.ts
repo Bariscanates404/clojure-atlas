@@ -588,14 +588,14 @@ export const httpRoutes: Adapter = {
           ...(p.dynamic ? { attrs: { dynamic: true } } : {}) });
         edges.push({
           from: id, to: permissionId(p.name), kind: 'requires_permission',
-          band: p.dynamic ? 'unknown' : found.includes(p) || p.guessed ? 'heuristic' : 'static_proven', file: p.file, line: p.line,
+          band: p.dynamic ? 'unknown' : bandOf(found.includes(p) || p.guessed ? 'heuristic' : undefined), file: p.file, line: p.line,
           attrs: { check: p.check, checks, alternative: p.alternative, alternatives: p.alternatives, all_of: p.allOf, ...(p.scope ? { tenant: p.scope } : {}) },
         });
       }
       if (r.authz.exempt) {
         nodes.push({ id: exemptionId(r.authz.exempt.reason), kind: 'authz_exemption', name: r.authz.exempt.reason, file: r.authz.exempt.file,
           line: r.authz.exempt.line });
-        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: 'static_proven', file: r.authz.exempt.file,
+        edges.push({ from: id, to: exemptionId(r.authz.exempt.reason), kind: 'exempted_by', band: bandOf(undefined), file: r.authz.exempt.file,
           line: r.authz.exempt.line,
           attrs: { label: r.authz.exempt.reason } });
       }

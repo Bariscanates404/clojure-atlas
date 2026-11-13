@@ -5,7 +5,8 @@ import type { GraphNode } from '../../mcp/graph.ts';
 import { flatChildren, formAt, kids, textOf, unwrap, type Form } from '../reader.ts';
 import { isTestFile } from '../../shared/testfile.ts';
 import { groupBy, type Adapter, type Context } from '../model.ts';
-import { canonicalPath, entry, isRoute, isRouteGroup, joinPath } from './route-data.ts';
+import { entry, isRoute, isRouteGroup, joinPath } from './route-data.ts';
+import { canonicalPath } from '../../shared/route-path.ts';
 
 const CLIENT_KEYS = [':name', ':view'];
 

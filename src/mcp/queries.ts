@@ -2,6 +2,7 @@
 // file, line and band plus the facts the renderer ranks by), notes and ready next calls. Text rendering
 // lives in render.ts and never needs to look anything up again.
 import type { Band, Graph, GraphEdge, GraphNode } from './graph.ts';
+import { canonicalPath } from '../shared/route-path.ts';
 import { BANDS, capability, inEdges, outEdges, weakest, compareText } from './graph.ts';
 import {
   ambiguous, call, capabilityNotes, countBy, dynamicResolveNote, edgeRow, gated, MACRO_HINT, nodeRow, notFound, resolve, unknownNote,
@@ -153,8 +154,8 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
   const deepest = rows.reduce((m, r) => Math.max(m, r.depth ?? 0), 0);
   const byDepth = new Map<string, number>();
   for (const r of rows) byDepth.set(String(r.depth), (byDepth.get(String(r.depth)) ?? 0) + 1);
-  const byComp = new Map<string, number>();
-  for (const r of rows) byComp.set(r.component ?? '(no component)', (byComp.get(r.component ?? '(no component)') ?? 0) + 1);
+  const compCounts = countBy(rows, (r) => r.component ?? '(no component)');
+  const byComp = new Map(Object.entries(compCounts));
   const entryRows = rows.filter((r) => r.entry);
   const byEntry = new Map<string, number>();
   for (const r of entryRows) {
@@ -190,7 +191,7 @@ export function blastRadius(g: Graph, query: string, depth?: number): QueryResul
     found: true,
     matches: [target.id],
     sections: gated(g, ['definitions'], sections),
-    counts: countBy(rows, (r) => r.component ?? '(no component)'),
+    counts: compCounts,
     notes,
     next: [
       ...(deeper.length ? [call('blast_radius', { var: target.name, section: 'deeper', limit: 100 })] : []),
@@ -213,8 +214,7 @@ export function canonicalRoute(input: string): { method: string | null; path: st
   const method = m ? m[1].toUpperCase() : null;
   if (m) s = s.slice(m[0].length);
   s = s.replace(/\s+@.*$/, '').replace(/[?#].*$/, '');
-  const segs = s.split('/').map((seg) => (/^(:.+|\{.*\}|\*.*)$/.test(seg) ? '{p}' : seg));
-  let path = segs.join('/');
+  let path = canonicalPath(s);
   if (!path.startsWith('/')) path = `/${path}`;
   if (path.length > 1) path = path.replace(/\/+$/, '');
   return { method, path };
@@ -327,6 +327,11 @@ const CHAIN_UNREAD_MORE = 'middleware not extracted: further checks UNKNOWN';
 const unresolvedHandler = (route: GraphNode | undefined): string | undefined =>
   typeof route?.attrs?.unresolved_handler === 'string' ? route.attrs.unresolved_handler : undefined;
 
+// The routes adapter sets attrs.conflict on a route that several definitions share (the same method and path): the router
+// decides which one serves, so what the definitions declare together is not the served route's check.
+const conflictingDefinitions = (route: GraphNode | undefined): number =>
+  typeof route?.attrs?.conflict === 'number' ? route.attrs.conflict : 0;
+
 // Why the check of a route may hide in what the build could not read: unread middleware, a handler it could not resolve,
 // or middleware it only guessed at (what a guessed wrapper does is not proven, so a check may sit in it).
 function unreadParts(g: Graph, route: GraphNode | undefined): string[] {
@@ -344,6 +349,13 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
   const exempt = outEdges(g, routeId, ['exempted_by']);
   if (!permE.length && !exempt.length && routeAuthzMissing(g)) return { state: 'unknown', text: ROUTE_AUTHZ_MISSING };
   const chainUnread = middlewareUnread(g.byId.get(routeId));
+  const definitions = conflictingDefinitions(g.byId.get(routeId));
+  if (definitions > 1) {
+    const names = (edges: GraphEdge[]) => [...new Set(edges.map((e) => g.byId.get(e.to)?.name ?? e.to))].join(', ');
+    const declared = [...(permE.length ? [`permission(s) ${names(permE)}`] : []), ...(exempt.length ? [`exemption(s) ${names(exempt)}`] : [])];
+    return { state: 'unknown', text: `not provable: ${definitions} definitions share this method and path and the router decides which one serves; `
+      + `declared across them: ${declared.join('; ') || 'no permission check and no exemption'} (HEURISTIC: confirm each definition at the cited lines)` };
+  }
   if (permE.length) {
     const unknown = permE.some((e) => e.band === 'unknown');
     const guessed = !unknown && permE.some((e) => e.band === 'heuristic');
@@ -931,7 +943,7 @@ function routeAuthzRows(g: Graph, changed: GraphNode[]): { routeIds: Set<string>
     // without the capability nothing was extracted: say so once in the notes, never as a finding about the route
     // a check decided at runtime exists, so it is a risk; no check found in what could be read is not provable either way: UNKNOWN, never HIGH
     if (v.state === 'unknown' && !noAuthz) {
-      const runtime = outEdges(g, id, ['requires_permission']).length > 0;
+      const runtime = conflictingDefinitions(route) < 2 && outEdges(g, id, ['requires_permission']).length > 0;
       uncertain ||= !runtime;
       risk.push(...risks([nodeRow(route, { band: 'unknown',
         detail: runtime ? 'permission check decided at runtime; not provable; evidence in the route data' : v.text })], runtime));
