@@ -263,6 +263,7 @@ describe('Streamable HTTP', () => {
     }
     assert.equal((await s.send(info, { headers: { Host: `localhost:${s.port}`, Origin: `http://localhost:${s.port}` } })).status, 200);
     assert.throws(() => createAtlasHttpServer(s.store, 'short'), /bearer token/);
+    assert.equal(s.server.keepAliveTimeout, 60_000, 'idle sockets outlive a slow graph load or a pause between agent calls');
     const other = createAtlasHttpServer(s.store, TOKEN);
     await assert.rejects(listenAtlasHttp(other, s.port), /EADDRINUSE/);
   });

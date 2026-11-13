@@ -42,6 +42,9 @@ export function createAtlasHttpServer(store: GraphStore, token: string): Server 
     });
   });
   server.maxRequestsPerSocket = 1000;
+  // A slow graph load can hold the event loop past Node's 5 s default; an idle socket closed then already holds the
+  // client's next request, which the client sees as ECONNRESET. Agent sessions also pause between calls.
+  server.keepAliveTimeout = 60_000;
 
   async function respond(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const address = server.address() as { port: number };

@@ -152,7 +152,13 @@ replaced by the new file instead of written through.
   headers. It checks that an Origin, when supplied, names this server's own localhost port.
 - Limits request bodies to 1 MiB and headers to 16 KiB, with request/header timeouts. Graph validation and
   file-size limits remain in effect. Queries and graph loading run in one Node process, so an expensive query
-  or a large reload can delay other clients; this shares memory, not CPU-parallel workers.
+  or a large reload can delay other clients; this shares memory, not CPU-parallel workers. Idle connections
+  are kept for 60 s, so a slow reload does not reset clients that are waiting.
+- With `--repo`, the working-tree check behind `STALE` (git status and file hashes, about a second on a
+  repository of several thousand files) runs once in place per repo, then in a worker thread at most every 3 s,
+  shared across graph reloads. Clients get the last finished check meanwhile, so `STALE` can show an edit a few
+  seconds late. Measured on metabase (4,554 files, ~1 M edges): 15 concurrent agent sessions, all answers
+  exact, about 1.9 GB for the server instead of about 2 GB per stdio session.
 - No remote bind option, hosted service, outbound API call or automatic source upload. What a cloud AI client
   sends to its model provider remains that client's responsibility, as with stdio.
 

@@ -695,7 +695,7 @@ An agent trusts what it is handed, so a wrong answer costs more than a missing o
 
 | Check | State |
 |---|---|
-| Automated tests | **907**, all passing (`npm run test:coverage`); a fixed bug gets a test that fails without the fix |
+| Automated tests | **911**, all passing (`npm run test:coverage`); a fixed bug gets a test that fails without the fix |
 | Source line coverage | **99.79%** (`npm run test:coverage`; the gate fails under 98%) |
 | Type check | `npm run typecheck` clean |
 | CI | [GitHub Actions](.github/workflows/ci.yml) runs the type check and the coverage gate on Node.js 22 and 24, on Linux, for every push to `main` and every pull request |

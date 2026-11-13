@@ -4,7 +4,8 @@ import { realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { loadGraph, type Graph } from './graph.ts';
 import type { ServerOptions } from './server.ts';
-import { analyzerFor, cachedSnapshot, SNAPSHOT_TTL_MS, snapshotOf } from '../snapshot.ts';
+import { analyzerFor, SNAPSHOT_TTL_MS } from '../snapshot.ts';
+import { SnapshotRefresher } from './snapshot-refresh.ts';
 
 export interface GraphTarget {
   file: string;
@@ -33,6 +34,7 @@ interface Entry extends GraphTarget {
 export class GraphStore {
   private entries: Entry[];
   private maxDistance?: number;
+  readonly snapshots = new SnapshotRefresher(SNAPSHOT_TTL_MS);
 
   constructor(targets: GraphTarget[], maxDistance?: number) {
     if (targets.length === 0 || targets.length > 32) throw new Error('serve needs between 1 and 32 graphs');
@@ -78,7 +80,7 @@ export class GraphStore {
         repoDir: entry.repo, maxDistance: this.maxDistance, graphDir: path.dirname(entry.file),
         // a relative base_graph is the agent's path, written from the repo it works in, not from the server's directory
         baseDir: entry.repo ?? path.dirname(entry.file),
-        ...(entry.repo ? { snapshot: cachedSnapshot(() => snapshotOf(entry.repo!, analyzer), SNAPSHOT_TTL_MS) } : {}),
+        ...(entry.repo ? { snapshot: () => this.snapshots.snapshot(entry.repo!, analyzer) } : {}),
       };
       // Never mutate the old graph: in-flight requests can finish against their original snapshot.
       entry.snapshot = { graph, options };
