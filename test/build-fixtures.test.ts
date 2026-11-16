@@ -18,7 +18,7 @@ const FIXTURES: [string, string][] = [
   ['reframe-dynamic', 'dispatch and dispatch-sync with an event id that is a parameter or a whole vector held in a variable: UNKNOWN dispatch sites on one dynamic-event node, next to a literal dispatch'],
   ['routes', 'compojure context mounts (also through route vars and non-literal paths), reitit route data with middleware and router interceptors, pedestal table routes and interceptors, handler calls, branching bodies, duplicate routes'],
   ['ring-wrap-files', 'middleware applied in another file than the routes it wraps: the guarded_by edges and the library middleware node cite the wrapping file and line'],
-  ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
+  ['authz', '.clojure-atlas.edn: route-data authz (one, any of, all of, runtime, an entry of a constant table), inherited exemption, permission middleware and fn, mounted route fns, router data, route macro, lint-as'],
   ['data', 'Datomic schema in edn, transact/q/pull proven, query literal heuristic, references with context, datascript schema'],
   ['system', 'integrant init-key, refs in edn and code, composite keys, mount defstate, component system-map'],
   ['client', 'reitit client routes (.cljs and shared .cljc) named by :name or :view, nested paths, parameters as {p}, paths differing only in parameter names merged into one node, secretary defroute'],

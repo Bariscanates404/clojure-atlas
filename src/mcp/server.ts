@@ -267,9 +267,23 @@ interface GraphContext {
   opts: ServerOptions;
 }
 
+// Sent once at initialize: when to reach for which tool and how to read an answer. A client hands it to the agent, so a
+// project needs no prompt or hook of its own to get the tools used at the right moment.
+export const INSTRUCTIONS = [
+  'Structural answers about this Clojure codebase, read from a graph built by `clojure-atlas build`. Ask before you edit or claim:',
+  '- changing a function: callers, then blast_radius; changing its parameters or a map key it reads: signature_impact, key_flow',
+  '- a route or a permission: route_authz, permission_routes',
+  '- a persisted attribute: attribute_usage; a re-frame event or subscription: event_flow',
+  '- whether something is tested: tests_for, tests_covering',
+  '- reviewing a change: context_for_change, once',
+  'Every row cites file:line and a band: [S] proven, [H] heuristic (open the line before relying on it), [?] unknown.',
+  'An empty answer is not proof of absence. STALE: the code moved since the build. DEGRADED: what the build could not read. graph_info: what this graph covers.',
+].join('\n');
+
 const server = stdioServer<GraphContext>({
   name: SERVER_NAME,
   version: VERSION,
+  instructions: INSTRUCTIONS,
   listTools: toolList,
   callTool: (ctx, name, args) => {
     if (!ctx.graph) throw new Error('no graph is loaded');

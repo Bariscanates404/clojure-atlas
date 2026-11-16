@@ -390,6 +390,15 @@ describe('MCP server', () => {
     assert.deepEqual(r.result.serverInfo, { name: 'clojure-atlas', version: '0.1.0' });
   });
 
+  it('initialize hands the agent instructions that name only tools the server has', () => {
+    const r = handleMessage(g, { jsonrpc: '2.0', id: 1, method: 'initialize' }) as { result: { instructions: string } };
+    const listed = (handleMessage(g, { jsonrpc: '2.0', id: 2, method: 'tools/list' }) as { result: { tools: { name: string }[] } }).result.tools.map((t) => t.name);
+    const named = r.result.instructions.match(/\b[a-z]+_[a-z_]+\b|\bcallers\b/g) ?? [];
+    assert.ok(named.length >= 10, r.result.instructions);
+    assert.deepEqual(named.filter((n) => !listed.includes(n)), []);
+    assert.match(r.result.instructions, /An empty answer is not proof of absence/);
+  });
+
   it('initialize without a version uses the default', () => {
     const r = handleMessage(g, { jsonrpc: '2.0', id: 1, method: 'initialize' }) as { result: Record<string, unknown> };
     assert.equal(r.result.protocolVersion, '2025-06-18');

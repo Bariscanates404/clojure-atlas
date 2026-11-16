@@ -54,7 +54,8 @@ const AUTHZ_KINDS = ['requires_permission', 'exempted_by'];
 // so elsewhere a route without a check reads as unknown, never as unguarded.
 function routeAuthz(ctx: Context, edges: readonly GraphEdge[]): Capability {
   if (!declaresAuthz(ctx.config)) {
-    return { name: 'route_authz', status: 'absent', note: 'not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn' };
+    return { name: 'route_authz', status: 'absent', note: 'not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn; '
+      + 'add :route-authz, :permission-middleware or :permission-fns there and rebuild' };
   }
   const mine = edges.filter((e) => AUTHZ_KINDS.includes(e.kind));
   return {

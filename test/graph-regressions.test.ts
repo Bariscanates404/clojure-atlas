@@ -88,7 +88,7 @@ function authzOff(status: 'absent' | 'unused') {
 describe('route siblings do not count an unknown check as a permission check', () => {
   it('with route authz absent, siblings are reported unknown, never as checking a permission', () => {
     const out = render(routeAuthz(authzOff('absent'), '/x'));
-    assert.match(out, /capability route_authz is absent/);
+    assert.match(out, /capability route_authz is absent: an empty answer is not proof of absence \(not declared: no authz key\)/);
     assert.match(out, /0 check a permission, 0 exempt, 0 neither, 2 unknown/);
     assert.doesNotMatch(out, /lacks the check/);
   });

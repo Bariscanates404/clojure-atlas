@@ -2,7 +2,7 @@
 // all of, decided at runtime), the exemption, and the permission middleware whose argument is a permission.
 import { flatChildren, formAt, kids, textOf as text, unwrap, type Form } from '../reader.ts';
 import type { Context } from '../model.ts';
-import { entry } from './route-data.ts';
+import { entries, entry } from './route-data.ts';
 
 export interface Permission {
   // keyword, or the symbol text when the permission is decided at runtime
@@ -59,13 +59,45 @@ export function constantMap(ctx: Context, at: Located): Located {
   return d && !d.params && d.value.t === 'map' ? { form: d.value, file: d.file } : at;
 }
 
-// :p one permission; #{:a :b} any of them; [:a :b] all of them; anything else is decided at runtime.
-export function permissionsOf(ctx: Context, at: Located, check: number, scope: string | undefined): Permission[] {
-  const u = unwrap(constant(ctx, at).form);
+// A symbol naming a var whose value is a map literal, also through vars that only name another var, stands for that map.
+function tableOf(ctx: Context, at: Located, depth = 0): Located | undefined {
+  const u = unwrap(at.form);
+  const def = u.t === 'symbol' ? ctx.defAt(at.file, u.row, u.col) : undefined;
+  const d = def ? definitionForm(ctx, def) : undefined;
+  if (!d || d.params) return undefined;
+  if (d.value.t === 'map') return { form: d.value, file: d.file };
+  return d.value.t === 'symbol' && depth < 4 ? tableOf(ctx, { form: d.value, file: d.file }, depth + 1) : undefined;
+}
+
+// (table k), (get table k) and (k table) with a literal key stand for that entry of a table held by a var: a permission
+// table shared by the routes and the code that links to them. A key the table lacks stays decided at runtime.
+export function lookedUp(ctx: Context, at: Located, bind: (f: Located) => Located): Located | undefined {
+  const u = unwrap(at.form);
+  const xs = u.t === 'list' ? u.children.map((form) => ({ form, file: at.file })) : [];
+  const viaGet = xs.length === 3 && text(unwrap(xs[0].form)) === 'get';
+  const keyFirst = xs.length === 2 && unwrap(xs[0].form).t === 'keyword';
+  if (!viaGet && xs.length !== 2) return undefined;
+  const [tableAt, keyAt] = viaGet ? [xs[1], xs[2]] : keyFirst ? [xs[1], xs[0]] : [xs[0], xs[1]];
+  const table = tableOf(ctx, tableAt);
+  const key = unwrap(bind(keyAt).form);
+  if (!table || (key.t !== 'keyword' && key.t !== 'string')) return undefined;
+  const hit = entries(table.form).find(([k]) => {
+    const e = unwrap(k);
+    return e.t === key.t && e.text === key.text;
+  });
+  return hit ? { form: hit[1], file: table.file } : undefined;
+}
+
+// :p one permission; #{:a :b} any of them; [:a :b] all of them; an entry of a constant table (see lookedUp); anything
+// else is decided at runtime. bind turns a helper's parameter into the argument of the call.
+export function permissionsOf(ctx: Context, at: Located, check: number, scope: string | undefined,
+  bind: (f: Located) => Located = (f) => f): Permission[] {
+  const value = constant(ctx, lookedUp(ctx, at, bind) ?? at);
+  const u = unwrap(value.form);
   const one = (x: Form, alternative: number, alternatives: number, allOf: number): Permission => {
     const v = unwrap(x);
     return { name: text(v) ?? `(runtime ${v.t})`, dynamic: v.t !== 'keyword', check, checks: check, alternative, alternatives, allOf,
-      ...(scope ? { scope } : {}), file: at.file, line: x.row };
+      ...(scope ? { scope } : {}), file: value.file, line: x.row };
   };
   if (u.t === 'set') return flatChildren(u).map((x, i, all) => one(x, i + 1, all.length, 1));
   if (u.t === 'vector') return flatChildren(u).map((x, _i, all) => one(x, 1, 1, all.length));
@@ -114,7 +146,7 @@ export function routeDataAuthz(ctx: Context, file: string, data: Form | undefine
       const perm = cfg.permission ? entry(o, cfg.permission) : undefined;
       const scopeForm = cfg.scope ? entry(o, cfg.scope) : undefined;
       const scope = scopeForm && m.bind({ form: scopeForm, file }).form;
-      return perm ? permissionsOf(ctx, m.bind({ form: perm, file }), check, scope && formText(scope)) : [];
+      return perm ? permissionsOf(ctx, m.bind({ form: perm, file }), check, scope && formText(scope), m.bind) : [];
     }).filter((ps) => ps.length);
     const single = found.length > 1 && found.every((ps) => ps.length === 1);
     permissions.push(...(single ? found.map(([p], k) => ({ ...p, alternative: k + 1, alternatives: found.length })) : found.flat()));

@@ -47,9 +47,26 @@ describe('route authz end to end through the MCP queries', () => {
     assert.match(routeAuthz(g, 'GET /catalog/browse').verdict, /^requires :read-catalog \(middleware not extracted: further checks UNKNOWN\)$/);
     assert.match(permissionRoutes(g, ':admin').verdict, /guards 2 route copy\(ies\): 0 require it, 2 accept it as one of alternatives/);
   });
+  it('a permission read from a constant table is proven: through a helper, an alias, get and a keyword call', async () => {
+    const g = graphFromJson(JSON.stringify(await buildFixture('authz')));
+    const band = (route: string) => g.doc.edges.filter((e) => e.kind === 'requires_permission' && e.from.startsWith(`route:${route} `)).map((e) => [e.to, e.band]);
+    assert.deepEqual(band('GET /orders.csv'), [['permission::export-orders', 'static_proven']]);
+    assert.deepEqual(band('GET /audit.log').sort(), [['permission::auditor', 'static_proven'], ['permission::export-audit', 'static_proven']]);
+    assert.deepEqual(band('GET /invoice'), [['permission::read-invoices', 'static_proven']]);
+    assert.deepEqual(band('GET /receipt'), [['permission::read-invoices', 'static_proven']]);
+    assert.match(permissionRoutes(g, ':read-invoices').verdict, /guards 2 route copy\(ies\): 2 require it/);
+    assert.match(routeAuthz(g, 'GET /audit.log').verdict, /^requires \(:export-audit OR :auditor\)/);
+  });
+  it('a key the table lacks stays decided at runtime, never read as no check', async () => {
+    const g = graphFromJson(JSON.stringify(await buildFixture('authz')));
+    const edges = g.doc.edges.filter((e) => e.kind === 'requires_permission' && e.from.startsWith('route:GET /unlisted '));
+    assert.deepEqual(edges.map((e) => [e.to, e.band]), [['permission:(runtime list)', 'unknown']]);
+  });
   it('without a declaration the capability is absent and an unchecked route is unknown, not unguarded', async () => {
     const g = graphFromJson(JSON.stringify(await buildFixture('routes')));
     assert.equal(g.doc.capabilities.find((c) => c.name === 'route_authz')?.status, 'absent');
+    // the answer says what to add, so a first run without the file is not a dead end
+    assert.match(permissionRoutes(g, ':admin').notes.join('\n'), /route_authz is absent: .*add :route-authz, :permission-middleware or :permission-fns there and rebuild/);
     assert.match(routeAuthz(g, 'GET /health').verdict, /not provable/);
   });
 });

@@ -40,6 +40,15 @@ The project's own `.clj-kondo` config is honored. An optional `.clojure-atlas.ed
 the generic adapters cannot guess: `:lint-as` for def-like macros, `:route-macros`, and the route authorization
 keys `:route-authz`, `:permission-middleware` and `:permission-fns`.
 
+A permission is read where it is written as a keyword, a set (any of), a vector (all of), a constant var, or an
+entry of a constant table: `(table "/orders.csv")`, `(get table :invoice)` or `(:invoice table)`, where `table`
+is a var holding a map literal and the key is a literal. That covers a permission map shared by the routes and
+the code that links to them, also through a helper such as `(export-authz "/orders.csv" tenant)`. Anything else,
+and a key the table lacks, is `decided at runtime` and shown as UNKNOWN, never as "no check".
+
+When a client connects, the server sends short instructions with `initialize`: which tool to call before which kind
+of change, and how to read the bands. MCP clients hand them to the agent, so no project prompt is needed for that.
+
 ## Shared local HTTP server
 
 Use this when several agent sessions work on the same codebase. One server process owns one in-memory
@@ -369,7 +378,7 @@ polylith-realworld, and which middleware wraps it?
 ```
 ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
 counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
-note: capability route_authz is absent: an empty answer is not proof of absence
+note: capability route_authz is absent: an empty answer is not proof of absence (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
 POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
   1. clojure.realworld.rest-api.handler/create-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]  entry: route POST /api/articles @clojure.realworld.rest-api.api/private-routes
 POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
@@ -417,7 +426,7 @@ Every route that checks a permission. Question: which routes in mount require `:
 ```
 DEGRADED: 4 namespace(s) defined in more than one file (app.conf, app.example, tapp.conf, ...) share one node each, so calls into them are heuristic; an empty or missing answer may be a gap in the graph, not absence
 PERMISSION_ROUTES :admin — no permission matches ":admin"
-note: capability route_authz is absent: an empty answer is not proof of absence
+note: capability route_authz is absent: an empty answer is not proof of absence (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
 note: use the exact permission name, with its namespace if it has one
 searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name
 ```
@@ -582,7 +591,8 @@ An empty answer is never a bare empty list. It takes one of these forms:
 - **none**: the thing exists and nothing relates to it. `callers: none (searched: call edges into this definition)`.
 - **not found**: the codebase has no such thing. `no definition matches "integrant.core/stop"`.
 - **capability off**: the graph cannot answer, because the adapter for that kind of fact found nothing to extract
-  or was not configured. `capability route_authz is absent: an empty answer is not proof of absence`. A section
+  or was not configured. `capability route_authz is absent: an empty answer is not proof of absence`, followed by the reason in
+  parentheses. A section
   that depends on it reads `not extracted (route_authz is absent)`, never "none". A middleware chain that cannot be
   read reads `not extracted (UNKNOWN)`.
 

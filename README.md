@@ -344,7 +344,7 @@ route_authz {"route": "POST /api/articles", "limit": 3}
 ```text
 ROUTE_AUTHZ POST /api/articles — not provable: route authz not in this graph
 counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
-note: capability route_authz is absent: an empty answer is not proof of absence
+note: capability route_authz is absent: an empty answer is not proof of absence (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
 note: POST /api/articles @clojure.realworld.rest-api.api/private-routes: 11 sibling route(s) in bases/rest-api/src/clojure/realworld/rest_api/api.clj: 0 check a permission, 0 exempt, 0 neither, 11 unknown (not provable from this graph)
 POST /api/articles @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): verdict not provable: route authz not in this graph (1)
   1. POST /api/articles @clojure.realworld.rest-api.api/private-routes  bases/rest-api/src/clojure/realworld/rest_api/api.clj:31 [S]
@@ -422,8 +422,9 @@ npm install --save-dev 'git+https://github.com/Bariscanates404/clojure-atlas.git
 npx clojure-atlas build
 ```
 
-The package is not on the npm registry; it installs from Git, and that install compiles the CLI. To pin the
-revision you reviewed, append `#<commit-sha>` to the URL. TypeScript and the Node type definitions are needed
+The package is not on the npm registry; it installs from Git, and that install compiles the CLI. If install
+scripts are disabled (npm `ignore-scripts=true`), the compile step is skipped and `npx clojure-atlas` is not found:
+install with `--ignore-scripts=false`. To pin the revision you reviewed, append `#<commit-sha>` to the URL. TypeScript and the Node type definitions are needed
 for that compile step only; the installed CLI has no required npm runtime dependency.
 
 The graph is written to `.clojure-atlas/graph.json.gz`. The first build downloads the pinned clj-kondo binary

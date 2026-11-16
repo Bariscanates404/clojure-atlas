@@ -9,6 +9,9 @@ node definition:shop.catalog/editor-authz [definition] src/shop/catalog.clj:7 {"
 node definition:shop.catalog/item-authz [definition] src/shop/catalog.clj:9 {"defined_by":"clojure.core/defn-","private":true,"signature":{"arities":[{"params":[{"kind":"symbol","name":"permission","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
 node definition:shop.catalog/reader [definition] src/shop/catalog.clj:5 {"defined_by":"clojure.core/def","private":true}
 node definition:shop.catalog/status-routes [definition] src/shop/catalog.clj:19 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:shop.exports/export-authz [definition] src/shop/exports.clj:8 {"defined_by":"clojure.core/defn-","private":true,"signature":{"arities":[{"params":[{"kind":"symbol","name":"route","reads_complete":false,"escapes":["passed to permission-of"]},{"kind":"symbol","name":"tenant","reads_complete":false,"escapes":["used as a value"]}],"variadic":false}]}}
+node definition:shop.exports/export-routes [definition] src/shop/exports.clj:11 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
+node definition:shop.exports/permission-of [definition] src/shop/exports.clj:6 {"defined_by":"clojure.core/def","private":true}
 node definition:shop.handlers/collect [definition] src/shop/handlers.clj:7 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"h","reads_complete":false,"escapes":["returned"]}],"variadic":false}]}}
 node definition:shop.handlers/delete-order [definition] src/shop/handlers.clj:6 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"req","reads_complete":false,"escapes":["passed to auth/require!","returned"]}],"variadic":false}]}}
 node definition:shop.handlers/health [definition] src/shop/handlers.clj:8 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
@@ -16,6 +19,8 @@ node definition:shop.handlers/list-orders [definition] src/shop/handlers.clj:5 {
 node definition:shop.handlers/report [definition] src/shop/handlers.clj:9 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[{"kind":"symbol","name":"_"}],"variadic":false}]}}
 node definition:shop.legacy/legacy [definition] src/shop/legacy.clj:5 {"defined_by":"clojure.core/def"}
 node definition:shop.macros/defhandler [definition] src/shop/macros.clj:2 {"defined_by":"clojure.core/defmacro","macro":true}
+node definition:shop.permissions/by-key [definition] src/shop/permissions.clj:8 {"defined_by":"clojure.core/def"}
+node definition:shop.permissions/route->permission [definition] src/shop/permissions.clj:3 {"defined_by":"clojure.core/def"}
 node definition:shop.routes-test/a-test-router-serves-nothing [definition] test/shop/routes_test.clj:6 roles=test {"defined_by":"clojure.test/deftest"}
 node definition:shop.routes/admin-routes [definition] src/shop/routes.clj:17 {"defined_by":"clojure.core/def"}
 node definition:shop.routes/app [definition] src/shop/routes.clj:19 {"defined_by":"clojure.core/defn","signature":{"arities":[{"params":[],"variadic":false}]}}
@@ -28,6 +33,7 @@ node key::delete [key] undefined:undefined
 node key::exempt [key] undefined:undefined
 node key::get [key] undefined:undefined
 node key::handler [key] undefined:undefined
+node key::invoice [key] undefined:undefined
 node key::middleware [key] undefined:undefined
 node key::or [key] undefined:undefined
 node key::permission [key] undefined:undefined
@@ -37,18 +43,25 @@ node key::status [key] undefined:undefined
 node key::tenant [key] undefined:undefined
 node namespace:shop.auth [namespace] src/shop/auth.clj:1
 node namespace:shop.catalog [namespace] src/shop/catalog.clj:1
+node namespace:shop.exports [namespace] src/shop/exports.clj:1
 node namespace:shop.handlers [namespace] src/shop/handlers.clj:1
 node namespace:shop.legacy [namespace] src/shop/legacy.clj:1
 node namespace:shop.macros [namespace] src/shop/macros.clj:1
+node namespace:shop.permissions [namespace] src/shop/permissions.clj:1
 node namespace:shop.routes [namespace] src/shop/routes.clj:1
 node namespace:shop.routes-test [namespace] test/shop/routes_test.clj:1
 node namespace:shop.web [namespace] src/shop/web.clj:1
+node permission:(runtime list) [permission] src/shop/exports.clj:16 {"dynamic":true}
 node permission::admin [permission] src/shop/routes.clj:9
 node permission::audit [permission] src/shop/routes.clj:11
+node permission::auditor [permission] src/shop/exports.clj:13
 node permission::delete-order [permission] src/shop/handlers.clj:6
 node permission::edit-catalog [permission] src/shop/catalog.clj:14
 node permission::export [permission] src/shop/catalog.clj:16
+node permission::export-audit [permission] src/shop/exports.clj:13
+node permission::export-orders [permission] src/shop/exports.clj:12
 node permission::read-catalog [permission] src/shop/catalog.clj:12
+node permission::read-invoices [permission] src/shop/exports.clj:14
 node permission::read-items [permission] src/shop/catalog.clj:13
 node permission::read-orders [permission] src/shop/routes.clj:9
 node permission::read-reports [permission] src/shop/routes.clj:14
@@ -59,11 +72,16 @@ node route:DELETE /api/orders/:id @shop.routes/app [route] src/shop/routes.clj:1
 node route:GET /admin @shop.routes/admin-routes [route] src/shop/routes.clj:17 {"method":"get","path":"/admin","full_path":"/admin","base":"shop.routes/admin-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /api/orders @shop.routes/app [route] src/shop/routes.clj:8 {"method":"get","path":"/api/orders","full_path":"/api/orders","base":"shop.routes/app","mount":"","library":"reitit"}
 node route:GET /api/reports @shop.routes/app [route] src/shop/routes.clj:14 {"method":"get","path":"/api/reports","full_path":"/api/reports","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /audit.log @shop.exports/export-routes [route] src/shop/exports.clj:13 {"method":"get","path":"/audit.log","full_path":"/audit.log","base":"shop.exports/export-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /catalog/browse @shop.catalog/catalog-routes [route] src/shop/catalog.clj:17 {"method":"get","path":"/catalog/browse","full_path":"/catalog/browse","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"get","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /health @shop.routes/app [route] src/shop/routes.clj:21 {"method":"get","path":"/health","full_path":"/health","base":"shop.routes/app","mount":"","library":"reitit"}
+node route:GET /invoice @shop.exports/export-routes [route] src/shop/exports.clj:14 {"method":"get","path":"/invoice","full_path":"/invoice","base":"shop.exports/export-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /legacy @shop.legacy/legacy [route] src/shop/legacy.clj:5 {"method":"get","path":"/legacy","full_path":"/legacy","base":"shop.legacy/legacy","mount":"","library":"compojure"}
+node route:GET /orders.csv @shop.exports/export-routes [route] src/shop/exports.clj:12 {"method":"get","path":"/orders.csv","full_path":"/orders.csv","base":"shop.exports/export-routes","mount":"","library":"reitit","middleware":"unknown"}
+node route:GET /receipt @shop.exports/export-routes [route] src/shop/exports.clj:15 {"method":"get","path":"/receipt","full_path":"/receipt","base":"shop.exports/export-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:GET /status @shop.catalog/status-routes [route] src/shop/catalog.clj:20 {"method":"get","path":"/status","full_path":"/status","base":"shop.catalog/status-routes","mount":"","library":"reitit","middleware":"unknown"}
+node route:GET /unlisted @shop.exports/export-routes [route] src/shop/exports.clj:16 {"method":"get","path":"/unlisted","full_path":"/unlisted","base":"shop.exports/export-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:POST /catalog/export @shop.catalog/catalog-routes [route] src/shop/catalog.clj:15 {"method":"post","path":"/catalog/export","full_path":"/catalog/export","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 node route:PUT /catalog/items @shop.catalog/catalog-routes [route] src/shop/catalog.clj:13 {"method":"put","path":"/catalog/items","full_path":"/catalog/items","base":"shop.catalog/catalog-routes","mount":"","library":"reitit","middleware":"unknown"}
 edge definition:shop.catalog/catalog-routes -calls-> definition:shop.catalog/item-authz static_proven src/shop/catalog.clj:13 {"arity":1,"arity_band":"static_proven"}
@@ -96,11 +114,45 @@ edge definition:shop.catalog/status-routes -produces_key-> key::get static_prove
 edge definition:shop.catalog/status-routes -produces_key-> key::handler static_proven src/shop/catalog.clj:20 {"via":"map-literal"}
 edge definition:shop.catalog/status-routes -produces_key-> key::permission static_proven src/shop/catalog.clj:20 {"via":"map-literal"}
 edge definition:shop.catalog/status-routes -references-> definition:shop.handlers/health static_proven src/shop/catalog.clj:20
+edge definition:shop.exports/export-authz -calls-> definition:shop.exports/permission-of static_proven src/shop/exports.clj:9 {"arity":1,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"route"}]}
+edge definition:shop.exports/export-authz -produces_key-> key::permission static_proven src/shop/exports.clj:9 {"via":"map-literal"}
+edge definition:shop.exports/export-authz -produces_key-> key::tenant static_proven src/shop/exports.clj:9 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -calls-> definition:shop.exports/export-authz static_proven src/shop/exports.clj:12 {"arity":2,"arity_band":"static_proven"}
+edge definition:shop.exports/export-routes -calls-> definition:shop.exports/export-authz static_proven src/shop/exports.clj:13 {"arity":2,"arity_band":"static_proven"}
+edge definition:shop.exports/export-routes -calls-> definition:shop.exports/export-authz static_proven src/shop/exports.clj:16 {"arity":2,"arity_band":"static_proven"}
+edge definition:shop.exports/export-routes -consumes_key-> key::invoice static_proven src/shop/exports.clj:14 {"via":"get"}
+edge definition:shop.exports/export-routes -consumes_key-> key::invoice static_proven src/shop/exports.clj:15 {"via":"keyword-fn"}
+edge definition:shop.exports/export-routes -produces_key-> key::authz static_proven src/shop/exports.clj:12 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::authz static_proven src/shop/exports.clj:13 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::authz static_proven src/shop/exports.clj:14 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::authz static_proven src/shop/exports.clj:15 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::authz static_proven src/shop/exports.clj:16 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::get static_proven src/shop/exports.clj:12 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::get static_proven src/shop/exports.clj:13 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::get static_proven src/shop/exports.clj:14 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::get static_proven src/shop/exports.clj:15 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::get static_proven src/shop/exports.clj:16 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::handler static_proven src/shop/exports.clj:12 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::handler static_proven src/shop/exports.clj:13 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::handler static_proven src/shop/exports.clj:14 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::handler static_proven src/shop/exports.clj:15 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::handler static_proven src/shop/exports.clj:16 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::permission static_proven src/shop/exports.clj:14 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -produces_key-> key::permission static_proven src/shop/exports.clj:15 {"via":"map-literal"}
+edge definition:shop.exports/export-routes -references-> definition:shop.handlers/report static_proven src/shop/exports.clj:12
+edge definition:shop.exports/export-routes -references-> definition:shop.handlers/report static_proven src/shop/exports.clj:13
+edge definition:shop.exports/export-routes -references-> definition:shop.handlers/report static_proven src/shop/exports.clj:14
+edge definition:shop.exports/export-routes -references-> definition:shop.handlers/report static_proven src/shop/exports.clj:15
+edge definition:shop.exports/export-routes -references-> definition:shop.handlers/report static_proven src/shop/exports.clj:16
+edge definition:shop.exports/export-routes -references-> definition:shop.permissions/by-key static_proven src/shop/exports.clj:14
+edge definition:shop.exports/export-routes -references-> definition:shop.permissions/by-key static_proven src/shop/exports.clj:15
+edge definition:shop.exports/permission-of -references-> definition:shop.permissions/route->permission static_proven src/shop/exports.clj:6 {"via":"alias"}
 edge definition:shop.handlers/delete-order -calls-> definition:shop.auth/require! static_proven src/shop/handlers.clj:6 {"arity":2,"arity_band":"static_proven","args":[{"i":0,"shape":"symbol","band":"unknown","local":"req"}]}
 edge definition:shop.handlers/health -produces_key-> key::status static_proven src/shop/handlers.clj:8 {"via":"map-literal"}
 edge definition:shop.handlers/list-orders -expands_via-> definition:shop.macros/defhandler static_proven src/shop/handlers.clj:5
 edge definition:shop.legacy/legacy -calls-> definition:shop.handlers/health static_proven src/shop/legacy.clj:5 {"arity":1,"arity_band":"static_proven"}
 edge definition:shop.legacy/legacy -expands_via-> definition:shop.web/GET* static_proven src/shop/legacy.clj:5
+edge definition:shop.permissions/by-key -produces_key-> key::invoice static_proven src/shop/permissions.clj:8 {"via":"map-literal"}
 edge definition:shop.routes-test/a-test-router-serves-nothing -produces_key-> key::get static_proven test/shop/routes_test.clj:7 {"via":"map-literal"}
 edge definition:shop.routes-test/a-test-router-serves-nothing -references-> definition:shop.handlers/health static_proven test/shop/routes_test.clj:7
 edge definition:shop.routes-test/a-test-router-serves-nothing -tests-> definition:shop.handlers/health static_proven test/shop/routes_test.clj:7
@@ -147,6 +199,11 @@ edge namespace:shop.catalog -defines-> definition:shop.catalog/item-authz static
 edge namespace:shop.catalog -defines-> definition:shop.catalog/reader static_proven src/shop/catalog.clj:5
 edge namespace:shop.catalog -defines-> definition:shop.catalog/status-routes static_proven src/shop/catalog.clj:19
 edge namespace:shop.catalog -requires-> namespace:shop.handlers static_proven src/shop/catalog.clj:3
+edge namespace:shop.exports -defines-> definition:shop.exports/export-authz static_proven src/shop/exports.clj:8
+edge namespace:shop.exports -defines-> definition:shop.exports/export-routes static_proven src/shop/exports.clj:11
+edge namespace:shop.exports -defines-> definition:shop.exports/permission-of static_proven src/shop/exports.clj:6
+edge namespace:shop.exports -requires-> namespace:shop.handlers static_proven src/shop/exports.clj:3
+edge namespace:shop.exports -requires-> namespace:shop.permissions static_proven src/shop/exports.clj:4
 edge namespace:shop.handlers -defines-> definition:shop.handlers/collect static_proven src/shop/handlers.clj:7
 edge namespace:shop.handlers -defines-> definition:shop.handlers/delete-order static_proven src/shop/handlers.clj:6
 edge namespace:shop.handlers -defines-> definition:shop.handlers/health static_proven src/shop/handlers.clj:8
@@ -158,6 +215,8 @@ edge namespace:shop.legacy -defines-> definition:shop.legacy/legacy static_prove
 edge namespace:shop.legacy -requires-> namespace:shop.handlers static_proven src/shop/legacy.clj:3
 edge namespace:shop.legacy -requires-> namespace:shop.web static_proven src/shop/legacy.clj:2
 edge namespace:shop.macros -defines-> definition:shop.macros/defhandler static_proven src/shop/macros.clj:2
+edge namespace:shop.permissions -defines-> definition:shop.permissions/by-key static_proven src/shop/permissions.clj:8
+edge namespace:shop.permissions -defines-> definition:shop.permissions/route->permission static_proven src/shop/permissions.clj:3
 edge namespace:shop.routes -defines-> definition:shop.routes/admin-routes static_proven src/shop/routes.clj:17
 edge namespace:shop.routes -defines-> definition:shop.routes/app static_proven src/shop/routes.clj:19
 edge namespace:shop.routes -defines-> definition:shop.routes/order-routes static_proven src/shop/routes.clj:6
@@ -186,6 +245,9 @@ edge route:GET /api/reports @shop.routes/app -guarded_by-> definition:shop.auth/
 edge route:GET /api/reports @shop.routes/app -requires_permission-> permission::read-reports static_proven src/shop/routes.clj:14 {"check":2,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
 edge route:GET /api/reports @shop.routes/app -requires_permission-> permission:perm unknown src/shop/routes.clj:15 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
 edge route:GET /api/reports @shop.routes/app -routes_to-> definition:shop.handlers/report static_proven src/shop/routes.clj:15
+edge route:GET /audit.log @shop.exports/export-routes -requires_permission-> permission::auditor static_proven src/shop/exports.clj:13 {"check":1,"checks":1,"alternative":2,"alternatives":2,"all_of":1,"tenant":":order"}
+edge route:GET /audit.log @shop.exports/export-routes -requires_permission-> permission::export-audit static_proven src/shop/exports.clj:13 {"check":1,"checks":1,"alternative":1,"alternatives":2,"all_of":1,"tenant":":order"}
+edge route:GET /audit.log @shop.exports/export-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/exports.clj:13
 edge route:GET /catalog/browse @shop.catalog/catalog-routes -requires_permission-> permission::read-catalog static_proven src/shop/catalog.clj:12 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:GET /catalog/browse @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:17
 edge route:GET /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::read-items static_proven src/shop/catalog.clj:13 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1,"tenant":":item"}
@@ -193,16 +255,24 @@ edge route:GET /catalog/items @shop.catalog/catalog-routes -routes_to-> definiti
 edge route:GET /health @shop.routes/app -exempted_by-> authz_exemption:load balancer probe static_proven src/shop/routes.clj:21 {"label":"load balancer probe"}
 edge route:GET /health @shop.routes/app -guarded_by-> definition:shop.auth/wrap-session static_proven src/shop/routes.clj:25 {"order":0,"level":"router-data","inherited_from":"router :data"}
 edge route:GET /health @shop.routes/app -routes_to-> definition:shop.handlers/health static_proven src/shop/routes.clj:21
+edge route:GET /invoice @shop.exports/export-routes -requires_permission-> permission::read-invoices static_proven src/shop/exports.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
+edge route:GET /invoice @shop.exports/export-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/exports.clj:14
 edge route:GET /legacy @shop.legacy/legacy -routes_to-> definition:shop.handlers/health static_proven src/shop/legacy.clj:5
+edge route:GET /orders.csv @shop.exports/export-routes -requires_permission-> permission::export-orders static_proven src/shop/exports.clj:12 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1,"tenant":":order"}
+edge route:GET /orders.csv @shop.exports/export-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/exports.clj:12
+edge route:GET /receipt @shop.exports/export-routes -requires_permission-> permission::read-invoices static_proven src/shop/exports.clj:15 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
+edge route:GET /receipt @shop.exports/export-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/exports.clj:15
 edge route:GET /status @shop.catalog/status-routes -exempted_by-> authz_exemption:public status static_proven src/shop/catalog.clj:20 {"label":"public status"}
 edge route:GET /status @shop.catalog/status-routes -requires_permission-> permission::read-status static_proven src/shop/catalog.clj:20 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:GET /status @shop.catalog/status-routes -routes_to-> definition:shop.handlers/health static_proven src/shop/catalog.clj:20
+edge route:GET /unlisted @shop.exports/export-routes -requires_permission-> permission:(runtime list) unknown src/shop/exports.clj:16 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1,"tenant":":order"}
+edge route:GET /unlisted @shop.exports/export-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/exports.clj:16
 edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::admin static_proven src/shop/catalog.clj:16 {"check":2,"checks":2,"alternative":2,"alternatives":2,"all_of":1}
 edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::export static_proven src/shop/catalog.clj:16 {"check":1,"checks":2,"alternative":1,"alternatives":1,"all_of":1}
 edge route:POST /catalog/export @shop.catalog/catalog-routes -requires_permission-> permission::read-items static_proven src/shop/catalog.clj:16 {"check":2,"checks":2,"alternative":1,"alternatives":2,"all_of":1}
 edge route:POST /catalog/export @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:15
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -requires_permission-> permission::edit-catalog static_proven src/shop/catalog.clj:14 {"check":1,"checks":1,"alternative":1,"alternatives":1,"all_of":1}
 edge route:PUT /catalog/items @shop.catalog/catalog-routes -routes_to-> definition:shop.handlers/report static_proven src/shop/catalog.clj:14
-usages resolved=25 unresolved=0 unknown=0 not-vars=0 external=28
-adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:36 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:45 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
-files sources=8 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0
+usages resolved=37 unresolved=0 unknown=0 not-vars=0 external=34
+adapters multimethods=off:0 implementations=off:0 events=off:0 routes=compojure, reitit:47 data_attributes=off:0 system=off:0 schemas=off:0 key_flow=keywords in code:67 key_tables=map literals in code:0 client_routes=off:0 requests=off:0 selectors=off:0 browser_tests=off:0
+files sources=10 edn=0 skipped-large=0 syntax-error-files=0 dropped-edges=0

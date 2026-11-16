@@ -178,7 +178,7 @@ export function capabilityNotes(g: Graph, names: string[]): string[] {
   for (const name of names) {
     const c = capability(g, name);
     if (!c) notes.push(`capability ${name} is not listed in this graph: an empty answer is not proof of absence`);
-    else if (c.status !== 'available') notes.push(`capability ${name} is ${c.status}: an empty answer is not proof of absence`);
+    else if (c.status !== 'available') notes.push(`capability ${name} is ${c.status}: an empty answer is not proof of absence${c.note ? ` (${c.note})` : ''}`);
     else if (c.note === NOT_USED) {
       notes.push(`capability ${name} is available but not used (nothing in this codebase switches it on): an empty answer is not proof of absence`);
     }

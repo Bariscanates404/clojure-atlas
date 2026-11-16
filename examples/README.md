@@ -186,7 +186,7 @@ component, and which tests to run.
 ```
 ROUTE_AUTHZ DELETE /api/articles/:slug — not provable: route authz not in this graph
 counts: route=1 [S1]  handler=1 [S1]  middleware=11 [H11]
-note: capability route_authz is absent: an empty answer is not proof of absence
+note: capability route_authz is absent: an empty answer is not proof of absence (not declared: .clojure-atlas.edn names no route authz key, permission middleware or permission fn)
 DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): handler (1)
   1. clojure.realworld.rest-api.handler/delete-article  bases/rest-api/src/clojure/realworld/rest_api/api.clj:33 [S]  entry: route DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes
 DELETE /api/articles/:slug @clojure.realworld.rest-api.api/private-routes (base clojure.realworld.rest-api.api/private-routes): middleware (outermost first) (11 H11)
