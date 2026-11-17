@@ -1,0 +1,59 @@
+// `clojure-atlas build`: the I/O shell around the pure builder. Lists the files, runs kondo, reads the sources,
+// assembles the graph and writes it (gzipped when the name ends in .gz).
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { ADAPTERS } from "./adapters/index.js";
+import { assemble } from "./assemble.js";
+import { EMPTY_CONFIG, parseConfig } from "./config.js";
+import { componentOf, listFiles, trackedSources } from "./files.js";
+import { analyze, effectiveLintAs } from "./kondo.js";
+import { kondo } from "./kondo-binary.js";
+import { analyzerVersion, projectKnownSymbols, snapshotOf } from "../snapshot.js";
+import { readPlaywright } from "./typescript.js";
+import { createContext } from "./model.js";
+export const DEFAULT_GRAPH = '.clojure-atlas/graph.json.gz';
+const CONFIG_FILE = '.clojure-atlas.edn';
+// readTs reads the Playwright side; tests hand in one bound to a TypeScript of their choosing.
+export async function buildGraph(dir, readTs = readPlaywright, kondoOptions = {}) {
+    const started = Date.now();
+    const root = path.resolve(dir);
+    const files = listFiles(root);
+    const configFile = path.join(root, CONFIG_FILE);
+    const config = existsSync(configFile) ? parseConfig(readFileSync(configFile, 'utf8')) : EMPTY_CONFIG;
+    const k = await kondo();
+    const known = projectKnownSymbols(root);
+    const { analysis, timedOut } = await analyze(k.command, root, files.sources, effectiveLintAs(known, config.lintAs), kondoOptions);
+    const sources = new Map();
+    for (const f of [...files.sources, ...files.edn])
+        sources.set(f, readFileSync(path.join(root, f), 'utf8'));
+    const playwright = readTs(root, files.packageJsons, files.typescript);
+    const ctx = createContext(analysis, config, playwright, sources, files.edn, (f) => componentOf(files.moduleRoots, f), known);
+    const tracked = trackedSources(root, files);
+    const snap = snapshotOf(root, analyzerVersion(k.version));
+    const doc = assemble(ctx, ADAPTERS, {
+        repo_name: path.basename(root), ref: snap.ref, sha: snap.sha, built_at: new Date().toISOString(),
+        snapshot: snap.id, dirty_files: snap.dirty.length, config_hash: snap.configHash, config_sources: snap.configSources, analyzer: snap.analyzer,
+    }, {
+        expected: tracked.expected, sources: files.sources.length, edn: files.edn.length,
+        skipped_large: files.skippedLarge.length, skipped_large_names: files.skippedLarge,
+        unread: tracked.unread.length, unread_names: tracked.unread, unread_why: tracked.unreadWhy, timed_out: timedOut.length, timed_out_names: timedOut,
+    });
+    doc.stats.build_ms = Date.now() - started;
+    return doc;
+}
+export function writeGraph(doc, out) {
+    mkdirSync(path.dirname(out), { recursive: true });
+    const json = JSON.stringify(doc);
+    // Same-directory rename publishes a complete snapshot to shared servers, including concurrent builds.
+    const temporary = `${out}.${randomUUID()}.partial`;
+    try {
+        const mode = (statSync(out, { throwIfNoEntry: false })?.mode ?? 0o600) & 0o777;
+        writeFileSync(temporary, out.endsWith('.gz') ? gzipSync(json) : json, { flag: 'wx', mode });
+        renameSync(temporary, out);
+    }
+    finally {
+        rmSync(temporary, { force: true });
+    }
+}

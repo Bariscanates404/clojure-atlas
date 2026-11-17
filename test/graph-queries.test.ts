@@ -928,7 +928,7 @@ describe('route authz states how sure it is', () => {
 
   it('a heuristic permission edge is not stated as plain "requires"', () => {
     const r = routeAuthz(g, 'GET /admin/users');
-    assert.match(r.verdict, /^requires p \(HEURISTIC: confirm at the cited line\)/);
+    assert.match(r.verdict, /^requires p \(HEURISTIC: a name match; the cited line is the evidence\)/);
     assert.doesNotMatch(routeAuthz(g, 'GET /users/{id}').verdict, /HEURISTIC/);
   });
 

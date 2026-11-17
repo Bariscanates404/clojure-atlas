@@ -1,0 +1,342 @@
+// Agent-facing text for a QueryResult: verdict first, counts with band mix, ranked rows grouped per component,
+// trees with written edge types, UNKNOWN as "not provable; evidence at", empty sections say what was searched, a
+// hard budget with a step-by-step fallback and the exact call for the rest, then 1-3 next calls.
+import { BANDS } from "./graph.js";
+// The tool arguments every answer honours, shared by the servers' input schemas.
+export const PAGING_PROPS = {
+    response_format: { type: 'string', enum: ['concise', 'detailed', 'json'],
+        description: 'concise (default): verdict, counts, top rows; detailed: adds details for the top rows and a legend; json: the structured result' },
+    limit: { type: 'number', description: 'rows per section (default 10 concise, 25 detailed, max 500)' },
+    offset: { type: 'number', description: 'skip this many rows per section (paging; truncated sections print the next offset)' },
+    section: { type: 'string', description: 'only sections whose name contains this text' },
+    max_tokens: { type: 'number', description: 'answer budget (default 1500 concise, 4000 detailed); over it the answer shortens step by step' },
+};
+export const withSource = (json, source) => JSON.stringify({ ...JSON.parse(json), source });
+// The render options a tool call's arguments carry; anything of the wrong type is left to the renderer's default.
+export function renderOptionsOf(args) {
+    const n = (k) => (typeof args[k] === 'number' ? args[k] : undefined);
+    return {
+        format: ['concise', 'detailed', 'json'].includes(String(args.response_format)) ? args.response_format : undefined,
+        limit: n('limit'),
+        offset: n('offset'),
+        maxTokens: n('max_tokens'),
+        section: typeof args.section === 'string' ? args.section : undefined,
+    };
+}
+export const DEFAULT_LIMIT = { concise: 10, detailed: 25 };
+export const MAX_LIMIT = 500;
+export const DEFAULT_MAX_TOKENS = { concise: 1500, detailed: 4000 };
+export const CHARS_PER_TOKEN = 4;
+const DETAIL_TOP = 5;
+const MAX_QUERY_CHARS = 80;
+// In-house: `declared` ([D]) is the band of el-mcp's curated rows, which share this renderer; no graph edge carries it.
+export const BAND_CODE = { static_proven: 'S', declared: 'D', heuristic: 'H', unknown: '?' };
+const LEGEND = 'legend: [S] static_proven  [H] heuristic (name or pattern match; the cited line is the evidence)  [?] unknown, not provable';
+export function clampLimit(limit, format = 'concise') {
+    const def = format === 'detailed' ? DEFAULT_LIMIT.detailed : DEFAULT_LIMIT.concise;
+    if (limit === undefined || !Number.isFinite(limit))
+        return def;
+    return Math.max(1, Math.min(MAX_LIMIT, Math.floor(limit)));
+}
+export function where(r) {
+    return r.line ? `${r.file ?? '(no file)'}:${r.line}` : (r.file ?? '(no file)');
+}
+const tag = (r) => `[${BAND_CODE[r.band] ?? '?'}]`;
+export function why(r, crossShownInGroup = false) {
+    const parts = [];
+    if (r.entry)
+        parts.push(`entry: ${r.entry}`);
+    if (r.cross && !crossShownInGroup)
+        parts.push('cross-comp');
+    if ((r.fanIn ?? 0) >= 3)
+        parts.push(`fan-in ${r.fanIn}`);
+    if (r.band === 'heuristic')
+        parts.push('heuristic match');
+    return parts.slice(0, 2).join(', ');
+}
+function rankKey(r) {
+    return [BANDS.indexOf(r.band), r.depth ?? 0, r.entry ? 0 : 1, -(r.fanIn ?? 0), r.cross ? 0 : 1, r.label];
+}
+function compareRows(a, b) {
+    const ka = rankKey(a);
+    const kb = rankKey(b);
+    for (let i = 0; i < ka.length; i++) {
+        if (ka[i] < kb[i])
+            return -1;
+        if (ka[i] > kb[i])
+            return 1;
+    }
+    return 0;
+}
+export function rankRows(rows) {
+    return rows.slice().sort(compareRows);
+}
+export function bandMix(rows) {
+    return BANDS.map((b) => ({ code: BAND_CODE[b], n: rows.filter((r) => r.band === b).length })).filter((x) => x.n).map((x) => `${x.code}${x.n}`).join(' ');
+}
+const shortName = (s) => s.short ?? s.name;
+// section= takes the long name (or part of it) or the short name the paging hints print.
+const sectionMatches = (s, want) => !want || s.name.includes(want) || s.short === want;
+function rowLine(r, n, withDetail, indent = '  ', grouped = false) {
+    const w = why(r, grouped);
+    const detail = withDetail && (r.detail || r.reason) ? `  (${[r.detail, r.reason].filter(Boolean).join('; ')})` : '';
+    const depth = r.depth && r.depth > 1 ? ` d${r.depth}` : '';
+    return `${indent}${n === null ? '' : `${n}. `}${r.label}  ${where(r)} ${tag(r)}${depth}${w ? `  ${w}` : ''}${detail}`;
+}
+function unknownLine(r) {
+    const reason = r.reason ? ` (${r.reason})` : '';
+    return `  UNKNOWN: ${r.label} at ${where(r)}${r.detail ? ` [${r.detail}]` : ''}${reason} — not provable; evidence at ${where(r)}`;
+}
+function groupKey(r, by) {
+    if (by === 'file')
+        return r.file ?? '(no file)';
+    if (by === 'component')
+        return r.component ?? '(no component)';
+    return '';
+}
+function treeOrder(rows) {
+    const ids = new Set(rows.map((r) => r.id));
+    const kids = new Map();
+    const roots = [];
+    for (const r of rows) {
+        if (r.parentId && ids.has(r.parentId)) {
+            const k = kids.get(r.parentId) ?? [];
+            k.push(r);
+            kids.set(r.parentId, k);
+        }
+        else
+            roots.push(r);
+    }
+    const out = [];
+    const walk = (r, trail) => {
+        out.push({ row: r, trail });
+        for (const c of rankRows(kids.get(r.id) ?? []))
+            walk(c, [...trail, r]);
+    };
+    for (const r of rankRows(roots))
+        walk(r, []);
+    return out;
+}
+const EDGE_WORDS = {
+    calls: 'called by', references: 'referenced by', passes_callback: 'passed as a callback by', registers_handler: 'registered as a handler by',
+    expands_via: 'expanded by',
+    may_dispatch_to: 'may be dispatched to by', rebinds: 'rebound by',
+};
+const edgeWord = (r) => EDGE_WORDS[r.kind ?? ''] ?? `${r.kind ?? 'linked'} by`;
+// How a section is grouped: an ordered section never is, and "component" falls back to none when no row has one.
+const groupingOf = (s, groupBy) => (s.ordered || (groupBy === 'component' && !s.rows.some((r) => r.component)) ? 'none' : groupBy);
+// The known rows of a section in the order every format pages them.
+function displayOrder(s, known, by) {
+    if (s.ordered)
+        return known.map((row) => ({ row, level: 0, group: '', trail: [] }));
+    if (s.tree) {
+        let current = '';
+        const flat = treeOrder(known).map(({ row, trail }) => {
+            if (!trail.length)
+                current = groupKey(row, by);
+            return { row, level: trail.length, group: current, trail };
+        });
+        const groups = [...new Set(flat.map((x) => x.group))];
+        return groups.flatMap((g) => flat.filter((x) => x.group === g));
+    }
+    const ranked = rankRows(known);
+    const groups = [...new Set(ranked.map((r) => groupKey(r, by)))];
+    return groups.flatMap((g) => ranked.filter((r) => groupKey(r, by) === g).map((row) => ({ row, level: 0, group: g, trail: [] })));
+}
+function renderSection(s, o, lv) {
+    if (!s.rows.length && s.unextracted)
+        return [`${s.name}: ${s.unextracted}`];
+    if (!s.rows.length)
+        return [`${s.name}: none${s.searched ? ` (searched: ${s.searched})` : ''}`];
+    const known = s.rows.filter((r) => r.band !== 'unknown');
+    const unknown = s.rows.filter((r) => r.band === 'unknown');
+    const out = [known.length
+            ? `${s.name} (${s.rows.length}${s.rows.length > 1 ? ` ${bandMix(s.rows)}` : ''})`
+            : `${s.name}: none proven (${unknown.length} uncertain)`];
+    const by = groupingOf(s, o.groupBy);
+    if (!lv.rows) {
+        if (lv.groups && by !== 'none') {
+            const counts = new Map();
+            for (const r of s.rows)
+                counts.set(groupKey(r, by), (counts.get(groupKey(r, by)) ?? 0) + 1);
+            out.push(`  ${[...counts].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+        }
+        // UNKNOWN rows stay listed while counts per group are shown: an unprovable row is never folded into a number
+        if (lv.groups) {
+            for (const u of unknown.slice(0, o.limit))
+                out.push(unknownLine(u));
+            if (unknown.length > o.limit)
+                out.push(`  +${unknown.length - o.limit} more UNKNOWN (all: section="${shortName(s)}" limit=${unknown.length})`);
+        }
+        return out;
+    }
+    const ordered = displayOrder(s, known, by);
+    const totals = new Map();
+    for (const x of ordered)
+        totals.set(x.group, (totals.get(x.group) ?? 0) + 1);
+    const page = ordered.slice(o.offset, o.offset + o.limit);
+    const withDetail = (i) => lv.details && (!!s.ordered || (o.format === 'detailed' && i < DETAIL_TOP));
+    const rowAt = (row, level, number, detail, indent, inGroup) => (level === 0
+        ? rowLine(row, number, detail, indent, inGroup)
+        : `${indent}${'    '.repeat(level - 1)}  └─ ${edgeWord(row)} ${rowLine(row, null, detail, '', inGroup)}`);
+    if (ordered.length && !page.length)
+        out.push(`  offset ${o.offset} is past the end of the ${ordered.length} row(s)`);
+    let lastGroup = null;
+    page.forEach((x, i) => {
+        const grouped = by !== 'none';
+        if (grouped && x.group !== lastGroup) {
+            out.push(`  ${x.group}: ${totals.get(x.group)}${by === 'component' && x.row.cross ? ' (cross-comp)' : ''}`);
+            lastGroup = x.group;
+        }
+        const indent = grouped ? '    ' : '  ';
+        const inGroup = by === 'component';
+        if (i === 0 && x.trail.length) {
+            out.push(`${indent}(continued from the previous page: the rows below hang under)`);
+            x.trail.forEach((t, level) => out.push(rowAt(t, level, null, false, indent, inGroup)));
+        }
+        out.push(rowAt(x.row, x.level, o.offset + i + 1, withDetail(i), indent, inGroup));
+    });
+    const rest = ordered.length - o.offset - page.length;
+    if (rest > 0)
+        out.push(`  +${rest} more (next page: offset=${o.offset + page.length} section="${shortName(s)}")`);
+    for (const u of unknown.slice(0, o.limit))
+        out.push(unknownLine(u));
+    if (unknown.length > o.limit)
+        out.push(`  +${unknown.length - o.limit} more UNKNOWN (all: section="${shortName(s)}" limit=${unknown.length})`);
+    return out;
+}
+function sectionOpts(o) {
+    const format = o.format === 'detailed' ? 'detailed' : 'concise';
+    return {
+        format,
+        groupBy: o.groupBy ?? 'component',
+        limit: clampLimit(o.limit, format),
+        offset: Math.max(0, Math.floor(Number.isFinite(o.offset) ? (o.offset ?? 0) : 0)),
+    };
+}
+// The lines before the sections (header, verdict, counts, legend, notes) and after them (next calls).
+function frame(res, o, sections) {
+    const head = [];
+    if (o.header)
+        head.push(o.header);
+    // a very long query is named once in full by the caller; the answer quotes a short form so the verdict fits the budget
+    const query = res.query.length > MAX_QUERY_CHARS ? `${res.query.slice(0, MAX_QUERY_CHARS)}... (${res.query.length} chars)` : res.query;
+    const quoted = (text) => text.split(res.query).join(query);
+    head.push(`${res.name.toUpperCase()} ${query} — ${quoted(res.verdict)}`);
+    const counted = sections.filter((s) => s.rows.length && !(s.name === 'definition' && s.rows.length === 1));
+    if (counted.length)
+        head.push(`counts: ${counted.map((s) => `${shortName(s)}=${s.rows.length} [${bandMix(s.rows)}]`).join('  ')}`);
+    if (o.format === 'detailed')
+        head.push(LEGEND);
+    for (const n of res.notes)
+        head.push(`note: ${quoted(n)}`);
+    if (o.section && !sections.length)
+        head.push(`no section matches ${JSON.stringify(o.section)}; sections: ${res.sections.map(shortName).join(', ')}`);
+    const tail = [];
+    if (!res.found && !res.sections.length && !res.badArgument && !res.unparsed
+        && !res.used)
+        tail.push('searched: names, ids and kind-prefixed ids; check the spelling or pass the fully qualified name');
+    if (res.next.length)
+        tail.push(`next: ${res.next.slice(0, 3).join('  ')}`);
+    return { head, tail };
+}
+const LADDER = [
+    { level: { details: true, rows: true, groups: true }, step: '' },
+    { level: { details: false, rows: true, groups: true }, step: 'details dropped' },
+    { level: { details: false, rows: false, groups: true }, step: 'rows→counts per group' },
+    { level: { details: false, rows: false, groups: false }, step: 'rows→section totals' },
+];
+// JSON honours section=, offset= and limit= like the text formats, and fits max_tokens (default: the detailed
+// budget) by halving the rows per section; `truncated` and each section's `total` say what was left out.
+function renderJson(res, opts) {
+    const budget = (opts.maxTokens !== undefined && Number.isFinite(opts.maxTokens) && opts.maxTokens > 0 ? opts.maxTokens
+        : DEFAULT_MAX_TOKENS.detailed) * CHARS_PER_TOKEN;
+    const offset = Math.max(0, Math.floor(Number.isFinite(opts.offset) ? (opts.offset ?? 0) : 0));
+    const paged = opts.limit !== undefined || offset > 0;
+    const sections = res.sections.filter((s) => sectionMatches(s, opts.section));
+    const most = Math.max(0, ...sections.map((s) => s.rows.length));
+    // the same page as the text formats: known rows in display order, then the section's first UNKNOWN rows
+    const page = (s, limit) => {
+        const known = s.rows.filter((r) => r.band !== 'unknown');
+        const unknown = s.rows.filter((r) => r.band === 'unknown');
+        return [...displayOrder(s, known, groupingOf(s, opts.groupBy ?? 'component')).slice(offset, offset + limit).map((x) => x.row), ...unknown.slice(0, limit)];
+    };
+    const shape = (limit, truncated) => JSON.stringify({
+        ...res,
+        sections: sections.map((s) => {
+            if (offset === 0 && limit >= s.rows.length)
+                return s;
+            return { ...s, rows: page(s, limit), total: s.rows.length, offset };
+        }),
+        ...(truncated ? { truncated: `rows cut to fit ${Math.floor(budget / CHARS_PER_TOKEN)} tokens; page with offset= and limit=` } : {}),
+    });
+    let limit = paged ? clampLimit(opts.limit, 'detailed') : most;
+    let out = shape(limit, false);
+    while (out.length > budget && limit > 0) {
+        limit = Math.floor(limit / 2);
+        out = shape(limit, true);
+    }
+    return out;
+}
+const CUT_NOTE = '\n... cut at the budget';
+// Last resort: cut at the last whole line that fits (a single over-long line at its last space).
+function hardCut(text, budget) {
+    let head = text.slice(0, Math.max(0, budget - CUT_NOTE.length));
+    const nl = head.lastIndexOf('\n');
+    const sp = head.lastIndexOf(' ');
+    if (nl > 0)
+        head = head.slice(0, nl);
+    else if (sp > 0)
+        head = head.slice(0, sp);
+    return `${head}${CUT_NOTE}`;
+}
+// Over the budget, sections step down the ladder one at a time, the largest first and the risk section last, so a
+// small section keeps its rows while a big one becomes counts.
+export function render(res, opts = {}) {
+    if (opts.format === 'json')
+        return renderJson(res, opts);
+    const format = opts.format === 'detailed' ? 'detailed' : 'concise';
+    const tokens = opts.maxTokens !== undefined && Number.isFinite(opts.maxTokens) && opts.maxTokens > 0 ? opts.maxTokens : DEFAULT_MAX_TOKENS[format];
+    const budget = tokens * CHARS_PER_TOKEN;
+    const so = sectionOpts(opts);
+    const sections = res.sections.filter((s) => sectionMatches(s, opts.section));
+    const { head, tail } = frame(res, opts, sections);
+    const cache = new Map();
+    const linesOf = (i, l) => {
+        const key = `${i}:${l}`;
+        let hit = cache.get(key);
+        if (hit === undefined) {
+            hit = renderSection(sections[i], so, LADDER[l].level);
+            cache.set(key, hit);
+        }
+        return hit;
+    };
+    const levels = sections.map(() => 0);
+    const last = LADDER.length - 1;
+    const note = () => {
+        const deepest = Math.max(0, ...levels);
+        if (deepest === 0)
+            return null;
+        // when only some sections stepped down, name them (at most three) so the others read as complete
+        const which = sections.filter((_s, i) => levels[i] > 0).map(shortName);
+        const scope = which.length < sections.length ? ` in ${which.slice(0, 3).join(', ')}${which.length > 3 ? ` +${which.length - 3} more` : ''}` : '';
+        return `truncated: ${LADDER[deepest].step}${scope} (budget ${tokens} tokens; narrow with section= or offset=, or raise max_tokens)`;
+    };
+    const compose = () => {
+        const n = note();
+        const top = n === null ? head : [...head.slice(0, opts.header ? 2 : 1), n, ...head.slice(opts.header ? 2 : 1)];
+        return [...top, ...sections.flatMap((_s, i) => linesOf(i, levels[i])), ...tail].join('\n');
+    };
+    for (;;) {
+        const text = compose();
+        if (text.length <= budget)
+            return text;
+        const size = (i) => linesOf(i, levels[i]).reduce((n, l) => n + l.length + 1, 0);
+        const open = sections.map((_s, i) => i).filter((i) => levels[i] < last);
+        const pool = open.some((i) => sections[i].name !== 'risk') ? open.filter((i) => sections[i].name !== 'risk') : open;
+        if (!pool.length)
+            return hardCut(text, budget);
+        const pick = pool.reduce((a, b) => (size(b) > size(a) ? b : a));
+        levels[pick] += 1;
+    }
+}

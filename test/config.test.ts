@@ -14,7 +14,7 @@ describe('.clojure-atlas.edn', () => {
     assert.deepEqual(c, {
       lintAs: { 'a.b/defx': 'clojure.core/def' },
       routeAuthz: { key: ':authz', permission: ':perm', exempt: ':public', scope: ':tenant', alternative: ':or' },
-      permissionMiddleware: ['a.auth/wrap-perm'], permissionFns: ['a.auth/check!'], routeMacros: { 'a.web/GET*': 'compojure.core/GET' },
+      permissionMiddleware: ['a.auth/wrap-perm'], permissionFns: ['a.auth/check!'], routeMacros: { 'a.web/GET*': 'compojure.core/GET' }, selectorPrefixes: [],
     });
   });
   it('an empty map is the empty config', () => assert.deepEqual(parseConfig('{}'), EMPTY_CONFIG));

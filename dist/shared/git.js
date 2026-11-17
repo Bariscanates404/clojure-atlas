@@ -1,0 +1,85 @@
+// The one way atlas runs git. The analyzed repository is untrusted: its .git/config and .gitattributes are read by
+// every git command, and some settings make git execute a command. Every call therefore carries overrides.
+//
+// Why the set is complete for the subcommands atlas uses (status, rev-parse, rev-list, ls-files, check-ignore):
+//  - core.fsmonitor runs a hook command on status/ls-files (index refresh); core.untrackedCache goes with it. Both off.
+//  - filter.<driver>.clean/smudge/process run when status compares a stat-dirty file's content, with the driver named
+//    by a .gitattributes file in the tree. Driver names are free text, so they are read from the config (`git config`
+//    runs nothing) and each is switched off: empty clean/smudge are skipped by git, `process` is cleared and
+//    `required` is false so an unusable driver is not an error.
+//  - core.hooksPath/.git/hooks: status may rewrite the index, which fires post-index-change. Hooks point at the null
+//    device, and GIT_OPTIONAL_LOCKS=0 stops status writing the index at all.
+//  - diff.external, diff.<driver>.textconv, core.pager, core.editor, credential/ssh/proxy settings belong to diff,
+//    pagers, editors and network commands, which atlas never runs (stdout is a pipe, so no pager starts anyway).
+//  - submodules: a submodule has its own config under .git/modules, which atlas cannot switch off, so no atlas call may
+//    run git inside one. status gets --ignore-submodules=all (see snapshot.ts); ls-files, rev-parse, rev-list and
+//    check-ignore never enter a submodule unless asked to (--recurse-submodules), which atlas never does.
+//  - the program: git is spawned from an absolute path found by searching PATH here (executable.ts), never from the
+//    analyzed directory, where Windows would look first.
+// GIT_TERMINAL_PROMPT=0 makes any credential question fail instead of waiting, and a timeout bounds every call.
+import { execFileSync } from 'node:child_process';
+import { devNull } from 'node:os';
+import { whichExecutable } from "./executable.js";
+export const SAFE_GIT_CONFIG = ['core.fsmonitor=false', 'core.untrackedCache=false', `core.hooksPath=${devNull}`];
+export const GIT_TIMEOUT_MS = 60_000;
+const ENV = { GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };
+const overrides = (config) => config.flatMap((c) => ['-c', c]);
+const located = new Map();
+// The absolute path of git for runs in `root`, found once per directory and PATH.
+function gitProgram(root) {
+    const key = `${root}\0${process.env.PATH ?? ''}`;
+    if (!located.has(key))
+        located.set(key, whichExecutable('git', [root, process.cwd()]));
+    return located.get(key) ?? null;
+}
+function exec(root, args, config, opts) {
+    const program = gitProgram(root);
+    if (program === null)
+        throw new Error('git is not installed or not on PATH');
+    try {
+        return execFileSync(program, [...overrides(config), '-C', root, ...args], {
+            encoding: 'utf8',
+            input: opts.input,
+            maxBuffer: 1 << 30,
+            timeout: opts.timeoutMs ?? GIT_TIMEOUT_MS,
+            env: { ...process.env, ...ENV },
+            stdio: [opts.input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'],
+        });
+    }
+    catch (err) {
+        const e = err;
+        const how = e.code === 'ETIMEDOUT' ? 'timed out' : e.status != null ? `exited ${e.status}` : `failed (${e.code ?? e.signal ?? 'unknown'})`;
+        throw new Error(`git ${args[0]} ${how}`);
+    }
+}
+// Overrides that switch off every filter driver the repository's config defines.
+function filterOverrides(root) {
+    let listed = '';
+    try {
+        listed = exec(root, ['config', '-z', '--get-regexp', '^filter\\.'], SAFE_GIT_CONFIG, {});
+    }
+    catch {
+        return [];
+    }
+    const drivers = new Set();
+    for (const entry of listed.split('\0')) {
+        const key = entry.split('\n')[0];
+        const m = /^filter\.(.+)\.[^.]+$/.exec(key);
+        if (m)
+            drivers.add(m[1]);
+    }
+    return [...drivers].flatMap((d) => [`filter.${d}.clean=`, `filter.${d}.smudge=`, `filter.${d}.process=`, `filter.${d}.required=false`]);
+}
+// Output of `git <args>` in `root`; throws when git fails or times out.
+export function runGit(root, args, opts = {}) {
+    return exec(root, args, [...SAFE_GIT_CONFIG, ...filterOverrides(root)], opts);
+}
+// The same, null on any failure (no repository, no git, timeout).
+export function git(root, args, input, timeoutMs) {
+    try {
+        return runGit(root, args, { input, timeoutMs });
+    }
+    catch {
+        return null;
+    }
+}

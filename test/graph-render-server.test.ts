@@ -387,7 +387,7 @@ describe('MCP server', () => {
     const r = handleMessage(g, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } }) as { result: Record<string, unknown> };
     assert.equal(r.result.protocolVersion, '2025-03-26');
     assert.deepEqual(r.result.capabilities, { tools: {} });
-    assert.deepEqual(r.result.serverInfo, { name: 'clojure-atlas', version: '0.1.0' });
+    assert.deepEqual(r.result.serverInfo, { name: 'clojure-atlas', version: '0.2.0' });
   });
 
   it('initialize hands the agent instructions that name only tools the server has', () => {

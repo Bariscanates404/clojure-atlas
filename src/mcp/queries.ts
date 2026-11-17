@@ -359,7 +359,7 @@ export function routeVerdict(g: Graph, routeId: string): { state: AuthzState; te
   if (permE.length) {
     const unknown = permE.some((e) => e.band === 'unknown');
     const guessed = !unknown && permE.some((e) => e.band === 'heuristic');
-    const caveat = unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : guessed ? ' (HEURISTIC: confirm at the cited line)' : '';
+    const caveat = unknown ? ' (includes an UNKNOWN check: decided at runtime, not absent)' : guessed ? ' (HEURISTIC: a name match; the cited line is the evidence)' : '';
     const text = `requires ${permissionExpression(g, permE)}${caveat}${chainUnread ? ` (${CHAIN_UNREAD_MORE})` : ''}`;
     return { state: unknown ? 'unknown' : 'permission', text };
   }
@@ -866,6 +866,8 @@ export interface ChangeOptions {
   added?: readonly string[];
   // the working clone (--repo): a file on disk there exists even when the graph holds no node of it
   repoDir?: string;
+  // In-house: the specs come from a diff (the review pipeline), so every file existed on one side and none is a mistyped path
+  fromDiff?: boolean;
 }
 
 export const CHANGE_FORMAT = '"file", "file:12" or "file:10-20,30-41"';
@@ -1023,7 +1025,7 @@ export function contextForChange(g: Graph, specs: string[], opts: ChangeOptions 
   if (!specs.every(validSpec)) return badSpecs(specs);
   const changes = specs.map(parseChange).filter((c) => c.file);
   const known = new Set([...g.doc.nodes.map((n) => n.file), ...(opts.added ?? [])]);
-  const missing = changes.filter((c) => !known.has(c.file) && !onDisk(opts.repoDir, c.file));
+  const missing = opts.fromDiff === true ? [] : changes.filter((c) => !known.has(c.file) && !onDisk(opts.repoDir, c.file));
   const missingFiles = [...new Set(missing.map((c) => c.file))];
   const title = `context for change (${changes.length} file(s))`;
   const changed = g.doc.nodes.filter((n) => changes.some((c) => touched(n, c)));

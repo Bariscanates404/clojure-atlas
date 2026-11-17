@@ -1,0 +1,166 @@
+// The slice of clj-kondo's analysis the builder reads, normalized: camelCase fields, the copies a .cljc file
+// yields per platform merged, and two kinds of var usage dropped: the arity-only copy kondo synthesizes for a
+// higher-order call (the value use at the same place stays) and a :refer in the ns form.
+import { contains } from "./reader.js";
+const emptyAnalysis = () => ({
+    nsDefs: [], nsUses: [], varDefs: [], varUses: [], keywords: [], protocolImpls: [], syntaxErrors: [],
+});
+const s = (v) => (typeof v === 'string' ? v : undefined);
+const n = (v) => (typeof v === 'number' ? v : undefined);
+const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'object' && x !== null) : []);
+function span(r) {
+    const row = n(r.row) ?? 0;
+    const col = n(r.col) ?? 0;
+    return { file: s(r.filename) ?? '', row, col, endRow: n(r['end-row']) ?? row, endCol: n(r['end-col']) ?? col };
+}
+// kondo names the platform of a definition in a .cljc file only; any other file has the one its extension says.
+const languageOf = (file) => (file.endsWith('.cljs') ? 'cljs' : 'clj');
+const key = (...xs) => xs.map(String).join('\0');
+// Keeps the first entry per key and folds later duplicates into it (a .cljc file is analyzed once per platform).
+function dedupe(xs, k, merge = (a) => a) {
+    const m = new Map();
+    for (const x of xs) {
+        const id = k(x);
+        const prev = m.get(id);
+        m.set(id, prev === undefined ? x : merge(prev, x));
+    }
+    return [...m.values()];
+}
+function reFrame(r) {
+    const ctx = r.context;
+    const rf = ctx && (ctx['re-frame.core'] ?? ctx['re-frame.alpha']);
+    if (!rf || typeof rf !== 'object')
+        return undefined;
+    return {
+        ...(s(rf['in-id']) ? { inId: s(rf['in-id']) } : {}),
+        ...(s(rf.id) ? { id: s(rf.id) } : {}),
+        ...(rf['event-ref'] === true ? { eventRef: true } : {}),
+        ...(rf['subscription-ref'] === true ? { subscriptionRef: true } : {}),
+    };
+}
+const CURRENT_NS = '__current-ns__';
+// One kondo JSON document (one `--lint` run) to the normalized model.
+export function normalize(raw) {
+    const a = (raw.analysis ?? {});
+    const nsDefs = dedupe(list(a['namespace-definitions']).map((r) => ({ ...span(r), name: s(r.name) ?? '' })), (x) => key(x.file, x.name));
+    const nsUses = dedupe(list(a['namespace-usages']).map((r) => ({ file: s(r.filename) ?? '', row: n(r.row) ?? 0, col: n(r.col) ?? 0, from: s(r.from) ?? '', to: s(r.to) ?? '' })), (x) => key(x.file, x.row, x.col, x.to));
+    const varDefs = dedupe(list(a['var-definitions']).map((r) => ({
+        ...span(r),
+        ns: s(r.ns) ?? '',
+        name: s(r.name) ?? '',
+        ...(s(r['defined-by']) ? { definedBy: s(r['defined-by']) } : {}),
+        ...(s(r['defined-by->lint-as']) ? { lintAs: s(r['defined-by->lint-as']) } : {}),
+        ...(Array.isArray(r['fixed-arities']) ? { fixedArities: r['fixed-arities'].filter((x) => typeof x === 'number') } : {}),
+        ...(n(r['varargs-min-arity']) !== undefined ? { varargsMin: n(r['varargs-min-arity']) } : {}),
+        test: r.test === true,
+        macro: r.macro === true,
+        fn: r.macro !== true && (Array.isArray(r['fixed-arities']) || n(r['varargs-min-arity']) !== undefined || r['defined-by'] === 'clojure.core/defmulti'),
+        private: r.private === true,
+        langs: [s(r.lang) ?? languageOf(span(r).file)],
+    })), (x) => key(x.file, x.ns, x.name, x.row, x.col), 
+    // a platform that counts other parameters leaves both counts: the form then has no single parameter vector
+    (p, q) => ({
+        ...p, langs: [...new Set([...p.langs, ...q.langs])].sort(),
+        ...(p.fixedArities || q.fixedArities ? { fixedArities: [...new Set([...(p.fixedArities ?? []), ...(q.fixedArities ?? [])])] } : {}),
+        ...(p.varargsMin !== q.varargsMin ? { varargsMin: -1 } : {}),
+    }));
+    const varUses = dedupe(list(a['var-usages'])
+        // an arity-only copy has no name position; a :refer in the ns form names a var without using it
+        .filter((r) => typeof r['name-row'] === 'number' && r.refer !== true)
+        .map((r) => ({
+        ...span(r),
+        nameRow: n(r['name-row']) ?? 0,
+        nameCol: n(r['name-col']) ?? 0,
+        from: s(r.from) ?? '',
+        ...(s(r['from-var']) ? { fromVar: s(r['from-var']) } : {}),
+        to: s(r.to) ?? '',
+        name: s(r.name) ?? '',
+        ...(n(r.arity) !== undefined ? { arity: n(r.arity) } : {}),
+        macro: r.macro === true,
+        defmethod: r.defmethod === true,
+        ...(s(r['dispatch-val-str']) ? { dispatch: s(r['dispatch-val-str']) } : {}),
+    })), (x) => key(x.file, x.nameRow, x.nameCol, x.to, x.name, x.defmethod));
+    const nsForms = new Map(nsDefs.map((d) => [d.file, d]));
+    const inNsForm = (file, row, col) => {
+        const d = nsForms.get(file);
+        return !!d && contains(d, row, col);
+    };
+    const keywords = dedupe(list(a.keywords)
+        // :require, :as, :refer in an ns form are syntax, not keyword uses
+        .filter((r) => !inNsForm(s(r.filename) ?? '', n(r.row) ?? 0, n(r.col) ?? 0))
+        .map((r) => {
+        const rf = reFrame(r);
+        // kondo spells the namespace of #::{...} keys as a placeholder: it is the namespace the keyword is written in
+        const ns = s(r.ns) === CURRENT_NS ? s(r.from) : s(r.ns);
+        return {
+            ...span(r),
+            ...(ns ? { ns } : {}),
+            name: s(r.name) ?? '',
+            from: s(r.from) ?? '',
+            ...(s(r['from-var']) ? { fromVar: s(r['from-var']) } : {}),
+            ...(s(r.reg) ? { reg: s(r.reg) } : {}),
+            ...(rf ? { reFrame: rf } : {}),
+            ...(r['keys-destructuring'] === true ? { destructured: true } : {}),
+        };
+    }), (x) => key(x.file, x.row, x.col), (p, q) => ({ ...q, ...p, ...(p.reg ?? q.reg ? { reg: p.reg ?? q.reg } : {}),
+        ...(p.reFrame || q.reFrame ? { reFrame: { ...q.reFrame, ...p.reFrame } } : {}) }));
+    const protocolImpls = dedupe(list(a['protocol-impls']).map((r) => ({
+        ...span(r),
+        protocolNs: s(r['protocol-ns']) ?? '',
+        protocolName: s(r['protocol-name']) ?? '',
+        method: s(r['method-name']) ?? '',
+        implNs: s(r['impl-ns']) ?? '',
+        definedBy: s(r['defined-by']) ?? '',
+    })), (x) => key(x.file, x.row, x.col, x.method));
+    const syntaxErrors = dedupe(list(raw.findings)
+        .filter((r) => r.type === 'syntax')
+        .map((r) => ({ file: s(r.filename) ?? '', row: n(r.row) ?? 0, message: s(r.message) ?? '' })), (x) => key(x.file, x.row, x.message));
+    return withoutProtocolParams(withoutRichComments({ nsDefs, nsUses, varDefs, varUses, keywords, protocolImpls, syntaxErrors }));
+}
+export const CORE_NS = /^(clojure|cljs)\.core$/;
+// the namespace kondo gives a symbol it cannot resolve: special forms, macros it does not know, unbound names
+export const UNKNOWN_NS = 'clj-kondo/unknown-namespace';
+// The calls of one clojure.core macro, by file: kondo gives such a call the span of its whole form.
+function macroCalls(a, name) {
+    const byFile = new Map();
+    for (const u of a.varUses)
+        if (u.macro && u.name === name && CORE_NS.test(u.to))
+            byFile.set(u.file, [...(byFile.get(u.file) ?? []), u]);
+    return byFile;
+}
+// What stands inside a (comment ...) form is never run: a call, a definition, a require or a keyword there is not
+// part of the program, so none of it is kept (the `comment` usage itself stays, it is a call to the macro).
+function withoutRichComments(a) {
+    const comments = macroCalls(a, 'comment');
+    if (comments.size === 0)
+        return a;
+    const inside = (file, row, col, self) => (comments.get(file) ?? []).some((c) => c !== self && contains(c, row, col));
+    return {
+        ...a,
+        nsUses: a.nsUses.filter((x) => !inside(x.file, x.row, x.col)),
+        varDefs: a.varDefs.filter((x) => !inside(x.file, x.row, x.col)),
+        varUses: a.varUses.filter((x) => !inside(x.file, x.row, x.col, x)),
+        keywords: a.keywords.filter((x) => !inside(x.file, x.row, x.col)),
+        protocolImpls: a.protocolImpls.filter((x) => !inside(x.file, x.row, x.col)),
+    };
+}
+// kondo reports the parameters of a protocol method signature, (defprotocol P (m [this x])), as usages of names it
+// cannot resolve; they are locals of a signature that has no body, so they are dropped.
+function withoutProtocolParams(a) {
+    const protocols = macroCalls(a, 'defprotocol');
+    if (protocols.size === 0)
+        return a;
+    return {
+        ...a,
+        varUses: a.varUses.filter((u) => u.to !== UNKNOWN_NS || !(protocols.get(u.file) ?? []).some((p) => contains(p, u.row, u.col))),
+    };
+}
+// Several runs (one per chunk of files) into one model; chunks never share a file.
+export function concat(parts) {
+    const out = emptyAnalysis();
+    for (const k of Object.keys(out))
+        out[k] = parts.flatMap((p) => p[k]);
+    return out;
+}
+// "ns/name" for a keyword, with its leading colon.
+export const keywordName = (k) => `:${k.ns ? `${k.ns}/` : ''}${k.name}`;

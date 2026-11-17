@@ -23,9 +23,12 @@ export interface ProjectConfig {
   permissionFns: string[];
   // project macros used like compojure's: {my.app/GET* compojure.core/GET}
   routeMacros: Record<string, string>;
+  // In-house: class prefixes the project reserves for test hooks (["qa-"]). A string literal that holds such a class is a
+  // rendered selector wherever it stands (a :qa-class or :main-class prop, a (str ...) argument), not only under :class.
+  selectorPrefixes: string[];
 }
 
-export const EMPTY_CONFIG: ProjectConfig = { lintAs: {}, permissionMiddleware: [], permissionFns: [], routeMacros: {} };
+export const EMPTY_CONFIG: ProjectConfig = { lintAs: {}, permissionMiddleware: [], permissionFns: [], routeMacros: {}, selectorPrefixes: [] };
 
 export class ConfigError extends Error {}
 
@@ -86,6 +89,10 @@ export function parseConfig(text: string): ProjectConfig {
     else if (k === ':route-macros') config.routeMacros = symbolMap(v, k);
     else if (k === ':permission-middleware') config.permissionMiddleware = symbolList(v, k);
     else if (k === ':permission-fns') config.permissionFns = symbolList(v, k);
+    else if (k === ':selector-prefixes') {
+      if (!Array.isArray(v) || !v.every((x) => typeof x === 'string' && /^[A-Za-z][\w-]*$/.test(x))) fail(`${k} must be a vector of class prefixes like "qa-"`);
+      config.selectorPrefixes = v as string[];
+    }
     else if (k === ':route-authz') {
       if (typeof v !== 'object' || Array.isArray(v)) fail(':route-authz must be a map');
       const m = v as Record<string, Edn>;

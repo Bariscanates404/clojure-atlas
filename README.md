@@ -711,6 +711,19 @@ that is the truth, instead of an empty list that reads like "none". A green suit
 about these fixtures and these repositories. They do not guarantee a correct answer on yours; read the band on
 every row.
 
+## Use as a library
+
+The package exports compiled JavaScript with type declarations, so another tool can import the queries and the renderer
+(`clojure-atlas/mcp/queries`, `/mcp/render`, `/mcp/rows`, `/mcp/graph`, `/mcp/server`, `/build/config`, `/version`) and find the
+CLI with `require.resolve('clojure-atlas/cli')`. It has no required runtime dependencies. Reading Playwright tests uses `typescript@5`, declared as an optional dependency: npm
+installs its own copy beside clojure-atlas even when the project uses TypeScript 7, `--omit=optional` leaves it out, and the build
+says so when it is missing. `dist/` is committed on release commits, so `npm install github:Bariscanates404/clojure-atlas#<sha> --ignore-scripts`
+runs no install script.
+
+`.clojure-atlas.edn` also takes `:selector-prefixes ["qa-"]`: a string literal holding a class with such a prefix links to the
+page-object selector wherever it stands (a `:qa-class` prop, a `(str ...)` argument) as a heuristic `renders` edge.
+`contextForChange` takes `{ fromDiff: true }` when the paths come from a diff rather than from a person typing them.
+
 ## Contributing
 
 **Let's build our Clojure X-ray tool together!**

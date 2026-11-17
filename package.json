@@ -1,6 +1,6 @@
 {
   "name": "clojure-atlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A structural map of any Clojure, ClojureScript or .cljc codebase, served to AI coding agents as MCP tools.",
   "license": "MIT",
   "author": "Barış Can Ateş",
@@ -16,8 +16,31 @@
   "bin": {
     "clojure-atlas": "dist/cli.js"
   },
+  "exports": {
+    "./cli": {
+      "default": "./dist/cli.js"
+    },
+    "./version": {
+      "types": "./dist/version.d.ts",
+      "default": "./dist/version.js"
+    },
+    "./build": {
+      "types": "./dist/build/index.d.ts",
+      "default": "./dist/build/index.js"
+    },
+    "./build/*": {
+      "types": "./dist/build/*.d.ts",
+      "default": "./dist/build/*.js"
+    },
+    "./mcp/*": {
+      "types": "./dist/mcp/*.d.ts",
+      "default": "./dist/mcp/*.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
-    "dist/**/*.js"
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
   ],
   "engines": {
     "node": ">=22.18.0"
@@ -36,19 +59,12 @@
     "test": "node --test \"test/*.test.ts\"",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-lines=98 \"test/*.test.ts\"",
     "coverage": "node scripts/coverage.ts",
-    "bench": "node bench/score.ts",
-    "prepare": "npm run build"
-  },
-  "peerDependencies": {
-    "typescript": ">=5.0.0 <6"
-  },
-  "peerDependenciesMeta": {
-    "typescript": {
-      "optional": true
-    }
+    "bench": "node bench/score.ts"
   },
   "devDependencies": {
-    "@types/node": "22.20.5",
+    "@types/node": "22.20.5"
+  },
+  "optionalDependencies": {
     "typescript": "5.9.2"
   }
 }

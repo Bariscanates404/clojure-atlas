@@ -1,4 +1,3 @@
 node_modules/
-dist/
 .clojure-atlas/
 *.tgz

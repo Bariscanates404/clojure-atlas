@@ -30,6 +30,13 @@ function rendered(f: Form): Selector[] {
   });
 }
 
+// In-house: classes with a test-hook prefix of the project (.clojure-atlas.edn :selector-prefixes) in a string literal, wherever
+// it stands. A name match on the literal, so the edge is heuristic; what `rendered` reads from hiccup stays proven.
+function hookClasses(f: Form, prefixes: readonly string[]): Selector[] {
+  if (f.t !== 'string' || prefixes.length === 0) return [];
+  return f.text.split(/[\s."'=]+/).filter((t) => prefixes.some((p) => t.startsWith(p) && t.length > p.length)).map((value) => ({ kind: 'class' as const, value }));
+}
+
 function pomSelectors(ctx: Context): Set<string> {
   return new Set(ctx.playwright.projects.flatMap((p) => p.pageObjects.flatMap((o) => o.members.flatMap((m) => m.selectors.map(selectorKey)))));
 }
@@ -63,13 +70,29 @@ export const selectors: Adapter = {
         }
       }
     }
+    const prefixes = ctx.config.selectorPrefixes;
     for (const d of ctx.analysis.nsDefs) {
+      const proven = new Set<string>();
+      const hooks: GraphEdge[] = [];
       for (const f of walk(ctx.forms(d.file))) {
         for (const s of rendered(f)) {
           if (!used.has(selectorKey(s))) continue;
-          edges.push({ from: owner({ file: d.file, row: f.row, col: f.col, from: d.name }), to: selectorId(s), kind: 'renders', band: 'static_proven',
-            file: d.file, line: f.row });
+          const from = owner({ file: d.file, row: f.row, col: f.col, from: d.name });
+          proven.add(`${from} ${selectorId(s)}`);
+          edges.push({ from, to: selectorId(s), kind: 'renders', band: 'static_proven', file: d.file, line: f.row });
         }
+        for (const s of hookClasses(f, prefixes)) {
+          if (!used.has(selectorKey(s))) continue;
+          hooks.push({ from: owner({ file: d.file, row: f.row, col: f.col, from: d.name }), to: selectorId(s), kind: 'renders', band: 'heuristic', file: d.file, line: f.row });
+        }
+      }
+      // one edge per owner and selector: the proven hiccup reading wins over the literal match
+      const seen = new Set<string>();
+      for (const e of hooks) {
+        const key = `${e.from} ${e.to}`;
+        if (proven.has(key) || seen.has(key)) continue;
+        seen.add(key);
+        edges.push(e);
       }
     }
     return { nodes, edges };
